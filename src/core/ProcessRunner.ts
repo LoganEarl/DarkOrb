@@ -1,5 +1,6 @@
 import { Process } from "./Process";
 import { PriorityQueue } from "utils/PriorityQueue";
+import { Log } from "utils/logger/Logger";
 
 export class ProcessRunner {
     private compare: (a: any, b: any) => number;
@@ -21,7 +22,7 @@ export class ProcessRunner {
             try {
                 process.preRunProcess();
             } catch (error) {
-                console.log("Error in prerun of PID:" + process.processId + "\n" + (error as Error).stack);
+                Log.e("Error in prerun of PID:" + process.processId, error);
             }
         });
 
@@ -32,15 +33,13 @@ export class ProcessRunner {
                 try {
                     process?.onCancel();
                 } catch (error) {
-                    console.log("Error in cancelation of PID:" + process.processId + "\n" + (error as Error).stack);
+                    Log.e("Error in cancelation of PID:" + process.processId, error);
                 }
             } else if (!shouldDelete) {
                 try {
                     process?.runProcess();
                 } catch (error) {
-                    console.log(
-                        "Error in run of PID:" + process?.processId + "\n" + error + "\n" + (error as Error).stack
-                    );
+                    Log.e("Error in run of PID:" + process?.processId, error);
                 }
                 if (process && !this.toDelete.includes(process!)) {
                     this.toRunNextTick.enqueue(process);
@@ -52,7 +51,7 @@ export class ProcessRunner {
             try {
                 process.postRunProcess();
             } catch (error) {
-                console.log("Error in postRun of PID:" + process.processId + "\n" + error);
+                Log.e("Error in postRun of PID:" + process.processId, error);
             }
         });
 
@@ -102,7 +101,7 @@ export class ProcessRunner {
             )}%`;
         });
 
-        console.log(output);
+        Log.i(output);
     }
 
     private static padString(value: string, width: number): string {

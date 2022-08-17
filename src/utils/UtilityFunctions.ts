@@ -226,3 +226,9 @@ export function rotatedMatrix<T>(matrix: T[][], clockwiseTurns: 0 | 1 | 2 | 3): 
     }
     return mat;
 }
+
+export function bodyCost(body: BodyPartConstant[]) {
+    return body.reduce(function (cost, part) {
+      return cost + BODYPART_COST[part];
+    }, 0);
+  }

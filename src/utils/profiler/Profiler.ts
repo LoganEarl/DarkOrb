@@ -1,3 +1,5 @@
+import { Log } from "utils/logger/Logger";
+
 /* tslint:disable:ban-types */
 export function init(): Profiler {
     const defaults = {
@@ -68,7 +70,6 @@ function wrapFunction(obj: object, key: PropertyKey, className?: string) {
         return;
     }
 
-    //console.log("Profiler 4")
     if (key === "constructor") {
         return;
     }
@@ -77,8 +78,6 @@ function wrapFunction(obj: object, key: PropertyKey, className?: string) {
     if (!originalFunction || typeof originalFunction !== "function") {
         return;
     }
-
-    //console.log("Profiler 5")
 
     // set a key for the object in memory
     if (!className) {
@@ -92,11 +91,7 @@ function wrapFunction(obj: object, key: PropertyKey, className?: string) {
         return;
     }
 
-    //console.log("Profiler 6")
-
     Reflect.set(obj, savedName, originalFunction);
-
-    ///////////
 
     Reflect.set(obj, key, function (this: any, ...args: any[]) {
         if (isEnabled()) {
@@ -120,22 +115,18 @@ export function profile(
     if (Game.shard.name === "sim") return;
     if (!Memory.noSeason) return;
 
-    //console.log("Profiler 1")
     if (key) {
         // case of method decorator
         wrapFunction(target, key);
         return;
     }
 
-    //console.log("Profiler 2")
     // case of class decorator
-
     const ctor = target as any;
     if (!ctor.prototype) {
         return;
     }
 
-    //console.log("Profiler 3")
     const className = ctor.name;
     Reflect.ownKeys(ctor.prototype).forEach(k => {
         wrapFunction(ctor.prototype, k, className);
@@ -147,7 +138,6 @@ function isEnabled(): boolean {
 }
 
 function record(key: string | symbol, time: number) {
-    //console.log("Detected key " + String(key))
     if (!Memory.profiler.data[String(key)]) {
         Memory.profiler.data[String(key)] = {
             calls: 0,
@@ -221,16 +211,16 @@ function outputProfilerData() {
     //// Footer line
     output += `${totalTicks} total ticks measured`;
     output += `\t\t\t${totalCpu.toFixed(2)} average CPU profiled per tick`;
-    console.log(output);
+    Log.i(output);
 }
 
 // debugging
 // function printObject(obj: object) {
 //   const name = obj.constructor ? obj.constructor.name : (obj as any).name;
-//   console.log("  Keys of :", name, ":");
+//   Log.i("  Keys of :", name, ":");
 //   Reflect.ownKeys(obj).forEach((k) => {
 //     try {
-//       console.log(`    ${k}: ${Reflect.get(obj, k)}`);
+//       Log.i(`    ${k}: ${Reflect.get(obj, k)}`);
 //     } catch (e) {
 //       // nothing
 //     }

@@ -9,7 +9,7 @@ export class Cache<T> {
         this.lookup = lookup
     }
 
-    public get() {
+    public get(): T {
         if(this.cachedResult != undefined && (this.lastLookup ?? (this.ttl * -2)) + this.ttl > Game.time) {
             return this.cachedResult
         }

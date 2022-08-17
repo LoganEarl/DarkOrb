@@ -3,6 +3,7 @@
  * Example: var Traveler = require('Traveler.js');
  */
 
+import { Log } from "utils/logger/Logger";
 import { drawCircledItem } from "utils/UtilityFunctions";
 import { isMainThread } from "worker_threads";
 
@@ -42,7 +43,7 @@ export class Traveler {
 
     public static travelTo(creep: Creep, destination: HasPos | RoomPosition, options: TravelToOptions = {}): number {
         if (!destination) {
-            console.log("Creep " + creep.name + " tried to move to an invalid destination");
+            Log.e("Creep " + creep.name + " tried to move to an invalid destination");
             return OK;
         }
 
@@ -151,14 +152,14 @@ export class Traveler {
             state.cpu = _.round(cpuUsed + state.cpu);
             if (state.cpu > REPORT_CPU_THRESHOLD) {
                 // see note at end of file for more info on this
-                //console.log(`TRAVELER: heavy cpu use: ${creep.name}, cpu: ${state.cpu} origin: ${
+                //Log.e`TRAVELER: heavy cpu use: ${creep.name}, cpu: ${state.cpu} origin: ${
                 //    creep.pos}, dest: ${destination}`);
             }
 
             let color = "orange";
             if (ret.incomplete) {
                 // uncommenting this is a great way to diagnose creep behavior issues
-                // console.log(`TRAVELER: incomplete path for ${creep.name}`);
+                // Log.e(`TRAVELER: incomplete path for ${creep.name}`);
                 color = "red";
             }
 
@@ -442,11 +443,11 @@ export class Traveler {
                 // can happen for situations where the creep would have to take an uncommonly indirect path
                 // options.allowedRooms and options.routeCallback can also be used to handle this situation
                 if (roomDistance <= 2) {
-                    console.log(`TRAVELER: path failed without findroute, trying with options.useFindRoute = true`);
-                    console.log(`from: ${origin}, destination: ${destination}`);
+                    Log.w(`TRAVELER: path failed without findroute, trying with options.useFindRoute = true`);
+                    Log.w(`from: ${origin}, destination: ${destination}`);
                     options.useFindRoute = true;
                     ret = this.findTravelPath(origin, destination, options);
-                    console.log(`TRAVELER: second attempt was ${ret.incomplete ? "not " : ""}successful`);
+                    Log.w(`TRAVELER: second attempt was ${ret.incomplete ? "not " : ""}successful`);
                     return ret;
                 }
 
@@ -538,7 +539,7 @@ export class Traveler {
         });
 
         if (!_.isArray(ret)) {
-            console.log(`couldn't findRoute to ${destination}`);
+            Log.w(`couldn't findRoute to ${destination}`);
             return;
         }
         for (let value of ret) {

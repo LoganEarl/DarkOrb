@@ -4,7 +4,7 @@
 import { MemoryComponent, memoryWriter } from "system/memory/MemoryWriter";
 import { Log } from "utils/logger/Logger";
 import { FIRST_NAMES } from "./creepNames/FirstNames";
-import { LAST_NAMES } from "./LastNames";
+import { LAST_NAMES } from "./creepNames/LastNames";
 
 class CreepManifest implements MemoryComponent {
     private memory?: ManifestMemory;

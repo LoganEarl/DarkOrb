@@ -1,20 +1,17 @@
-export function hasRespawned() {
-    // check for multiple calls on same tick
-    if (Memory.respawnTick && Memory.respawnTick === Game.time) return true;
+import { Log } from "./logger/Logger";
+import { findStructure } from "./StructureFindCache";
 
+export function hasRespawned() {
     // server reset or sim
     if (Game.time === 0) {
         Memory.respawnTick = Game.time;
         return true;
     }
-
     // check for 0 creeps
     if (Object.keys(Game.creeps).length) return false;
-
     // check for only 1 room
     var rNames = Object.keys(Game.rooms);
     if (rNames.length !== 1) return false;
-
     // check for controller, progress and safe mode
     var room = Game.rooms[rNames[0]];
     if (
@@ -23,16 +20,42 @@ export function hasRespawned() {
         room.controller.level !== 1 ||
         room.controller.progress ||
         !room.controller.safeMode ||
-        room.controller.safeMode !== SAFE_MODE_DURATION - 1
+        room.controller.safeMode <= SAFE_MODE_DURATION - 1
     )
         return false;
-
     // check for 1 spawn
     if (Object.keys(Game.spawns).length !== 1) return false;
-
     // if all cases point to a respawn, you've respawned
     Memory.respawnTick = Game.time;
     return true;
+}
+
+export function getFreeSpacesNextTo(pos: RoomPosition, room?: Room): RoomPosition[] {
+    const terrain = Game.map.getRoomTerrain(pos.roomName);
+
+    let obsticles = room ? findStructure(room, FIND_STRUCTURES).filter(s => !s.isWalkable && s.pos.isNearTo(pos)) : [];
+
+    let freeSpots: RoomPosition[] = [];
+    for (let x = -1; x <= 1; x++) {
+        for (let y = -1; y <= 1; y++) {
+            if (x !== 0 || y !== 0) {
+                let structureBlocks =
+                    obsticles.length && _.any(obsticles, s => s.pos.x === pos.x + x && s.pos.y === pos.y + y);
+
+                if (!structureBlocks && terrain.get(pos.x + x, pos.y + y) !== TERRAIN_MASK_WALL) {
+                    freeSpots.push(new RoomPosition(pos.x + x, pos.y + y, pos.roomName));
+                }
+            }
+        }
+    }
+
+    freeSpots.sort((a, b) => {
+        let result = a.x - b.x;
+        if (result !== 0) return result;
+        result = a.y - b.y;
+        return result;
+    });
+    return freeSpots;
 }
 
 export function componentToHex(c: number): string {
@@ -119,6 +142,29 @@ export function getMultirooomDistance(start: RoomPosition, end: RoomPosition): n
         const dy = Math.abs(50 * (to.y - from.y) + to.y - from.y);
         return _.max([dx, dy]);
     }
+}
+
+export function manhattanDistance(x1: number, y1: number, x2: number, y2: number): number {
+    return _.max([Math.abs(x1 - x2), Math.abs(y1 - y2)]);
+}
+
+export function roomPos(coord: Coord, roomName: string) {
+    return new RoomPosition(coord.x, coord.y, roomName);
+}
+
+export function roomNameFromCoord(roomCoord: Coord) {
+    let x = roomCoord.x;
+    let y = roomCoord.y;
+
+    let c1 = x;
+    let c2 = y;
+    if (x < 0) c1 = -1 * (c1 + 1);
+    if (y < 0) c2 = -1 * (c2 + 1);
+
+    let ns = y < 0 ? "N" : "S";
+    let ew = x < 0 ? "W" : "E";
+
+    return ns + c2 + ew + c1;
 }
 
 export function initRoomPosition(pos: { x: number; y: number; roomName: string }): RoomPosition {
@@ -229,6 +275,6 @@ export function rotatedMatrix<T>(matrix: T[][], clockwiseTurns: 0 | 1 | 2 | 3): 
 
 export function bodyCost(body: BodyPartConstant[]) {
     return body.reduce(function (cost, part) {
-      return cost + BODYPART_COST[part];
+        return cost + BODYPART_COST[part];
     }, 0);
-  }
+}

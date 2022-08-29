@@ -76,6 +76,7 @@ interface RoomPosition {
     isEdge: boolean;
     isVisible: boolean;
     rangeToEdge: number;
+    localCoords: Coord;
     roomCoords: Coord;
     neighbors: RoomPosition[];
 

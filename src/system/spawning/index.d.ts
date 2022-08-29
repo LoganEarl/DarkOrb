@@ -1,8 +1,8 @@
 interface ManifestMemory {
-    previousNameIndex: number
-    creepNamesByHandle: {[handle: string]: string[]}
+    previousNameIndex: number;
+    creepNamesByHandle: { [handle: string]: string[] };
 }
 
 interface Memory {
-    manifestMemory?: ManifestMemory
+    manifestMemory?: ManifestMemory;
 }

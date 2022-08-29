@@ -1,3 +1,4 @@
+import { unpackCoord } from "utils/Packrat";
 import { minBy } from "utils/UtilityFunctions";
 
 Object.defineProperty(RoomPosition.prototype, "print", {
@@ -50,6 +51,13 @@ Object.defineProperty(RoomPosition.prototype, "coordName", {
     configurable: true
 });
 
+Object.defineProperty(RoomPosition.prototype, "localCoords", {
+    get: function () {
+        return { x: this.x, y: this.y };
+    },
+    configurable: true
+});
+
 RoomPosition.prototype.lookForStructure = function (structureType: StructureConstant): Structure | undefined {
     return _.find(this.lookFor(LOOK_STRUCTURES), s => s.structureType === structureType);
 };
@@ -87,8 +95,8 @@ Object.defineProperty(RoomPosition.prototype, "roomCoords", {
         const parsed = /^[WE]([0-9]+)[NS]([0-9]+)$/.exec(this.roomName);
         let x = parseInt(parsed![1], 10);
         let y = parseInt(parsed![2], 10);
-        if (this.roomName.includes("W")) x = -x;
-        if (this.roomName.includes("N")) y = -y;
+        if (this.roomName.includes("W")) x = -x - 1;
+        if (this.roomName.includes("N")) y = -y - 1;
         return { x: x, y: y } as Coord;
     },
     configurable: true

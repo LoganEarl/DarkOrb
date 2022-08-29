@@ -7,21 +7,36 @@ import "./model/Structures";
 import "./model/Creep";
 import { hasRespawned } from "utils/UtilityFunctions";
 import { setFeature, toggleFeature } from "utils/featureToggles/FeatureToggles";
-import { memoryWriter } from "system/memory/MemoryWriter";
+import { memoryWriter } from "utils/MemoryWriter";
 import { shardSpawnSystem } from "system/spawning/ShardSpawnSystem";
 import { Log } from "utils/logger/Logger";
 import { creepManifest } from "system/spawning/CreepManifest";
 import { SpawnProcess } from "system/spawning/SpawnProcess";
+import { ScoutProcess } from "system/scouting/ScoutProcess";
+import { resetAllSystems } from "utils/SystemResetter";
 
 let deferedInit = false;
-let waitingForRespawn = false;
 let globalRefresh = true;
 
 Log.i(`Global refresh detected, recreating process table`);
 
+function resetForRespawn() {
+    //Clear out memory from old spawn
+    Log.w("Fresh spawn detected, clearing all memory");
+    let memoryKeys = Object.keys(Memory);
+    memoryKeys.forEach(key => {
+        Log.w("Deleting memory key: " + key);
+        (Memory as any)[key] = undefined;
+    });
+
+    //Reset systems
+    resetAllSystems();
+}
+
 function init() {
     global.PLAYER_USERNAME = Game.spawns[Object.keys(Game.spawns)[0]].owner.username;
     global.INVADER_USERNAME = "Invader";
+    global.KEEPER_USERNAME = "Source Keeper";
 
     if (!Memory.rooms) Memory.rooms = {};
 
@@ -35,6 +50,7 @@ function init() {
 
     global.runner = new ProcessRunner();
     global.runner.addProcess(new SpawnProcess());
+    global.runner.addProcess(new ScoutProcess());
 
     //===================================================================Initialize Global Functions
     global.processes = () => {
@@ -51,15 +67,16 @@ export const loop = () => {
     try {
         let detectedRespawn = hasRespawned();
         //If we have respawned make sure to reinit all our processes
-        if ((globalRefresh || (!detectedRespawn && waitingForRespawn)) && !deferedInit) {
+        if ((globalRefresh || detectedRespawn) && !deferedInit) {
+            if (detectedRespawn) {
+                resetForRespawn();
+            }
+
             globalRefresh = false;
             if (!Game.cpu.bucket || Game.cpu.bucket > 500) {
-                waitingForRespawn = false;
                 init();
             } else deferedInit = true;
         }
-
-        waitingForRespawn = detectedRespawn;
 
         //If we are waiting to have enough bucket to start up
         if (deferedInit) {

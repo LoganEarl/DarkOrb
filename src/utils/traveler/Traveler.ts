@@ -29,7 +29,7 @@ interface Reservation {
 export class Traveler {
     private static structureMatrixCache: { [roomName: string]: CostMatrix } = {};
     private static creepMatrixCache: { [roomName: string]: CostMatrix } = {};
-    private static roomTypeCache: { [roomName: string]: number } = {};
+    private static roomTypeCache: { [roomName: string]: RoomType } = {};
     private static creepMatrixTick: number;
     private static structureMatrixTick: number;
 
@@ -865,12 +865,12 @@ export class Traveler {
         };
     }
 
-    public static roomType(roomName: string): number | undefined {
+    public static roomType(roomName: string): RoomType {
         if (!this.roomTypeCache[roomName]) {
-            let type: number;
+            let type: RoomType;
             let coords = this.getRoomCoordinates(roomName);
             if (coords === undefined) {
-                return undefined;
+                throw new Error("Tried to parse an invalid room name:" + roomName);
             }
             if (coords.x % 10 === 0 || coords.y % 10 === 0) {
                 type = ROOMTYPE_HIGHWAY;
@@ -903,6 +903,8 @@ export const ROOMTYPE_CONTROLLER = 0;
 export const ROOMTYPE_SOURCEKEEPER = 1;
 export const ROOMTYPE_CORE = 2;
 export const ROOMTYPE_HIGHWAY = 3;
+
+export type RoomType = 0 | 1 | 2 | 3;
 
 // assigns a function to Creep.prototype: creep.travelTo(destination)
 // Creep.prototype.travelTo = function(destination: RoomPosition|{pos: RoomPosition}, options?: TravelToOptions) {

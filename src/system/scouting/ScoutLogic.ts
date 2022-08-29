@@ -22,12 +22,57 @@ import {
     RoomPathingInfo
 } from "./ScoutInterface";
 
-function evaluateSource(source: Source): SourceInfo {
-    return {
-        packedId: packId(source.id),
-        packedPosition: packCoord(source.pos.localCoords),
-        packedFreeSpots: packCoordList(getFreeSpacesNextTo(source.pos, source.room).map(p => p.localCoords))
-    };
+function evaluateSources(sources: [Source, ...Source[]]): [SourceInfo, ...SourceInfo[]] {
+    if (sources.length == 1) {
+        return [
+            {
+                packedId: packId(sources[0].id),
+                packedPosition: packCoord(sources[0].pos.localCoords),
+                packedFreeSpots: packCoordList(
+                    getFreeSpacesNextTo(sources[0].pos, sources[0].room).map(p => p.localCoords)
+                )
+            }
+        ];
+    }
+
+    //Yes I know this is dirty. It is late and I want it to work. also, this like never has to run
+    sources.sort((a, b) => getFreeSpacesNextTo(a.pos, a.room).length - getFreeSpacesNextTo(b.pos, b.room).length);
+
+    let freeSpacesBySource: RoomPosition[][] = [];
+    for (let i = 0; i < sources.length; i++) {
+        freeSpacesBySource[i] = getFreeSpacesNextTo(sources[i].pos, sources[i].room);
+    }
+
+    let sourceInfos: [SourceInfo, ...SourceInfo[]] = sources.map(s => {
+        return {
+            packedId: packId(s.id),
+            packedPosition: packCoord(sources[0].pos.localCoords),
+            packedFreeSpots: ""
+        };
+    }) as [SourceInfo, ...SourceInfo[]];
+
+    Log.d("Free spaces by source:" + JSON.stringify(freeSpacesBySource));
+
+    //Add free spaces one at a time to each source. This solves for cases where they have overlaping spots
+    let packedUsedSpots: string[] = [];
+    let maxFreeSpaces = _.max(freeSpacesBySource, spaces => spaces.length)?.length ?? 0;
+    for (let spaceIndex = 0; spaceIndex < maxFreeSpaces; spaceIndex++) {
+        Log.d(`looping for free space index ${spaceIndex} of ${maxFreeSpaces}`);
+        for (let sourceIndex = 0; sourceIndex < freeSpacesBySource.length; sourceIndex++) {
+            let freeSpaces = freeSpacesBySource[sourceIndex];
+            Log.d(`Checking source ${sourceIndex}. Found free ${freeSpaces.length} spaces around it`);
+            if (spaceIndex < freeSpaces.length) {
+                let packedSpace = packCoord(freeSpaces[spaceIndex].localCoords);
+                if (!packedUsedSpots.includes(packedSpace)) {
+                    packedUsedSpots.push(packedSpace);
+                    sourceInfos[sourceIndex].packedFreeSpots += packedSpace;
+                    Log.d(`Space was not used. Adding ${packedSpace} to source ${sourceIndex}`);
+                }
+            }
+        }
+    }
+
+    return sourceInfos;
 }
 
 function evaluateMineral(mineral: Mineral): MineralInfo {
@@ -47,7 +92,7 @@ function evaluateMining(room: Room): RoomMiningInfo | undefined {
 
     return {
         //Safe to cast here. We already checked the length
-        sources: sources.map(s => evaluateSource(s)) as [SourceInfo, ...SourceInfo[]],
+        sources: evaluateSources(sources as [Source, ...Source[]]),
         mineral: evaluateMineral(mineral[0])
     };
 }

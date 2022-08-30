@@ -40,22 +40,22 @@ function evaluateSources(sources: [Source, ...Source[]]): [SourceInfo, ...Source
         };
     }) as [SourceInfo, ...SourceInfo[]];
 
-    Log.d("Free spaces by source:" + JSON.stringify(freeSpacesBySource));
+    // Log.d("Free spaces by source:" + JSON.stringify(freeSpacesBySource));
 
     //Add free spaces one at a time to each source. This solves for cases where they have overlaping spots
     let packedUsedSpots: string[] = [];
     let maxFreeSpaces = _.max(freeSpacesBySource, spaces => spaces.length)?.length ?? 0;
     for (let spaceIndex = 0; spaceIndex < maxFreeSpaces; spaceIndex++) {
-        Log.d(`looping for free space index ${spaceIndex} of ${maxFreeSpaces}`);
+        // Log.d(`looping for free space index ${spaceIndex} of ${maxFreeSpaces}`);
         for (let sourceIndex = 0; sourceIndex < freeSpacesBySource.length; sourceIndex++) {
             let freeSpaces = freeSpacesBySource[sourceIndex];
-            Log.d(`Checking source ${sourceIndex}. Found free ${freeSpaces.length} spaces around it`);
+            // Log.d(`Checking source ${sourceIndex}. Found free ${freeSpaces.length} spaces around it`);
             if (spaceIndex < freeSpaces.length) {
                 let packedSpace = packPos(freeSpaces[spaceIndex]);
                 if (!packedUsedSpots.includes(packedSpace)) {
                     packedUsedSpots.push(packedSpace);
                     sourceInfos[sourceIndex].packedFreeSpots += packedSpace;
-                    Log.d(`Space was not used. Adding ${packedSpace} to source ${sourceIndex}`);
+                    // Log.d(`Space was not used. Adding ${packedSpace} to source ${sourceIndex}`);
                 }
             }
         }
@@ -124,7 +124,7 @@ function evaluateThreats(room: Room, isMyOwnedRoom: boolean): RoomThreatInfo | u
     });
     let threatsByPlayer: { [playerName: string]: ThreatInfo } = {};
     Object.keys(allDangerous).forEach(
-        player => (threatsByPlayer[player] = sumThreat(dangerousByPlayer[player], hostileTowers, player))
+        player => (threatsByPlayer[player] = sumThreat(dangerousByPlayer[player] ?? [], hostileTowers, player))
     );
 
     return {
@@ -211,10 +211,14 @@ function findRallyPoint(room: Room): RoomPosition | undefined {
 
 function findPathableExits(rallyPos: RoomPosition, exitsToRoomNames: string[]): string[] {
     return exitsToRoomNames.filter(name => {
+        let allowedRooms: { [roomName: string]: boolean } = {};
+        allowedRooms[rallyPos.roomName] = true;
+        allowedRooms[name] = true;
         let path = Traveler.findTravelPath(rallyPos, new RoomPosition(25, 25, name), {
-            range: 23,
-            maxRooms: 2,
-            ignoreStructures: false
+            range: 21,
+            route: allowedRooms,
+            ignoreStructures: false,
+            offRoad: true
         });
         return path && !path.incomplete;
     });
@@ -300,7 +304,7 @@ export function getRoomsToExplore(
         if (eligibleExits.length) {
             //If there are rooms to explore, only add them to the list if they are among the closest to the cluster center
             if (scoutingInfo.roomSearchDepth < minDepth) {
-                roomsToExplore = [...eligibleExits];
+                roomsToExplore = eligibleExits.slice();
                 minDepth = scoutingInfo.roomSearchDepth;
             } else if (scoutingInfo.roomSearchDepth === minDepth) {
                 roomsToExplore.push(...eligibleExits);
@@ -347,7 +351,7 @@ export function runScout(scout: Creep, roomToExplore: string, shardMap: ShardMap
     //Head to the targeted controller
     else if (positionLock) {
         scout.queueSay("🖊️🎯");
-        Traveler.travelTo(scout, positionLock[0]);
+        Traveler.travelTo(scout, positionLock[0], { offRoad: true });
     }
     //If we are in the room we need to explore
     else if (scout.pos.roomName === roomToExplore && !shardMap[roomToExplore]) {
@@ -359,7 +363,7 @@ export function runScout(scout: Creep, roomToExplore: string, shardMap: ShardMap
     }
     //We aren't in the room yet. Go to it
     else if (scout.pos.roomName !== roomToExplore && !shardMap[roomToExplore]) {
-        Traveler.travelTo(scout, new RoomPosition(25, 25, roomToExplore), { range: 23 });
+        Traveler.travelTo(scout, new RoomPosition(25, 25, roomToExplore), { range: 21, offRoad: true });
         scout.queueSay("👁️");
     }
     //It was scouted before we could get there. Done!

@@ -10,16 +10,12 @@ import { registerResetFunction } from "utils/SystemResetter";
 class CreepManifest implements MemoryComponent {
     private memory?: ManifestMemory;
 
-    initialize() {
-        this.loadMemory();
-    }
-
     saveMemory(): void {
         if (this.memory) Memory.manifestMemory = this.memory;
     }
 
     //Get all living creeps under the handle
-    public getCreeps(handle: string): Creep[] {
+    _getCreeps(handle: string): Creep[] {
         this.loadMemory();
 
         //Detect any that died during the query phase
@@ -40,8 +36,7 @@ class CreepManifest implements MemoryComponent {
     }
 
     //Linear congruential gnerator to traverse name space. Hits each name once before looping (in theory)
-    //TODO broken: last names are missing sometimes
-    public nextName(creepHandle: string, jobName: string): string {
+    _nextName(creepHandle: string, jobName: string): string {
         this.loadMemory();
         this.memory = this.memory!;
 
@@ -81,8 +76,8 @@ class CreepManifest implements MemoryComponent {
     }
 }
 
-export let creepManifest: CreepManifest = new CreepManifest();
-registerResetFunction(() => (creepManifest = new CreepManifest()));
+export let _creepManifest: CreepManifest = new CreepManifest();
+registerResetFunction(() => (_creepManifest = new CreepManifest()));
 
 /*
 For when I invariably forget why this works and check this comment. 

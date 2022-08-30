@@ -2,7 +2,7 @@ import { Cluster } from "cluster";
 import { distanceTransformDiag } from "utils/algorithms/DistanceTransform";
 import { floodFill } from "utils/algorithms/FloodFill";
 import { Log } from "utils/logger/Logger";
-import { packId, packCoord, packCoordList, unpackCoord } from "utils/Packrat";
+import { packId, packCoord, packCoordList, unpackCoord, packPos } from "utils/Packrat";
 import { ROOMTYPE_CONTROLLER, Traveler } from "utils/traveler/Traveler";
 import {
     getFreeSpacesNextTo,
@@ -10,17 +10,6 @@ import {
     manhattanDistance,
     roomNameFromCoord
 } from "utils/UtilityFunctions";
-import { ShardMap } from ".";
-import {
-    SourceInfo,
-    MineralInfo,
-    RoomMiningInfo,
-    RoomOwnershipInfo,
-    RoomScoutingInfo,
-    RoomThreatInfo,
-    ThreatInfo,
-    RoomPathingInfo
-} from "./ScoutInterface";
 
 function evaluateSources(sources: [Source, ...Source[]]): [SourceInfo, ...SourceInfo[]] {
     if (sources.length == 1) {
@@ -46,7 +35,7 @@ function evaluateSources(sources: [Source, ...Source[]]): [SourceInfo, ...Source
     let sourceInfos: [SourceInfo, ...SourceInfo[]] = sources.map(s => {
         return {
             packedId: packId(s.id),
-            packedPosition: packCoord(sources[0].pos.localCoords),
+            packedPosition: packPos(sources[0].pos),
             packedFreeSpots: ""
         };
     }) as [SourceInfo, ...SourceInfo[]];
@@ -62,7 +51,7 @@ function evaluateSources(sources: [Source, ...Source[]]): [SourceInfo, ...Source
             let freeSpaces = freeSpacesBySource[sourceIndex];
             Log.d(`Checking source ${sourceIndex}. Found free ${freeSpaces.length} spaces around it`);
             if (spaceIndex < freeSpaces.length) {
-                let packedSpace = packCoord(freeSpaces[spaceIndex].localCoords);
+                let packedSpace = packPos(freeSpaces[spaceIndex]);
                 if (!packedUsedSpots.includes(packedSpace)) {
                     packedUsedSpots.push(packedSpace);
                     sourceInfos[sourceIndex].packedFreeSpots += packedSpace;

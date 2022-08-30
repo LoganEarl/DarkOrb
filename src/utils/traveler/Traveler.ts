@@ -904,8 +904,6 @@ export const ROOMTYPE_SOURCEKEEPER = 1;
 export const ROOMTYPE_CORE = 2;
 export const ROOMTYPE_HIGHWAY = 3;
 
-export type RoomType = 0 | 1 | 2 | 3;
-
 // assigns a function to Creep.prototype: creep.travelTo(destination)
 // Creep.prototype.travelTo = function(destination: RoomPosition|{pos: RoomPosition}, options?: TravelToOptions) {
 //     return Traveler.travelTo(this, destination, options);

@@ -9,22 +9,22 @@ export class ScoutProcess extends Process {
 
     clusterRecreator: ScheduledJob = new ScheduledJob(
         () => {
-            shardScoutSystem.createSuperclusters();
-            shardScoutSystem.subdivideSupercluster();
-            shardScoutSystem.registerCreepConfigs();
+            shardScoutSystem._createSuperclusters();
+            shardScoutSystem._subdivideSupercluster();
+            shardScoutSystem._registerCreepConfigs();
         },
         this,
         500
     );
-    clusterSubdivider: ScheduledJob = new ScheduledJob(shardScoutSystem.subdivideSupercluster, shardScoutSystem, 100);
-    creepConfigUpdater: ScheduledJob = new ScheduledJob(shardScoutSystem.registerCreepConfigs, shardScoutSystem, 100);
-    jobChecker: ScheduledJob = new ScheduledJob(shardScoutSystem.clearDeadCreepAssignments, shardScoutSystem, 10);
+    clusterSubdivider: ScheduledJob = new ScheduledJob(shardScoutSystem._subdivideSupercluster, shardScoutSystem, 100);
+    creepConfigUpdater: ScheduledJob = new ScheduledJob(shardScoutSystem._registerCreepConfigs, shardScoutSystem, 100);
+    jobChecker: ScheduledJob = new ScheduledJob(shardScoutSystem._clearDeadCreepAssignments, shardScoutSystem, 10);
 
     constructor() {
         super("ScoutProcess", 1);
-        shardScoutSystem.createSuperclusters();
-        shardScoutSystem.subdivideSupercluster();
-        shardScoutSystem.registerCreepConfigs();
+        shardScoutSystem._createSuperclusters();
+        shardScoutSystem._subdivideSupercluster();
+        shardScoutSystem._registerCreepConfigs();
     }
 
     run(): void {
@@ -32,6 +32,6 @@ export class ScoutProcess extends Process {
         this.clusterRecreator.run();
         this.clusterSubdivider.run();
         this.creepConfigUpdater.run();
-        shardScoutSystem.runCreeps();
+        shardScoutSystem._runCreeps();
     }
 }

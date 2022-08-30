@@ -27,7 +27,7 @@ export function init(): Profiler {
         },
 
         start() {
-            Memory.profiler.start = Game.time;
+            Memory.profiler!.start = Game.time;
             return "Profiler started";
         },
 
@@ -42,9 +42,9 @@ export function init(): Profiler {
             if (!isEnabled()) {
                 return;
             }
-            const timeRunning = Game.time - Memory.profiler.start!;
-            Memory.profiler.total += timeRunning;
-            delete Memory.profiler.start;
+            const timeRunning = Game.time - Memory.profiler!.start!;
+            Memory.profiler!.total += timeRunning;
+            delete Memory.profiler!.start;
             return "Profiler stopped";
         },
 
@@ -134,18 +134,18 @@ export function profile(
 }
 
 function isEnabled(): boolean {
-    return Memory.profiler.start !== undefined;
+    return Memory.profiler!.start !== undefined;
 }
 
 function record(key: string | symbol, time: number) {
-    if (!Memory.profiler.data[String(key)]) {
-        Memory.profiler.data[String(key)] = {
+    if (!Memory.profiler!.data[String(key)]) {
+        Memory.profiler!.data[String(key)] = {
             calls: 0,
             time: 0
         };
     }
-    Memory.profiler.data[String(key)].calls++;
-    Memory.profiler.data[String(key)].time += time;
+    Memory.profiler!.data[String(key)].calls++;
+    Memory.profiler!.data[String(key)].time += time;
 }
 
 interface OutputData {
@@ -157,9 +157,9 @@ interface OutputData {
 }
 
 function outputProfilerData() {
-    let totalTicks = Memory.profiler.total;
-    if (Memory.profiler.start) {
-        totalTicks += Game.time - Memory.profiler.start;
+    let totalTicks = Memory.profiler!.total;
+    if (Memory.profiler!.start) {
+        totalTicks += Game.time - Memory.profiler!.start;
     }
 
     ///////
@@ -168,9 +168,9 @@ function outputProfilerData() {
     let calls: number;
     let time: number;
     let result: Partial<OutputData>;
-    const data = Reflect.ownKeys(Memory.profiler.data).map(key => {
-        calls = Memory.profiler.data[String(key)].calls;
-        time = Memory.profiler.data[String(key)].time;
+    const data = Reflect.ownKeys(Memory.profiler!.data).map(key => {
+        calls = Memory.profiler!.data[String(key)].calls;
+        time = Memory.profiler!.data[String(key)].time;
         result = {};
         result.name = `${String(key)}`;
         result.calls = calls;

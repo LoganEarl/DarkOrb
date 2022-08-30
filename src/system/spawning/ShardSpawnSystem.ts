@@ -3,13 +3,12 @@
 import { Log } from "utils/logger/Logger";
 import { registerResetFunction } from "utils/SystemResetter";
 import { RoomSpawnSystem } from "./RoomSpawnSystem";
-import { CreepConfig } from "./SpawnInterface";
 
 class ShardSpawnSystem {
-    public roomSpawnSystems: { [roomName: string]: RoomSpawnSystem } = {};
+    private roomSpawnSystems: { [roomName: string]: RoomSpawnSystem } = {};
 
     //Initialize the spawning systems
-    public scanSpawnSystems() {
+    _scanSpawnSystems() {
         //Check for registered rooms that are dead
         for (let system of Object.values(this.roomSpawnSystems)) {
             if (!Game.rooms[system.roomName] || !Game.rooms[system.roomName].controller?.my) {
@@ -28,21 +27,20 @@ class ShardSpawnSystem {
         }
     }
 
-    public spawnCreeps() {
-        Object.values(this.roomSpawnSystems).forEach(s => s.spawnCreeps());
+    _spawnCreeps() {
+        Object.values(this.roomSpawnSystems).forEach(s => s._spawnCreeps());
     }
 
-    public registerGlobalCreepConfig(config: CreepConfig) {
+    _registerCreepConfig(config: CreepConfig, roomName?: string) {
         //TODO we need a way of doing this properly. Maybe a queue system where we add additional creeps to rooms?
-        Object.values(this.roomSpawnSystems)[0].registerCreepConfig(config);
+        Object.values(this.roomSpawnSystems)[0]._registerCreepConfig(config);
     }
 
-    public unregisterGlobalHandle(handle: string) {
+    _unregisterHandle(handle: string, roomName?: string) {
         //TODO we need a way of doing this properly
-        Object.values(this.roomSpawnSystems)[0].unregisterHandle(handle);
+        Object.values(this.roomSpawnSystems)[0]._unregisterHandle(handle);
     }
 }
 
-export let shardSpawnSystem: ShardSpawnSystem = new ShardSpawnSystem();
-
-registerResetFunction(() => (shardSpawnSystem = new ShardSpawnSystem()));
+export let _shardSpawnSystem: ShardSpawnSystem = new ShardSpawnSystem();
+registerResetFunction(() => (_shardSpawnSystem = new ShardSpawnSystem()));

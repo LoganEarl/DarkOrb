@@ -1,19 +1,17 @@
-import { ErrorMapper } from "utils/ErrorMapper";
 import { ProcessRunner } from "core/ProcessRunner";
 import * as Profiler from "utils/profiler/Profiler";
-import { sayAll } from "model/Creep";
-import "./model/RoomPosition";
-import "./model/Structures";
-import "./model/Creep";
+import { sayAll } from "prototypes/Creep";
+import "./prototypes/RoomPosition";
+import "./prototypes/Structures";
+import "./prototypes/Creep";
 import { hasRespawned } from "utils/UtilityFunctions";
 import { setFeature, toggleFeature } from "utils/featureToggles/FeatureToggles";
 import { memoryWriter } from "utils/MemoryWriter";
-import { shardSpawnSystem } from "system/spawning/ShardSpawnSystem";
 import { Log } from "utils/logger/Logger";
-import { creepManifest } from "system/spawning/CreepManifest";
 import { SpawnProcess } from "system/spawning/SpawnProcess";
 import { ScoutProcess } from "system/scouting/ScoutProcess";
 import { resetAllSystems } from "utils/SystemResetter";
+import { StorageProcess } from "system/storage/StorageProcess";
 
 let deferedInit = false;
 let globalRefresh = true;
@@ -40,17 +38,13 @@ function init() {
 
     if (!Memory.rooms) Memory.rooms = {};
 
-    //===================================================================Initialize Systems
-    Log.i("Recreating systems");
-    creepManifest.initialize();
-    shardSpawnSystem.scanSpawnSystems();
-
     //===================================================================Initialize Processes
     Log.i("Recreating process table");
 
     global.runner = new ProcessRunner();
     global.runner.addProcess(new SpawnProcess());
     global.runner.addProcess(new ScoutProcess());
+    global.runner.addProcess(new StorageProcess());
 
     //===================================================================Initialize Global Functions
     global.processes = () => {

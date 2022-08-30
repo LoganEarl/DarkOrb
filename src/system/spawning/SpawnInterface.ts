@@ -1,27 +1,18 @@
-export interface CreepConfig {
-    body: BodyPartConstant[]
-    handle: string                      //Id used to look up the creeps
-    jobName: string                     //The name of the creep's job. Used in prioritization and is added to name
-    quantity: number                    //How many of this creep to maintain. Note, this does not garuntee only one creep will be alive at a time
-                                        //To do that, disable all prespawning as well
+import { _creepManifest } from "./CreepManifest";
+import { _shardSpawnSystem } from "./ShardSpawnSystem";
 
-    dontPrespawnParts?: boolean         //Prevents prespawning the creep based on body size
-    additionalPrespawntime?: number     //If present, adds additional prespawn time. Independent from body-based prespawn times
-    spawnPosition?: SpawnPosition       //Instruction to use a specific spawn with a specific spawn direction
-    desiredRoomPosition?: RoomPosition  //If present will be used to select a spawn when multiple are possible
-
-    memory?: CreepMemory                //Memory to give the new creep
-    boosts?: BoostDefinition[]          //What boosts to give the creep
+export function registerCreepConfig(config: CreepConfig, roomName?: string) {
+    _shardSpawnSystem._registerCreepConfig(config, roomName);
 }
 
-export interface SpawnPosition {
-    spawnId: Id<StructureSpawn>
-    directions: DirectionConstant[]
+export function unregisterHandle(handle: string, roomName?: string) {
+    _shardSpawnSystem._unregisterHandle(handle, roomName);
 }
 
-export interface BoostDefinition {
-    bodyPart: BodyPartConstant
-    boostType: ResourceConstant
-    numNeeded: number
-    optional?: boolean
+export function getCreeps(handle: string): Creep[] {
+    return _creepManifest._getCreeps(handle);
+}
+
+export function nextName(handle: string, jobName: string): string {
+    return _creepManifest._nextName(handle, jobName);
 }

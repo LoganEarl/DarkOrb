@@ -1,39 +1,38 @@
 //Keeps track of the spawns in a room.
 //Holds queued creep configs
 
-import { JOB_NAME_SCOUT } from "system/scouting/ScoutInterface";
 import { Log } from "utils/logger/Logger";
 import { findStructure } from "utils/StructureFindCache";
 import { bodyCost } from "utils/UtilityFunctions";
-import { creepManifest } from "./CreepManifest";
-import { CreepConfig } from "./SpawnInterface";
+import { _creepManifest } from "./CreepManifest";
 
-const DEFAULT_PRIORITIES = [
-    "Sludger", //Miner
-    "Drudge", //Hauler
-    JOB_NAME_SCOUT //Scout
-];
-
-const DEFAULT_PRIORITY_COMPARITOR = (a: CreepConfig, b: CreepConfig) =>
-    (DEFAULT_PRIORITIES.indexOf(a.jobName) ?? 9999999) - (DEFAULT_PRIORITIES.indexOf(b.jobName) ?? 9999999);
 export class RoomSpawnSystem {
     public roomName: string;
 
     private creepConfigs: { [handle: string]: CreepConfig } = {};
 
+    private defaultPriorities = [
+        "Sludger", //Miner
+        "Drudge", //Hauler
+        "Aspect" //Scout
+    ];
+
+    private priorityComparator = (a: CreepConfig, b: CreepConfig) =>
+        (this.defaultPriorities.indexOf(a.jobName) ?? 9999999) - (this.defaultPriorities.indexOf(b.jobName) ?? 9999999);
+
     constructor(room: Room) {
         this.roomName = room.name;
     }
 
-    public registerCreepConfig(config: CreepConfig) {
+    _registerCreepConfig(config: CreepConfig) {
         this.creepConfigs[config.handle] = config;
     }
 
-    public unregisterHandle(handle: string) {
+    _unregisterHandle(handle: string) {
         delete this.creepConfigs[handle];
     }
 
-    public spawnCreeps() {
+    _spawnCreeps() {
         let room = Game.rooms[this.roomName];
         if (room) {
             let readySpawns: StructureSpawn[] = findStructure(room, FIND_MY_SPAWNS)
@@ -45,10 +44,10 @@ export class RoomSpawnSystem {
 
             if (readyToSpawn.length && readySpawns.length) {
                 for (let spawn of readySpawns) {
-                    let next = _.min(readyToSpawn, DEFAULT_PRIORITY_COMPARITOR);
+                    let next = _.min(readyToSpawn, this.priorityComparator);
                     let result = spawn.spawnCreep(next.body, "SPAWN_TEST:" + Math.random(), { dryRun: true });
                     if (result == OK) {
-                        let name = creepManifest.nextName(next.handle, next.jobName);
+                        let name = _creepManifest._nextName(next.handle, next.jobName);
                         result = spawn.spawnCreep(next.body, name, { memory: next.memory });
                         if (result == OK) {
                             //Remove the spawned creep from the list of ready ones if there is more than one spawn
@@ -75,8 +74,8 @@ export class RoomSpawnSystem {
     }
 
     private configShouldBeSpawned(config: CreepConfig): boolean {
-        let currentPopulation = creepManifest
-            .getCreeps(config.handle)
+        let currentPopulation = _creepManifest
+            ._getCreeps(config.handle)
             .filter(c => !this.isReadyForPrespawn(c, config)).length;
         return currentPopulation < config.quantity;
     }

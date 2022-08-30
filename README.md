@@ -6,9 +6,9 @@ There is no brain, only Dark Orb
 
 You will need:
 
-- [Node.JS](https://nodejs.org/en/download) (10.x)
-- A Package Manager ([Yarn](https://yarnpkg.com/en/docs/getting-started) or [npm](https://docs.npmjs.com/getting-started/installing-node))
-- Rollup CLI (Optional, install via `npm install -g rollup`)
+-   [Node.JS](https://nodejs.org/en/download) (10.x)
+-   A Package Manager ([Yarn](https://yarnpkg.com/en/docs/getting-started) or [npm](https://docs.npmjs.com/getting-started/installing-node))
+-   Rollup CLI (Optional, install via `npm install -g rollup`)
 
 Download the latest source [here](https://github.com/screepers/screeps-typescript-starter/archive/master.zip) and extract it to a folder.
 
@@ -40,8 +40,13 @@ Finally, there are also NPM scripts that serve as aliases for these commands in 
 
 The type definitions for Screeps come from [typed-screeps](https://github.com/screepers/typed-screeps). If you find a problem or have a suggestion, please open an issue there.
 
-## Documentation
+## Conventions
 
-Based off of the screeps typescript starter template.
+This bot is organized into systems. Anything within the `src/system/` directory is considered a system. Each package is composed of multiple files
 
-To visit the docs, [click here](https://screepers.gitbook.io/screeps-typescript-starter/).
+-   `index.d.ts`: Place any publicly accessible data types, interfaces, and Memory additions here.
+-   `[System name]Interface.ts`: The entrypoint for the system. Code that needs methods described in the system must go through the functions and interfaces in this file.
+-   `[SystemName]Logic.ts`: For complicated calculations and creep logic.
+-   `[Scoppe][System Name]System.ts`: Files deliniating systems by their scope. For instance, there is a Shard level spawning system and a room level one. The shard level one is responsible for multi-room creeps and coordinating spawning operations between multiple rooms. Room level ones are just that, room level
+
+Another important note is naming convention. TypeScript has no package-private modifier, so all methods beginning with `_` are considered scoped only to the system. You should not access any properties beginning with an underscore while crossing from one system to another.

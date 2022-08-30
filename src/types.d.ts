@@ -8,7 +8,6 @@ declare global {
     interface RoomMemory {}
 
     interface Memory {
-        profiler: ProfilerMemory;
         noSeason?: boolean;
         season1?: boolean;
         season2?: boolean;
@@ -16,33 +15,13 @@ declare global {
         respawnTick?: number;
     }
 
-    interface ProfilerMemory {
-        data: { [name: string]: ProfilerData };
-        start?: number;
-        total: number;
-    }
-
-    interface ProfilerData {
-        calls: number;
-        time: number;
-    }
-
-    interface Profiler {
-        clear(): void;
-        output(): void;
-        start(): void;
-        status(): void;
-        stop(): void;
-        toString(): string;
-    }
-
     namespace NodeJS {
         interface Global {
             PLAYER_USERNAME: string;
             INVADER_USERNAME: string;
             KEEPER_USERNAME: string;
-            runner: ProcessRunner;
             Profiler: Profiler;
+            runner: ProcessRunner;
             processes: () => void;
             setFeature: (feature: string, enabled: boolean) => void;
             toggleFeature: (feature: string) => boolean;

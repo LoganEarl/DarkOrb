@@ -3,9 +3,11 @@ import { Log } from "utils/logger/Logger";
 import { assignRoomToScout, getRoomsToExplore, runScout, scoutRoom } from "./ScoutLogic";
 import { registerResetFunction } from "utils/SystemResetter";
 import { getCreeps, registerCreepConfig, unregisterHandle } from "system/spawning/SpawnInterface";
+import { unpackCoord, unpackPos } from "utils/Packrat";
+import { hslToHex } from "utils/UtilityFunctions";
 
 const MAX_SCOUT_DEPTH = 6;
-const SCOUTS_PER_CLUSTER = 1;
+const SCOUTS_PER_CLUSTER = 4;
 
 class ShardScoutSystem implements MemoryComponent {
     private memory?: ScoutMemory;
@@ -70,17 +72,41 @@ class ShardScoutSystem implements MemoryComponent {
                 Object.values(this.scoutAssignments),
                 MAX_SCOUT_DEPTH
             );
+            let handle = "ScoutsForCluster:" + i;
             if (toExploreForCluster.length) {
-                registerCreepConfig({
-                    body: [MOVE],
-                    handle: "ScoutsForCluster:" + i,
-                    jobName: "Aspect",
-                    quantity: SCOUTS_PER_CLUSTER,
-                    dontPrespawnParts: true,
-                    desiredRoomPosition: new RoomPosition(25, 25, toExploreForCluster[0])
-                });
+                registerCreepConfig(handle, [
+                    {
+                        body: [MOVE],
+                        handle: handle,
+                        jobName: "Aspect",
+                        quantity: SCOUTS_PER_CLUSTER,
+                        dontPrespawnParts: true,
+                        desiredRoomPosition: new RoomPosition(25, 25, toExploreForCluster[0])
+                    }
+                ]);
             } else {
-                unregisterHandle("ScoutsForCluster:" + i);
+                unregisterHandle(handle);
+            }
+        }
+    }
+
+    _visualize() {
+        this.loadMemory();
+        let clusters = this.memory!.clusters;
+
+        for (let i = 0; i < clusters.length; i++) {
+            let clusterColor = hslToHex((i / clusters.length) * 360, 100, 50);
+            for (let roomName of clusters[i]) {
+                let pathingInfo = this._getMapData(roomName)?.pathingInfo;
+                if (pathingInfo?.packedRallyPos) {
+                    let pos = unpackPos(pathingInfo.packedRallyPos);
+                    Game.map.visual.circle(pos, { radius: 1.5, stroke: clusterColor, fill: clusterColor });
+                    pathingInfo.pathableExits
+                        .map(roomName => this._getMapData(roomName)?.pathingInfo?.packedRallyPos)
+                        .filter(p => p)
+                        .map(p => unpackPos(p!))
+                        .forEach(p => Game.map.visual.line(pos, p, { color: clusterColor }));
+                }
             }
         }
     }
@@ -127,5 +153,5 @@ class ShardScoutSystem implements MemoryComponent {
     }
 }
 
-export let shardScoutSystem: ShardScoutSystem = new ShardScoutSystem();
-registerResetFunction(() => (shardScoutSystem = new ShardScoutSystem()));
+export let _shardScoutSystem: ShardScoutSystem = new ShardScoutSystem();
+registerResetFunction(() => (_shardScoutSystem = new ShardScoutSystem()));

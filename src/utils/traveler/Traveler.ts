@@ -431,8 +431,22 @@ export class Traveler {
             {
                 maxOps: options.maxOps,
                 maxRooms: options.maxRooms,
-                plainCost: options.offRoad ? 1 : options.ignoreRoads ? 1 : 2,
-                swampCost: options.offRoad ? 1 : options.ignoreRoads ? 5 : 10,
+                plainCost:
+                    (options.plainCost ?? 0) > 0
+                        ? options.plainCost
+                        : options.offRoad
+                        ? 1
+                        : options.ignoreRoads
+                        ? 1
+                        : 2,
+                swampCost:
+                    (options.swampCost ?? 0) > 0
+                        ? options.swampCost
+                        : options.offRoad
+                        ? 1
+                        : options.ignoreRoads
+                        ? 5
+                        : 10,
                 roomCallback: callback
             }
         );
@@ -941,6 +955,8 @@ export interface TravelToOptions {
     route?: { [roomName: string]: boolean };
     ensurePath?: boolean;
     pushy?: boolean;
+    plainCost?: number;
+    swampCost?: number;
 }
 
 export interface TravelData {

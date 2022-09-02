@@ -12,6 +12,7 @@ import { SpawnProcess } from "system/spawning/SpawnProcess";
 import { ScoutProcess } from "system/scouting/ScoutProcess";
 import { resetAllSystems } from "utils/SystemResetter";
 import { StorageProcess } from "system/storage/StorageProcess";
+import { MinerProcess } from "system/mining/MinerProcess";
 
 let deferedInit = false;
 let globalRefresh = true;
@@ -22,9 +23,12 @@ function resetForRespawn() {
     //Clear out memory from old spawn
     Log.w("Fresh spawn detected, clearing all memory");
     let memoryKeys = Object.keys(Memory);
+    let excludedKeys = ["featureToggles"];
     memoryKeys.forEach(key => {
-        Log.w("Deleting memory key: " + key);
-        (Memory as any)[key] = undefined;
+        if (!excludedKeys.includes(key)) {
+            Log.w("Deleting memory key: " + key);
+            (Memory as any)[key] = undefined;
+        }
     });
 
     //Reset systems
@@ -45,6 +49,7 @@ function init() {
     global.runner.addProcess(new SpawnProcess());
     global.runner.addProcess(new ScoutProcess());
     global.runner.addProcess(new StorageProcess());
+    global.runner.addProcess(new MinerProcess());
 
     //===================================================================Initialize Global Functions
     global.processes = () => {

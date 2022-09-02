@@ -31,9 +31,9 @@ class ShardSpawnSystem {
         Object.values(this.roomSpawnSystems).forEach(s => s._spawnCreeps());
     }
 
-    _registerCreepConfig(config: CreepConfig, roomName?: string) {
+    _registerCreepConfig(handle: string, config: CreepConfig[], roomName?: string) {
         //TODO we need a way of doing this properly. Maybe a queue system where we add additional creeps to rooms?
-        Object.values(this.roomSpawnSystems)[0]._registerCreepConfig(config);
+        Object.values(this.roomSpawnSystems)[0]._registerCreepConfig(handle, config);
     }
 
     _unregisterHandle(handle: string, roomName?: string) {

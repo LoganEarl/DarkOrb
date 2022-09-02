@@ -18,7 +18,7 @@ export function floodFill(
     const visitedCM = new PathFinder.CostMatrix();
 
     //We will always get a matrix here because we have room visibility
-    const blockingStructureMatrix = Traveler.getStructureMatrix(room.name, undefined, false)!;
+    const blockingStructureMatrix = Traveler.getStructureMatrix(room.name, true, false)!;
 
     // Construct values for the flood
     let depth = 0;

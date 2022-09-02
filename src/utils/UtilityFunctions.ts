@@ -73,6 +73,15 @@ export function rgbToHex(r: number, g: number, b: number): string {
     return "#" + componentToHex(vc(r)) + componentToHex(vc(g)) + componentToHex(vc(b));
 }
 
+export function hslToHex(h: number, s: number, l: number): string {
+    s /= 100;
+    l /= 100;
+    const k = (n: number) => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = (n: number) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+    return rgbToHex(255 * f(0), 255 * f(8), 255 * f(4));
+}
+
 export function orderOf(item: any, array: any[]): number {
     let index = array.indexOf(item);
     if (index === -1) index = array.length;
@@ -271,10 +280,4 @@ export function rotatedMatrix<T>(matrix: T[][], clockwiseTurns: 0 | 1 | 2 | 3): 
         rotateMatrix(mat);
     }
     return mat;
-}
-
-export function bodyCost(body: BodyPartConstant[]) {
-    return body.reduce(function (cost, part) {
-        return cost + BODYPART_COST[part];
-    }, 0);
 }

@@ -3,18 +3,19 @@
 
 import { Log } from "utils/logger/Logger";
 import { findStructure } from "utils/StructureFindCache";
-import { bodyCost } from "utils/UtilityFunctions";
 import { _creepManifest } from "./CreepManifest";
+import { _configShouldBeSpawned, _haveSufficientCapacity } from "./SpawnLogic";
 
 export class RoomSpawnSystem {
     public roomName: string;
 
-    private creepConfigs: { [handle: string]: CreepConfig } = {};
+    private creepConfigs: { [handle: string]: CreepConfig[] } = {};
 
     private defaultPriorities = [
-        "Sludger", //Miner
+        "Aspect", //Scout
+        "Exhumer", //Miner
         "Drudge", //Hauler
-        "Aspect" //Scout
+        "Sludger" //Mineral miner
     ];
 
     private priorityComparator = (a: CreepConfig, b: CreepConfig) =>
@@ -24,8 +25,8 @@ export class RoomSpawnSystem {
         this.roomName = room.name;
     }
 
-    _registerCreepConfig(config: CreepConfig) {
-        this.creepConfigs[config.handle] = config;
+    _registerCreepConfig(handle: string, configs: CreepConfig[]) {
+        this.creepConfigs[handle] = configs;
     }
 
     _unregisterHandle(handle: string) {
@@ -38,9 +39,9 @@ export class RoomSpawnSystem {
             let readySpawns: StructureSpawn[] = findStructure(room, FIND_MY_SPAWNS)
                 .map(s => s as StructureSpawn)
                 .filter(s => !s.spawning);
-            let readyToSpawn = Object.values(this.creepConfigs).filter(
-                c => this.configShouldBeSpawned(c) && this.haveSufficientCapacity(c)
-            );
+            let readyToSpawn: CreepConfig[] = Object.values(this.creepConfigs)
+                .reduce((acc, val) => acc.concat(val), [])
+                .filter(c => _configShouldBeSpawned(c) && _haveSufficientCapacity(room, c));
 
             if (readyToSpawn.length && readySpawns.length) {
                 for (let spawn of readySpawns) {
@@ -71,23 +72,5 @@ export class RoomSpawnSystem {
                 }
             }
         }
-    }
-
-    private configShouldBeSpawned(config: CreepConfig): boolean {
-        let currentPopulation = _creepManifest
-            ._getCreeps(config.handle)
-            .filter(c => !this.isReadyForPrespawn(c, config)).length;
-        return currentPopulation < config.quantity;
-    }
-
-    private isReadyForPrespawn(creep: Creep, config: CreepConfig): boolean {
-        let partPrespawn = config.dontPrespawnParts ? 0 : config.body.length * 3;
-        let totalPrespawn = partPrespawn + (config.additionalPrespawntime ?? 0);
-        let ticksUntilPrespawn = (creep.ticksToLive ?? CREEP_LIFE_TIME) - totalPrespawn;
-        return ticksUntilPrespawn <= 0;
-    }
-
-    private haveSufficientCapacity(config: CreepConfig): boolean {
-        return Game.rooms[this.roomName]!.energyCapacityAvailable >= bodyCost(config.body);
     }
 }

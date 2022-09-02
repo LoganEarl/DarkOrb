@@ -1,5 +1,5 @@
-import { shardScoutSystem } from "./ShardScoutSystem";
+import { _shardScoutSystem } from "./ShardScoutSystem";
 
 export function getMapData(roomName: string): RoomScoutingInfo | undefined {
-    return shardScoutSystem._getMapData(roomName);
+    return _shardScoutSystem._getMapData(roomName);
 }

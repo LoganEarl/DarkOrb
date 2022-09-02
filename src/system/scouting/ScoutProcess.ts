@@ -1,7 +1,8 @@
 import { Process } from "core/Process";
-import { Log } from "utils/logger/Logger";
+import { FEATURE_VISUALIZE_SCOUTING } from "utils/featureToggles/FeatureToggleRegistry";
+import { getFeature } from "utils/featureToggles/FeatureToggles";
 import { ScheduledJob } from "utils/ScheduledJob";
-import { shardScoutSystem } from "./ShardScoutSystem";
+import { _shardScoutSystem } from "./ShardScoutSystem";
 
 //Responsible for triggering spawning code. Single process for the whole empire
 export class ScoutProcess extends Process {
@@ -9,22 +10,26 @@ export class ScoutProcess extends Process {
 
     clusterRecreator: ScheduledJob = new ScheduledJob(
         () => {
-            shardScoutSystem._createSuperclusters();
-            shardScoutSystem._subdivideSupercluster();
-            shardScoutSystem._registerCreepConfigs();
+            _shardScoutSystem._createSuperclusters();
+            _shardScoutSystem._subdivideSupercluster();
+            _shardScoutSystem._registerCreepConfigs();
         },
         this,
         500
     );
-    clusterSubdivider: ScheduledJob = new ScheduledJob(shardScoutSystem._subdivideSupercluster, shardScoutSystem, 100);
-    creepConfigUpdater: ScheduledJob = new ScheduledJob(shardScoutSystem._registerCreepConfigs, shardScoutSystem, 100);
-    jobChecker: ScheduledJob = new ScheduledJob(shardScoutSystem._clearDeadCreepAssignments, shardScoutSystem, 10);
+    clusterSubdivider: ScheduledJob = new ScheduledJob(
+        _shardScoutSystem._subdivideSupercluster,
+        _shardScoutSystem,
+        100
+    );
+    creepConfigUpdater: ScheduledJob = new ScheduledJob(_shardScoutSystem._registerCreepConfigs, _shardScoutSystem, 50);
+    jobChecker: ScheduledJob = new ScheduledJob(_shardScoutSystem._clearDeadCreepAssignments, _shardScoutSystem, 10);
 
     constructor() {
         super("ScoutProcess", 1);
-        shardScoutSystem._createSuperclusters();
-        shardScoutSystem._subdivideSupercluster();
-        shardScoutSystem._registerCreepConfigs();
+        _shardScoutSystem._createSuperclusters();
+        _shardScoutSystem._subdivideSupercluster();
+        _shardScoutSystem._registerCreepConfigs();
     }
 
     run(): void {
@@ -32,6 +37,10 @@ export class ScoutProcess extends Process {
         this.clusterRecreator.run();
         this.clusterSubdivider.run();
         this.creepConfigUpdater.run();
-        shardScoutSystem._runCreeps();
+        _shardScoutSystem._runCreeps();
+
+        if (getFeature(FEATURE_VISUALIZE_SCOUTING)) {
+            _shardScoutSystem._visualize();
+        }
     }
 }

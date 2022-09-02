@@ -1,3 +1,5 @@
+type BodySorter = (a: BodyPartConstant, b: BodyPartConstant) => number;
+
 interface CreepConfig {
     body: BodyPartConstant[];
     handle: string; //Id used to look up the creeps
@@ -8,6 +10,7 @@ interface CreepConfig {
     dontPrespawnParts?: boolean; //Prevents prespawning the creep based on body size
     additionalPrespawntime?: number; //If present, adds additional prespawn time. Independent from body-based prespawn times
     spawnPosition?: SpawnPosition; //Instruction to use a specific spawn with a specific spawn direction
+    //TODO implement
     desiredRoomPosition?: RoomPosition; //If present will be used to select a spawn when multiple are possible
 
     memory?: CreepMemory; //Memory to give the new creep

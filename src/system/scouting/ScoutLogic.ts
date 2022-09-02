@@ -190,14 +190,20 @@ function findRallyPoint(room: Room): RoomPosition | undefined {
     matrix = distanceTransformDiag(matrix, false, room);
     //Find the max value in the resulting matrix, it is now the rally point! Tiebreak with favoring
     // distance to the center of the room
-    let highest: number = 0;
+    let highest: number = -1;
     let highestCoord: Coord = { x: 0, y: 0 };
     for (let y = 0; y <= 49; y++) {
         for (let x = 0; x <= 49; x++) {
             if (matrix.get(x, y) > 0 && matrix.get(x, y) >= highest) {
-                let currentDist = manhattanDistance(x, y, 25, 25);
-                let highestDist = manhattanDistance(highestCoord.x, highestCoord.y, 25, 25);
-                if (highest == -1 || currentDist < highestDist) {
+                if (matrix.get(x, y) === highest) {
+                    let currentDist = manhattanDistance(x, y, 25, 25);
+                    let highestDist = manhattanDistance(highestCoord.x, highestCoord.y, 25, 25);
+                    if (highest == -1 || currentDist < highestDist) {
+                        highest = matrix.get(x, y);
+                        highestCoord.x = x;
+                        highestCoord.y = y;
+                    }
+                } else {
                     highest = matrix.get(x, y);
                     highestCoord.x = x;
                     highestCoord.y = y;
@@ -228,7 +234,7 @@ function evaluatePathing(room: Room, exitsToRooms: string[]): RoomPathingInfo | 
     let rallyPosition = findRallyPoint(room);
     if (rallyPosition) {
         return {
-            packedRallyPos: packCoord(rallyPosition.localCoords),
+            packedRallyPos: packPos(rallyPosition),
             pathableExits: findPathableExits(rallyPosition, exitsToRooms)
         };
     }
@@ -311,6 +317,8 @@ export function getRoomsToExplore(
             }
         }
     }
+
+    Log.d(`Rooms to explore ${JSON.stringify(roomsToExplore)}`);
     return roomsToExplore;
 }
 
@@ -363,7 +371,11 @@ export function runScout(scout: Creep, roomToExplore: string, shardMap: ShardMap
     }
     //We aren't in the room yet. Go to it
     else if (scout.pos.roomName !== roomToExplore && !shardMap[roomToExplore]) {
-        Traveler.travelTo(scout, new RoomPosition(25, 25, roomToExplore), { range: 21, offRoad: true });
+        Traveler.travelTo(scout, new RoomPosition(25, 25, roomToExplore), {
+            range: 21,
+            offRoad: true,
+            useFindRoute: true
+        });
         scout.queueSay("👁️");
     }
     //It was scouted before we could get there. Done!

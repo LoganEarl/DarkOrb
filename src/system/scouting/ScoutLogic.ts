@@ -187,7 +187,7 @@ function findRallyPoint(room: Room): RoomPosition | undefined {
     }
 
     //Use the distance transform to find open spots, passing the matrix from before
-    matrix = distanceTransformDiag(matrix, false, room);
+    matrix = distanceTransformDiag(matrix, false, room, 0, 0, 49, 49, true);
     //Find the max value in the resulting matrix, it is now the rally point! Tiebreak with favoring
     // distance to the center of the room
     let highest: number = -1;

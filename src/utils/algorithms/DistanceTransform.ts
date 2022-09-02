@@ -9,7 +9,8 @@ export function distanceTransformDiag(
     x1 = 0,
     y1 = 0,
     x2 = roomDimensions - 1,
-    y2 = roomDimensions - 1
+    y2 = roomDimensions - 1,
+    closeRoom: boolean = false
 ) {
     const distanceCM = new PathFinder.CostMatrix();
 
@@ -18,7 +19,8 @@ export function distanceTransformDiag(
 
     for (x = x1; x <= x2; x += 1) {
         for (y = y1; y <= y2; y += 1) {
-            distanceCM.set(x, y, initialCM.get(x, y) === 255 ? 0 : 255);
+            if (closeRoom && (x == 0 || x == 49 || y == 0 || y == 49)) distanceCM.set(x, y, 0);
+            else distanceCM.set(x, y, initialCM.get(x, y) === 255 ? 0 : 255);
         }
     }
 

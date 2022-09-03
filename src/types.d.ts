@@ -1,8 +1,5 @@
 // example declaration file - remove these and add your own custom typings
 import { ProcessRunner } from "core/ProcessRunner";
-
-type MainStorageStructure = StructureStorage | StructureContainer | StructureSpawn;
-
 // memory extension samples
 declare global {
     interface RoomMemory {}

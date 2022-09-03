@@ -18,6 +18,9 @@ let deferedInit = false;
 let globalRefresh = true;
 
 Log.i(`Global refresh detected, recreating process table`);
+global.PLAYER_USERNAME = Game.spawns[Object.keys(Game.spawns)[0]].owner.username;
+global.INVADER_USERNAME = "Invader";
+global.KEEPER_USERNAME = "Source Keeper";
 
 function resetForRespawn() {
     //Clear out memory from old spawn
@@ -36,10 +39,6 @@ function resetForRespawn() {
 }
 
 function init() {
-    global.PLAYER_USERNAME = Game.spawns[Object.keys(Game.spawns)[0]].owner.username;
-    global.INVADER_USERNAME = "Invader";
-    global.KEEPER_USERNAME = "Source Keeper";
-
     if (!Memory.rooms) Memory.rooms = {};
 
     //===================================================================Initialize Processes

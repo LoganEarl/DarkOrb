@@ -22,6 +22,11 @@ Creep.prototype.queueSay = function (toSay: string, toAll?: boolean): void {
     creepSayQueue[this.name] = (creepSayQueue[this.name] ?? "") + toSay;
 };
 
+const SWEARS = ["😤", "🤬", "😡", "👎", "🖕", "🤏", "😬", "🤮", "👉👌"];
+Creep.prototype.swear = function (): void {
+    this.queueSay(SWEARS[_.random(0, SWEARS.length - 1, false)]);
+};
+
 export function sayAll() {
     for (let name of Object.keys(creepSayQueue)) {
         Game.creeps[name]?.say(creepSayQueue[name], true);

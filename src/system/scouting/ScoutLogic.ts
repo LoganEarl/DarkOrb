@@ -1,8 +1,7 @@
-import { Cluster } from "cluster";
 import { distanceTransformDiag } from "utils/algorithms/DistanceTransform";
 import { floodFill } from "utils/algorithms/FloodFill";
 import { Log } from "utils/logger/Logger";
-import { packId, packCoord, packCoordList, unpackCoord, packPos } from "utils/Packrat";
+import { packCoord, packCoordList, unpackCoord, packPos } from "utils/Packrat";
 import { ROOMTYPE_CONTROLLER, Traveler } from "utils/traveler/Traveler";
 import {
     getFreeSpacesNextTo,
@@ -15,7 +14,7 @@ function evaluateSources(sources: [Source, ...Source[]]): [SourceInfo, ...Source
     if (sources.length == 1) {
         return [
             {
-                packedId: packId(sources[0].id),
+                id: sources[0].id,
                 packedPosition: packCoord(sources[0].pos.localCoords),
                 packedFreeSpots: packCoordList(
                     getFreeSpacesNextTo(sources[0].pos, sources[0].room).map(p => p.localCoords)
@@ -34,7 +33,7 @@ function evaluateSources(sources: [Source, ...Source[]]): [SourceInfo, ...Source
 
     let sourceInfos: [SourceInfo, ...SourceInfo[]] = sources.map(s => {
         return {
-            packedId: packId(s.id),
+            id: s.id as string,
             packedPosition: packPos(sources[0].pos),
             packedFreeSpots: ""
         };
@@ -66,7 +65,7 @@ function evaluateSources(sources: [Source, ...Source[]]): [SourceInfo, ...Source
 
 function evaluateMineral(mineral: Mineral): MineralInfo {
     return {
-        packedId: packId(mineral.id),
+        id: mineral.id as string,
         packedPosition: packCoord(mineral.pos.localCoords),
         packedFreeSpots: packCoordList(getFreeSpacesNextTo(mineral.pos, mineral.room).map(p => p.localCoords)),
         mineralType: mineral.mineralType
@@ -246,6 +245,7 @@ function evaluateRoomDepth(pathingInfo: RoomPathingInfo | undefined, exitsToRoom
     if (!depthCheckRooms || depthCheckRooms.length === 0) {
         depthCheckRooms = exitsToRooms.map(roomName => shardMap[roomName]).filter(data => data);
     }
+    Log.d(`depthRooms: ${JSON.stringify(depthCheckRooms)}`);
     return (_.min(depthCheckRooms, roomData => roomData.roomSearchDepth)?.roomSearchDepth ?? 99) + 1;
 }
 
@@ -257,6 +257,7 @@ export function scoutRoom(room: Room, shardMap: ShardMap): RoomScoutingInfo {
             .filter(v => v)
             .map(v => v!) ?? [];
     let pathingInfo = evaluatePathing(room, exitsToRooms);
+    Log.i(`ownership: ${JSON.stringify(ownership)} username: ${global.PLAYER_USERNAME}`);
     let roomDepth =
         ownership?.username === global.PLAYER_USERNAME ? 0 : evaluateRoomDepth(pathingInfo, exitsToRooms, shardMap);
 

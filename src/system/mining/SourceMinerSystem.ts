@@ -1,11 +1,18 @@
 import { getMapData } from "system/scouting/ScoutInterface";
-import { registerCreepConfig, unregisterHandle } from "system/spawning/SpawnInterface";
+import { getCreeps, registerCreepConfig, unregisterHandle } from "system/spawning/SpawnInterface";
 import { getMainStorage } from "system/storage/StorageInterface";
 import { Log } from "utils/logger/Logger";
 import { MemoryComponent, memoryWriter } from "utils/MemoryWriter";
-import { unpackId, unpackPosList } from "utils/Packrat";
-import { getMultirooomDistance } from "utils/UtilityFunctions";
-import { _designCreepsForMineral, _designCreepsForSource, _findPathToFreeSpace } from "./MinerLogic";
+import { unpackPos, unpackPosList } from "utils/Packrat";
+import { Traveler } from "utils/traveler/Traveler";
+import { getMultirooomDistance, samePos } from "utils/UtilityFunctions";
+import {
+    _assignMiningSpace,
+    _designCreepsForMineral,
+    _designCreepsForSource,
+    _findPathToFreeSpace,
+    _runSourceMiner
+} from "./MinerLogic";
 
 /*
     We don't want to do too much here. Calcuate the mining path, figure out our creep configs, and know how to run the logic
@@ -18,6 +25,12 @@ export class SourceMinerSystem implements MemoryComponent {
     private sourceId: Id<Source | Mineral>;
     private isSource: boolean;
     private freeSpaces: RoomPosition[] = [];
+    private creepAssignments: { [creepName: string]: MinerAssignment } = {};
+    private configs: CreepConfig[] = [];
+
+    get handle() {
+        return `Mining:${this.parentRoomName}->${this.roomName}:${this.sourceId}`;
+    }
 
     constructor(sourceId: Id<Source | Mineral>, isSource: boolean, roomName: string, parentRoomName: string) {
         this.sourceId = sourceId;
@@ -52,10 +65,7 @@ export class SourceMinerSystem implements MemoryComponent {
         //Does not require room memory for a reason!!
         let roomData = getMapData(this.roomName);
         if (this.isSource && roomData?.miningInfo) {
-            let ourSourceData = _.find(
-                roomData!.miningInfo!.sources,
-                s => unpackId(s.packedId) == (this.sourceId as string)
-            );
+            let ourSourceData = _.find(roomData!.miningInfo!.sources, s => s.id == (this.sourceId as string));
             if (ourSourceData) {
                 this.freeSpaces = unpackPosList(ourSourceData.packedFreeSpots);
                 this.clearStopReason("NoMapData");
@@ -103,7 +113,7 @@ export class SourceMinerSystem implements MemoryComponent {
             this.addStopReason("NoHomeRoom");
         }
 
-        let handle = `Mining:${this.parentRoomName}->${this.roomName}:${this.sourceId}`;
+        let handle = this.handle;
         if (this.memory!.state !== "Active") {
             //When we aren't active we prevent additional creep spawns. We DONT stop running though.
             unregisterHandle(handle, this.parentRoomName);
@@ -112,9 +122,8 @@ export class SourceMinerSystem implements MemoryComponent {
             let mapData: RoomScoutingInfo | undefined = getMapData(this.roomName);
             if (mapData) {
                 this.clearStopReason("NoMapData");
-                let configs: CreepConfig[];
                 if (this.isSource) {
-                    configs = _designCreepsForSource(
+                    this.configs = _designCreepsForSource(
                         handle,
                         this.freeSpaces.length,
                         parentRoom,
@@ -122,11 +131,11 @@ export class SourceMinerSystem implements MemoryComponent {
                         mapData
                     );
                 } else {
-                    configs = [
+                    this.configs = [
                         _designCreepsForMineral(handle, this.freeSpaces.length, parentRoom, this.memory!.pathLength)
                     ];
                 }
-                registerCreepConfig(handle, configs, this.parentRoomName);
+                registerCreepConfig(handle, this.configs, this.parentRoomName);
             } else {
                 this.addStopReason("NoMapData");
             }
@@ -146,6 +155,42 @@ export class SourceMinerSystem implements MemoryComponent {
     _stop() {
         this.loadMemory();
         this.addStopReason("Mandated");
+    }
+
+    _runCreeps() {
+        this.loadMemory();
+
+        let creeps = getCreeps(this.handle);
+        // Log.d(`Saw ${creeps.length} when running mining job with handle ${this.handle}`);
+        if (creeps.length) {
+            if (this.memory!.state === "Active") {
+                for (let creep of creeps) {
+                    if (!this.creepAssignments[creep.name]) {
+                        let populationSize = _.sum(this.configs, c => c.quantity);
+                        this.creepAssignments[creep.name] = _assignMiningSpace(
+                            creep,
+                            this.freeSpaces,
+                            this.sourceId,
+                            this.creepAssignments,
+                            populationSize
+                        );
+                    }
+                    let assignment = this.creepAssignments[creep.name];
+                    let primary = samePos(this.freeSpaces[0], assignment.placeToStand);
+                    if (this.isSource) {
+                        _runSourceMiner(creep, assignment, primary);
+                    } else {
+                        //TODO Run mineral miner
+                    }
+                }
+            } else {
+                for (let creep of creeps) {
+                    if (_.random(0, 6) === 0) creep.swear();
+                    let packedRally = getMapData(this.parentRoomName)?.pathingInfo?.packedRallyPos;
+                    if (packedRally !== undefined) Traveler.travelTo(creep, unpackPos(packedRally));
+                }
+            }
+        }
     }
 
     private clearStopReason(reason: MinerStopReason) {

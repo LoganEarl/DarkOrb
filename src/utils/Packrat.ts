@@ -80,66 +80,6 @@ function uint16ArrayToHex(array: Uint16Array): string {
     }
     return hex.join("");
 }
-
-/**
- * Convert a standard 24-character hex id in screeps to a compressed UTF-16 encoded string of length 6.
- *
- * Benchmarking: average of 500ns to execute on shard2 public server, reduce stringified size by 75%
- */
-export function packId(id: string): string {
-    return (
-        String.fromCharCode(parseInt(id.substr(0, 4), 16)) +
-        String.fromCharCode(parseInt(id.substr(4, 4), 16)) +
-        String.fromCharCode(parseInt(id.substr(8, 4), 16)) +
-        String.fromCharCode(parseInt(id.substr(12, 4), 16)) +
-        String.fromCharCode(parseInt(id.substr(16, 4), 16)) +
-        String.fromCharCode(parseInt(id.substr(20, 4), 16))
-    );
-}
-
-/**
- * Convert a compressed six-character UTF-encoded id back into the original 24-character format.
- *
- * Benchmarking: average of 1.3us to execute on shard2 public server
- */
-export function unpackId(packedId: string): string {
-    let id = "";
-    let current: number;
-    for (let i = 0; i < 6; ++i) {
-        current = packedId.charCodeAt(i);
-        id += (current >>> 8).toString(16).padStart(2, "0"); // String.padStart() requires es2017+ target
-        id += (current & 0xff).toString(16).padStart(2, "0");
-    }
-    return id;
-}
-
-/**
- * Packs a list of ids as a utf-16 string. This is better than having a list of packed coords, as it avoids
- * extra commas and "" when memroy gets stringified.
- *
- * Benchmarking: average of 500ns per id to execute on shard2 public server, reduce stringified size by 81%
- */
-export function packIdList(ids: string[]): string {
-    let str = "";
-    for (let i = 0; i < ids.length; ++i) {
-        str += packId(ids[i]);
-    }
-    return str;
-}
-
-/**
- * Unpacks a list of ids stored as a utf-16 string.
- *
- * Benchmarking: average of 1.2us per id to execute on shard2 public server.
- */
-export function unpackIdList(packedIds: string): string[] {
-    const ids: string[] = [];
-    for (let i = 0; i < packedIds.length; i += 6) {
-        ids.push(unpackId(packedIds.substr(i, 6)));
-    }
-    return ids;
-}
-
 /**
  * Packs a coord as a single utf-16 character. The seemingly strange choice of encoding value ((x << 6) | y) + 65 was
  * chosen to be fast to compute (x << 6 | y is significantly faster than 50 * x + y) and to avoid control characters,
@@ -348,10 +288,10 @@ export function unpackPosList(chars: string): RoomPosition[] {
 }
 
 // Useful to register these functions on global to use with console
-global.packId = packId;
-global.unpackId = unpackId;
-global.packIdList = packIdList;
-global.unpackIdList = unpackIdList;
+// global.packId = packId;
+// global.unpackId = unpackId;
+// global.packIdList = packIdList;
+// global.unpackIdList = unpackIdList;
 global.packCoord = packCoord;
 global.unpackCoord = unpackCoord;
 global.unpackCoordAsPos = unpackCoordAsPos;

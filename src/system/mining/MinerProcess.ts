@@ -7,6 +7,8 @@ import { _shardMinerSystem } from "./ShardMinerSystem";
 export class MinerProcess extends Process {
     processType = "MinerProcess";
 
+    private first = true;
+
     roomScanner: ScheduledJob = new ScheduledJob(_shardMinerSystem._rescanRooms, _shardMinerSystem, 10);
     minePartitioner: ScheduledJob = new ScheduledJob(_shardMinerSystem._repartitionMiningRooms, _shardMinerSystem, 100);
     configReloader: ScheduledJob = new ScheduledJob(_shardMinerSystem._reloadAllConfigs, _shardMinerSystem, 50);
@@ -15,20 +17,24 @@ export class MinerProcess extends Process {
 
     constructor() {
         super("MinerProcess", 1);
-
-        _shardMinerSystem._rescanRooms();
-        _shardMinerSystem._repartitionMiningRooms();
-        _shardMinerSystem._reloadAllConfigs();
-        _shardMinerSystem._reloadAllPaths();
-        _shardMinerSystem._reloadActiveMiningJobs();
     }
 
     run(): void {
-        this.roomScanner.run();
-        this.minePartitioner.run();
-        this.configReloader.run();
-        this.pathReloader.run();
-        this.jobReloader.run();
+        if (this.first) {
+            this.first = false;
+            _shardMinerSystem._rescanRooms();
+            _shardMinerSystem._repartitionMiningRooms();
+            _shardMinerSystem._reloadAllPaths();
+            _shardMinerSystem._reloadActiveMiningJobs();
+            _shardMinerSystem._reloadAllConfigs();
+        } else {
+            this.roomScanner.run();
+            this.minePartitioner.run();
+            this.configReloader.run();
+            this.pathReloader.run();
+            this.jobReloader.run();
+        }
+        _shardMinerSystem._runCreeps();
 
         if (getFeature(FEATURE_VISUALIZE_MINING)) {
             _shardMinerSystem._visualize();

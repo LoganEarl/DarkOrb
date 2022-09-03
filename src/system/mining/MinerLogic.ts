@@ -1,8 +1,8 @@
 import { getMapData } from "system/scouting/ScoutInterface";
 import { bodyCost, maximizeBody, maximizeBodyForTargetParts } from "system/spawning/SpawnInterface";
-import { getMainStorage } from "system/storage/StorageInterface";
 import { packPos } from "utils/Packrat";
 import { ROOMTYPE_CORE, ROOMTYPE_SOURCEKEEPER, Traveler } from "utils/traveler/Traveler";
+import { samePos } from "utils/UtilityFunctions";
 
 export function _calcualteMiningPath(start: RoomPosition, end: RoomPosition): PathFinderPath {
     //Remember, this is for determining how hard the path is curently. This is NOT for plotting a road
@@ -125,7 +125,7 @@ export function _findAllSourcesInRange(
 
     if (!visited) visited = new Set();
 
-    let sources: SourceInfo[] = sourceRoom.miningInfo?.sources ?? [];
+    let sources: SourceInfo[] = sourceRoom.miningInfo?.sources.slice() ?? [];
     let exits = sourceRoom.pathingInfo?.pathableExits ?? [];
     visited.add(sourceRoom.roomName);
     exits.forEach(exitRoomName => {
@@ -134,4 +134,95 @@ export function _findAllSourcesInRange(
         }
     });
     return sources;
+}
+
+export function _assignMiningSpace(
+    creep: Creep,
+    possibleSpaces: RoomPosition[],
+    mineId: Id<Source | Mineral>,
+    existingAssignments: { [creepName: string]: MinerAssignment },
+    populationSize: number
+): MinerAssignment {
+    let usedSpaces = _.min([populationSize, possibleSpaces.length]);
+    let occupiedCount: number[] = new Array<number>(usedSpaces);
+    let assignedSpaces = Object.values(existingAssignments);
+    //Find how many times each possible space was used, and pick the space which is assigned the least times
+    let minIndex = 0;
+    let min = 999;
+    for (let i = 0; i < usedSpaces; i++) {
+        occupiedCount[i] = _.sum(assignedSpaces, assignment =>
+            samePos(possibleSpaces[i], assignment.placeToStand) ? 1 : 0
+        );
+        if (occupiedCount[i] < min) {
+            min = occupiedCount[i];
+            minIndex = i;
+        }
+    }
+
+    let standPos = min < 999 ? possibleSpaces[minIndex] : possibleSpaces[0];
+
+    let assignment: MinerAssignment = {
+        creepName: creep.name,
+        placeToStand: standPos,
+        mineId: mineId
+    };
+
+    if (Game.rooms[possibleSpaces[0].roomName]) {
+        const structures = standPos.findInRange(FIND_STRUCTURES, 1);
+        const sites = standPos.findInRange(FIND_CONSTRUCTION_SITES, 1);
+        const links: StructureLink[] = structures
+            .filter(s => s.structureType === STRUCTURE_LINK)
+            .map(s => s as StructureLink);
+        const containers: StructureContainer[] = structures
+            .filter(s => s.structureType === STRUCTURE_CONTAINER)
+            .map(s => s as StructureContainer);
+
+        assignment.constructionProject = sites[0]?.id;
+        assignment.depositContainer = containers[0]?.id;
+        assignment.depositLink = links[0]?.id;
+    }
+    return assignment;
+}
+
+export function _runSourceMiner(creep: Creep, assignment: MinerAssignment, primaryMiner: boolean) {
+    if (!samePos(creep.pos, assignment.placeToStand)) {
+        Traveler.travelTo(creep, assignment.placeToStand, { range: 0 });
+    } else {
+        let container: StructureContainer | null = null;
+        let pile: Resource | null = null;
+        if (primaryMiner && creep.getActiveBodyparts(CARRY) > 0) {
+            if (assignment.constructionProject && creep.store.getUsedCapacity(RESOURCE_ENERGY) >= 30) {
+                let project = Game.getObjectById(assignment.constructionProject);
+                if (project) {
+                    creep.queueSay("🔨");
+                    creep.build(project);
+                }
+            }
+
+            if (assignment.depositContainer) {
+                container = Game.getObjectById(assignment.depositContainer);
+                if (container && creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                    if (container.hits < container.hitsMax) {
+                        creep.queueSay("🔧");
+                        creep.repair(container) === OK;
+                        return;
+                    } else if (creep.store.getUsedCapacity(RESOURCE_ENERGY) >= 30)
+                        creep.transfer(container, RESOURCE_ENERGY);
+                }
+            }
+
+            if (assignment.depositLink) {
+                let link = Game.getObjectById(assignment.depositLink);
+                if (link && creep.store.getUsedCapacity(RESOURCE_ENERGY) >= 30) creep.transfer(link, RESOURCE_ENERGY);
+            }
+        }
+
+        let source = Game.getObjectById(assignment.mineId);
+        if (source) {
+            const piles = creep.pos.lookFor(LOOK_RESOURCES).filter(pile => pile.resourceType === RESOURCE_ENERGY);
+            if (piles.length) pile = piles[0];
+            creep.harvest(source);
+            //TODO logistics node callback goes here
+        }
+    }
 }

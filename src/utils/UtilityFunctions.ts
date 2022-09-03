@@ -30,6 +30,10 @@ export function hasRespawned() {
     return true;
 }
 
+export function samePos(pos1: RoomPosition, pos2: RoomPosition): boolean {
+    return pos1.x === pos2.x && pos1.y === pos1.y && pos1.roomName === pos2.roomName;
+}
+
 export function getFreeSpacesNextTo(pos: RoomPosition, room?: Room): RoomPosition[] {
     const terrain = Game.map.getRoomTerrain(pos.roomName);
 

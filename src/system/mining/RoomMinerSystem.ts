@@ -1,5 +1,5 @@
 import { getMainStorage } from "system/storage/StorageInterface";
-import { unpackCoordList, unpackId, unpackPosList } from "utils/Packrat";
+import { unpackCoordList, unpackPosList } from "utils/Packrat";
 import { _calcualteMiningPath } from "./MinerLogic";
 import { SourceMinerSystem } from "./SourceMinerSystem";
 
@@ -17,7 +17,7 @@ export class RoomMinerSystem {
     _getLengthToSource(sourceId: Id<Source>, mapData: RoomScoutingInfo): number {
         let packedFreeSpots = _.find(
             mapData.miningInfo?.sources ?? [],
-            s => unpackId(s.packedId) === (sourceId as string)
+            s => s.id === (sourceId as string)
         )?.packedFreeSpots;
         let mainStorage = getMainStorage(this.roomName);
         if (packedFreeSpots !== undefined && mainStorage !== undefined) {
@@ -60,6 +60,10 @@ export class RoomMinerSystem {
 
     _visualize() {
         Object.values(this.sourceMinerSystems).forEach(s => s._visualize());
+    }
+
+    _runCreeps() {
+        Object.values(this.sourceMinerSystems).forEach(s => s._runCreeps());
     }
 
     _reloadAllConfigs() {

@@ -7,7 +7,7 @@ import { unpackCoord, unpackPos } from "utils/Packrat";
 import { hslToHex } from "utils/UtilityFunctions";
 
 const MAX_SCOUT_DEPTH = 6;
-const SCOUTS_PER_CLUSTER = 4;
+const SCOUTS_PER_CLUSTER = 1;
 
 class ShardScoutSystem implements MemoryComponent {
     private memory?: ScoutMemory;

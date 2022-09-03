@@ -1,6 +1,6 @@
 import { getMapData } from "system/scouting/ScoutInterface";
 import { Log } from "utils/logger/Logger";
-import { unpackId, unpackPos } from "utils/Packrat";
+import { unpackPos } from "utils/Packrat";
 import { registerResetFunction } from "utils/SystemResetter";
 import { _findAllSourcesInRange } from "./MinerLogic";
 import { RoomMinerSystem } from "./RoomMinerSystem";
@@ -29,6 +29,7 @@ export class ShardMinerSystem {
     //Loop through the spawns, get unique rooms with active spawns, and make sure we have a room miner system for each
     //Remove miner systems we don't have room visibility or spawns in
     public _rescanRooms() {
+        Log.d("Rescanning mining rooms");
         let minerRooms = Object.keys(this.roomMinerSystems);
         minerRooms.forEach(roomName => {
             if (!Game.rooms[roomName] || Game.rooms[roomName].find(FIND_MY_SPAWNS).length === 0) {
@@ -43,7 +44,10 @@ export class ShardMinerSystem {
                 .map(spawn => spawn.pos.roomName)
         );
         ownedRooms.forEach(roomName => {
-            if (!this.roomMinerSystems[roomName]) this.roomMinerSystems[roomName] = new RoomMinerSystem(roomName);
+            if (!this.roomMinerSystems[roomName]) {
+                Log.i(`Detected miner system in ${roomName}, starting mining`);
+                this.roomMinerSystems[roomName] = new RoomMinerSystem(roomName);
+            }
         });
     }
 
@@ -51,6 +55,7 @@ export class ShardMinerSystem {
     //This is EXPENSIVE. Don't run it often...
     //TODO this can be optimized by caching distance info to avoid all the path calculation
     public _repartitionMiningRooms() {
+        Log.d("Repartitioning mining rooms");
         //Get the sources in range to each spawn room
         let sourceInfosPerSpawnRoom: { [spawnRoomName: string]: SourceInfo[] } = {};
         Object.keys(this.roomMinerSystems).forEach(spawnRoom => {
@@ -64,7 +69,7 @@ export class ShardMinerSystem {
             let sourcesToAssign: SourceInfo[] = sourceInfosPerSpawnRoom[spawnRoom];
             let roomMinerSystem: RoomMinerSystem = this.roomMinerSystems[spawnRoom];
             sourcesToAssign.forEach(source => {
-                let sourceId: Id<Source> = unpackId(source.packedId) as Id<Source>;
+                let sourceId: Id<Source> = source.id as Id<Source>;
                 let sourceRoomName = unpackPos(source.packedPosition).roomName;
                 sourceRoomNames[sourceId as string] = sourceRoomName;
                 let existingAssignment = assignedSources[sourceId as string];
@@ -102,11 +107,18 @@ export class ShardMinerSystem {
     }
 
     _reloadAllConfigs() {
+        Log.d("Reloading miner configs");
         Object.values(this.roomMinerSystems).forEach(s => s._reloadAllConfigs());
     }
 
     _reloadAllPaths() {
+        Log.d("Reloading paths");
         Object.values(this.roomMinerSystems).forEach(s => s._reloadAllPathInfo());
+    }
+
+    _runCreeps() {
+        // Log.d(`Running ${Object.values(this.roomMinerSystems).length} mining systems for creeps`);
+        Object.values(this.roomMinerSystems).forEach(s => s._runCreeps());
     }
 
     _visualize() {

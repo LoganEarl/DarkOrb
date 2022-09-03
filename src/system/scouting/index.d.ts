@@ -5,13 +5,13 @@ type RoomOwnershipType =
     | "Reserved"; //They reserved the controller
 
 interface SourceInfo {
-    packedId: string;
+    id: string;
     packedPosition: string;
     packedFreeSpots: string;
 }
 
 interface MineralInfo {
-    packedId: string;
+    id: string;
     packedPosition: string;
     packedFreeSpots: string;
     mineralType: MineralConstant;

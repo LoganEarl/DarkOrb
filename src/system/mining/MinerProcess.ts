@@ -16,7 +16,7 @@ export class MinerProcess extends Process {
     jobReloader: ScheduledJob = new ScheduledJob(_shardMinerSystem._reloadActiveMiningJobs, _shardMinerSystem, 50);
 
     constructor() {
-        super("MinerProcess", 1);
+        super("MinerProcess", 2);
     }
 
     run(): void {

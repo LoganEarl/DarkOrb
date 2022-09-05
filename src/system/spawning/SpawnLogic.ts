@@ -25,7 +25,7 @@ export function _maximizeBodyForTargetParts(
     let repeatingCost = _bodyCost(repeatingBody);
 
     do {
-        let currentBody: BodyPartConstant[] = Object.assign([], baseBody);
+        let currentBody: BodyPartConstant[] = baseBody.slice();
         let bodyEnergyCost = baseCost;
         usedParts += baseBodyPartUsage;
 
@@ -39,7 +39,8 @@ export function _maximizeBodyForTargetParts(
             usedParts += repeatingBodyPartUsage;
         }
 
-        bodies.push(currentBody.sort(sorter));
+        currentBody.sort(sorter);
+        bodies.push(currentBody);
     } while (usedParts + baseBodyPartUsage <= targetNumber && (maxCreeps ?? bodies.length) >= bodies.length);
 
     return bodies;
@@ -76,7 +77,7 @@ export function _bodyCost(body: BodyPartConstant[]) {
 
 export function _configShouldBeSpawned(config: CreepConfig): boolean {
     let currentPopulation = _creepManifest
-        ._getCreeps(config.handle)
+        ._getCreeps(config.handle, config.subHandle)
         .filter(c => !_isReadyForPrespawn(c, config)).length;
     return currentPopulation < config.quantity;
 }

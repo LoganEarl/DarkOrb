@@ -22,6 +22,7 @@ declare global {
             processes: () => void;
             setFeature: (feature: string, enabled: boolean) => void;
             toggleFeature: (feature: string) => boolean;
+            spawnQueues: () => void;
         }
     }
 }

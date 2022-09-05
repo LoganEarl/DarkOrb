@@ -40,6 +40,10 @@ class ShardSpawnSystem {
         //TODO we need a way of doing this properly
         Object.values(this.roomSpawnSystems)[0]._unregisterHandle(handle);
     }
+
+    _printSpawnQueues() {
+        Object.values(this.roomSpawnSystems).forEach(s => s._printSpawnQueues());
+    }
 }
 
 export let _shardSpawnSystem: ShardSpawnSystem = new ShardSpawnSystem();

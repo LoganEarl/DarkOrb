@@ -14,10 +14,6 @@ export function getCreeps(handle: string): Creep[] {
     return _creepManifest._getCreeps(handle);
 }
 
-export function nextName(handle: string, jobName: string): string {
-    return _creepManifest._nextName(handle, jobName);
-}
-
 export function bodyCost(body: BodyPartConstant[]): number {
     return _bodyCost(body);
 }
@@ -49,4 +45,8 @@ export function maximizeBody(
     sorter?: BodySorter
 ): BodyPartConstant[] {
     return _maximizeBody(baseBody, repeatingBody, maxCapacity, sorter);
+}
+
+export function printSpawnQueues() {
+    _shardSpawnSystem._printSpawnQueues();
 }

@@ -12,14 +12,22 @@ export class RoomSpawnSystem {
     private creepConfigs: { [handle: string]: CreepConfig[] } = {};
 
     private defaultPriorities = [
+        "Primordial", //Initial fast startup creeps
         "Aspect", //Scout
-        "Exhumer", //Miner
         "Drudge", //Hauler
+        "Exhumer", //Miner
         "Sludger" //Mineral miner
     ];
 
-    private priorityComparator = (a: CreepConfig, b: CreepConfig) =>
-        (this.defaultPriorities.indexOf(a.jobName) ?? 9999999) - (this.defaultPriorities.indexOf(b.jobName) ?? 9999999);
+    private priorityComparator = (a: CreepConfig, b: CreepConfig) => {
+        let aPriority = this.defaultPriorities.indexOf(a.jobName) ?? 9999999;
+        let bPriority = this.defaultPriorities.indexOf(b.jobName) ?? 9999999;
+        if (aPriority === bPriority) {
+            aPriority = a.subPriority ?? 9999999;
+            bPriority = b.subPriority ?? 9999999;
+        }
+        return aPriority - bPriority;
+    };
 
     constructor(room: Room) {
         this.roomName = room.name;
@@ -45,10 +53,11 @@ export class RoomSpawnSystem {
 
             if (readyToSpawn.length && readySpawns.length) {
                 for (let spawn of readySpawns) {
-                    let next = _.min(readyToSpawn, this.priorityComparator);
+                    readyToSpawn.sort(this.priorityComparator);
+                    let next = readyToSpawn[0];
                     let result = spawn.spawnCreep(next.body, "SPAWN_TEST:" + Math.random(), { dryRun: true });
                     if (result == OK) {
-                        let name = _creepManifest._nextName(next.handle, next.jobName);
+                        let name = _creepManifest._nextName(next.handle, next.jobName, next.subHandle);
                         result = spawn.spawnCreep(next.body, name, { memory: next.memory });
                         if (result == OK) {
                             //Remove the spawned creep from the list of ready ones if there is more than one spawn
@@ -72,5 +81,16 @@ export class RoomSpawnSystem {
                 }
             }
         }
+    }
+
+    _printSpawnQueues() {
+        let configs = Object.values(this.creepConfigs)
+            .reduce((acc, val) => acc.concat(val), [])
+            .filter(c => _configShouldBeSpawned(c) && _haveSufficientCapacity(Game.rooms[this.roomName], c));
+        configs.sort(this.priorityComparator);
+        Log.i(`${this.roomName} 
+            Spawn Queue: ${JSON.stringify(configs)}
+            All Configs: ${JSON.stringify(this.creepConfigs)}
+            `);
     }
 }

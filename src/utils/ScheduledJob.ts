@@ -1,6 +1,4 @@
 var nextSeed = 0;
-var jobs: ScheduledJob[] = [];
-
 export class ScheduledJob {
     private job: () => void;
     private seed: number;

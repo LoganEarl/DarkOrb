@@ -1,5 +1,6 @@
 import { FEATURE_VISUALIZE_HAULING } from "utils/featureToggles/FeatureToggleRegistry";
 import { getFeature } from "utils/featureToggles/FeatureToggles";
+import { Log } from "utils/logger/Logger";
 import { PriorityQueue } from "utils/PriorityQueue";
 import { Traveler } from "utils/traveler/Traveler";
 import { clamp } from "utils/UtilityFunctions";
@@ -35,7 +36,7 @@ export function _runHauler(
         };
     }
 
-    let target: LogisticsNodeTarget | null = _lookupNodeTarget(targetNode.id);
+    let target: LogisticsNodeTarget | null = _lookupNodeTarget(targetNode.targetId);
     let targetPos = target?.pos ?? targetNode.lastKnownPosition;
     let resource = targetNode.resource as ResourceConstant;
 
@@ -150,7 +151,7 @@ export function _assignJobForHauler(
     storage: MainStorage,
     prevResults?: HaulerRunResults
 ): LogisticsPairing | null {
-    let nodes = Object.values(logisticsNodes).filter(node => {
+    let servicableNodes = Object.values(logisticsNodes).filter(node => {
         const nodeResource = node.resource as ResourceConstant;
         const canServiceSourceRequests =
             (storage!.store.getFreeCapacity(nodeResource) ?? 0) > 0 || creep.store.getFreeCapacity(nodeResource) > 0;
@@ -159,15 +160,18 @@ export function _assignJobForHauler(
 
         return (canServiceSinkRequests && node.type === "Sink") || (canServiceSourceRequests && node.type === "Source");
     });
-    if (nodes.length) {
-        // console.log("Nodes:" + JSON.stringify(nodes))
+    if (servicableNodes.length) {
         const possiblePairings: { [nodeId: string]: LogisticsPairing } = {};
-        nodes.forEach(
-            node => (possiblePairings[node.id] = generatePair(creep, node, storage!, nodeAssignments, prevResults))
+        servicableNodes.forEach(
+            node => (possiblePairings[node.nodeId] = generatePair(creep, node, storage!, nodeAssignments, prevResults))
         );
-        // console.log(creep.name + " possible pairings: " + JSON.stringify(possiblePairings))
         const bestPairing = _.max(possiblePairings, pairing => pairing.drdt);
-        // console.log("Selected pairing: " + JSON.stringify(pairing))
+
+        // Log.d(`All nodes: ${JSON.stringify(logisticsNodes)}`);
+        // Log.d(`Servicable nodes: ${JSON.stringify(servicableNodes)}`);
+        // Log.d(`Previous assignments: ${JSON.stringify(nodeAssignments)}`);
+        // Log.d("Possible pairings: " + JSON.stringify(possiblePairings));
+        // Log.d("Best pairing: " + JSON.stringify(bestPairing));
         nodeAssignments[bestPairing.nodeId].enqueue(bestPairing);
         haulerAssignments[creep.name] = bestPairing;
 
@@ -200,7 +204,7 @@ function generatePair(
     prevResults?: HaulerRunResults
 ): LogisticsPairing {
     const nodeResource = node.resource as ResourceConstant;
-    let nodeTarget = _lookupNodeTarget(node.id);
+    let nodeTarget = _lookupNodeTarget(node.targetId);
     let pos = nodeTarget?.pos ?? node.lastKnownPosition;
 
     //console.log(`Generating pair for ${creep.name} with node ${JSON.stringify(node)} and prev results ${JSON.stringify(prevResults? prevResults : "")}`)
@@ -251,8 +255,8 @@ function generatePair(
     //the other pairing we already have. We have to factor those in here. Sadly, this is a pain
     let lastDirectUpdate = 0;
     let lastServiceUpdate = 0;
-    let otherNodePairings = nodeAssignments[node.id];
-    for (let pairing of otherNodePairings.items) {
+    let otherNodePairings = nodeAssignments[node.nodeId]?.items ?? [];
+    for (let pairing of otherNodePairings) {
         //only factor in pairings that happen before us
         if (pairing?.eta > serviceEta) {
             break;
@@ -297,7 +301,7 @@ function generatePair(
 
     return {
         haulerName: creep.name,
-        nodeId: node.id,
+        nodeId: node.nodeId,
         eta: useServiceRoute ? serviceEta : directEta,
         queueIndex: useServiceRoute ? serviceEta : directEta,
         usesServiceRoute: useServiceRoute,

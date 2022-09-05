@@ -67,7 +67,11 @@ export class RoomMinerSystem {
     }
 
     _reloadAllConfigs() {
-        Object.values(this.sourceMinerSystems).forEach(s => s._reloadCreepConfigs());
+        let first = true;
+        Object.values(this.sourceMinerSystems).forEach(s => {
+            s._reloadCreepConfigs(first);
+            first = false;
+        });
     }
 
     _reloadAllPathInfo() {

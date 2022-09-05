@@ -1,5 +1,6 @@
 import { getMapData } from "system/scouting/ScoutInterface";
 import { bodyCost, maximizeBody, maximizeBodyForTargetParts } from "system/spawning/SpawnInterface";
+import { Log } from "utils/logger/Logger";
 import { packPos } from "utils/Packrat";
 import { ROOMTYPE_CORE, ROOMTYPE_SOURCEKEEPER, Traveler } from "utils/traveler/Traveler";
 import { samePos } from "utils/UtilityFunctions";
@@ -43,7 +44,8 @@ export function _designCreepsForSource(
     maxMiningSpots: number,
     parentRoom: Room,
     pathLength: number,
-    mapData: RoomScoutingInfo
+    mapData: RoomScoutingInfo,
+    priority: number
 ): CreepConfig[] {
     let sourceEnergy: number = SOURCE_ENERGY_NEUTRAL_CAPACITY;
     if (mapData.ownership?.username === global.PLAYER_USERNAME) {
@@ -73,13 +75,26 @@ export function _designCreepsForSource(
         bodies[0].push(CARRY);
     }
 
+    Log.d(
+        `Planning bodies for mining ${handle}.
+        ClaimedBy: ${mapData.ownership?.username},
+        Me: ${global.PLAYER_USERNAME}
+        E/t: ${energyPerTick}
+        Work parts: ${wantedWorkParts}
+        Bodies: ${JSON.stringify(bodies)}
+        MaxBodies: ${maxMiningSpots}`
+    );
+
+    let subHandle = 0;
     return bodies.map(body => {
         return {
             body: body,
             handle: handle,
+            subHandle: `${subHandle++}`,
             jobName: "Exhumer",
             quantity: 1,
-            additionalPrespawntime: pathLength
+            additionalPrespawntime: pathLength,
+            subPriority: priority
         };
     });
 }
@@ -188,8 +203,9 @@ export function _runSourceMiner(creep: Creep, assignment: MinerAssignment, prima
     if (!samePos(creep.pos, assignment.placeToStand)) {
         Traveler.travelTo(creep, assignment.placeToStand, { range: 0 });
     } else {
+        Traveler.reservePosition(creep.pos);
+
         let container: StructureContainer | null = null;
-        let pile: Resource | null = null;
         if (primaryMiner && creep.getActiveBodyparts(CARRY) > 0) {
             if (assignment.constructionProject && creep.store.getUsedCapacity(RESOURCE_ENERGY) >= 30) {
                 let project = Game.getObjectById(assignment.constructionProject);
@@ -219,10 +235,7 @@ export function _runSourceMiner(creep: Creep, assignment: MinerAssignment, prima
 
         let source = Game.getObjectById(assignment.mineId);
         if (source) {
-            const piles = creep.pos.lookFor(LOOK_RESOURCES).filter(pile => pile.resourceType === RESOURCE_ENERGY);
-            if (piles.length) pile = piles[0];
             creep.harvest(source);
-            //TODO logistics node callback goes here
         }
     }
 }

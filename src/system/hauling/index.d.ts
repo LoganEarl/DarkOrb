@@ -14,7 +14,8 @@ declare global {
         | SymbolDecoder;
 
     interface LogisticsNode {
-        id: string; //Unique identifier. Will be the target of the node. (i.e. a creep name, building id, tombstone id, etc)
+        nodeId: string; //Unique identifier of the node.
+        targetId: string; //Unique identifier. Will be the target of the node. (i.e. a creep name, building id, tombstone id, etc)
         level: number; //How much we have currently have. This is only current for the tick that assign job triggered
         maxLevel: number; //The maximum the node can hold. Relevant for remote mining container's limited capacity
         resource: string; //The Type of resource

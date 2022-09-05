@@ -15,28 +15,44 @@ class CreepManifest implements MemoryComponent {
     }
 
     //Get all living creeps under the handle
-    _getCreeps(handle: string): Creep[] {
+    _getCreeps(handle: string, subHandle?: string): Creep[] {
         this.loadMemory();
 
-        //Detect any that died during the query phase
-        let deadCreepNames = (this.memory!.creepNamesByHandle[handle] ?? []).filter(name => !Game.creeps[name]);
-        if (deadCreepNames.length > 0) {
-            Log.d("Clearing memory for creeps with names: " + JSON.stringify(deadCreepNames));
-            this.memory!.creepNamesByHandle[handle] = (this.memory!.creepNamesByHandle[handle] ?? []).filter(
-                name => Game.creeps[name]
-            );
-            memoryWriter.updateComponent(this);
-        }
+        let byHandle = this.memory!.creepNamesByHandle[handle] ?? {};
 
-        return (
-            (this.memory!.creepNamesByHandle[handle] ?? [])
-                .map(name => Game.creeps[name])
-                .filter(c => c && !c.spawning) ?? []
-        );
+        if (subHandle) {
+            //Detect any that died during the query phase=
+            let deadCreepNames = (byHandle[subHandle] ?? []).filter(name => !Game.creeps[name]);
+            if (deadCreepNames.length > 0) {
+                Log.d("Clearing memory for creeps with names: " + JSON.stringify(deadCreepNames));
+                byHandle[subHandle] = byHandle[subHandle].filter(name => Game.creeps[name]);
+                memoryWriter.updateComponent(this);
+            }
+
+            return (byHandle[subHandle] ?? []).map(name => Game.creeps[name]).filter(c => c && !c.spawning) ?? [];
+        } else {
+            //Detect any that died during the query phase=
+            let deadCreepNames = Object.values(byHandle)
+                .reduce((acc, val) => acc.concat(val), [])
+                .filter(name => !Game.creeps[name]);
+            if (deadCreepNames.length > 0) {
+                Log.d("Clearing memory for creeps with names: " + JSON.stringify(deadCreepNames));
+                for (let subHandle of Object.keys(byHandle))
+                    byHandle[subHandle] = byHandle[subHandle].filter(name => Game.creeps[name]);
+                memoryWriter.updateComponent(this);
+            }
+
+            return (
+                Object.values(byHandle)
+                    .reduce((acc, val) => acc.concat(val), [])
+                    .map(name => Game.creeps[name])
+                    .filter(c => c && !c.spawning) ?? []
+            );
+        }
     }
 
     //Linear congruential gnerator to traverse name space. Hits each name once before looping (in theory)
-    _nextName(creepHandle: string, jobName: string): string {
+    _nextName(creepHandle: string, jobName: string, subHandle: string = "None"): string {
         this.loadMemory();
         this.memory = this.memory!;
 
@@ -54,8 +70,10 @@ class CreepManifest implements MemoryComponent {
 
             if (!Game.creeps[name]) {
                 this.memory.previousNameIndex = nextIndex;
-                this.memory.creepNamesByHandle[creepHandle] = (
-                    this.memory.creepNamesByHandle[creepHandle] ?? []
+                if (!this.memory.creepNamesByHandle[creepHandle]) this.memory.creepNamesByHandle[creepHandle] = {};
+
+                this.memory.creepNamesByHandle[creepHandle][subHandle] = (
+                    this.memory.creepNamesByHandle[creepHandle][subHandle] ?? []
                 ).concat(name);
                 this.memory.previousNameIndex = nextIndex;
                 memoryWriter.updateComponent(this);

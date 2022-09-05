@@ -31,7 +31,7 @@ export function hasRespawned() {
 }
 
 export function samePos(pos1: RoomPosition, pos2: RoomPosition): boolean {
-    return pos1.x === pos2.x && pos1.y === pos1.y && pos1.roomName === pos2.roomName;
+    return pos1.x === pos2.x && pos1.y === pos2.y && pos1.roomName === pos2.roomName;
 }
 
 export function getFreeSpacesNextTo(pos: RoomPosition, room?: Room): RoomPosition[] {
@@ -129,6 +129,22 @@ export function drawCircledItem(
         });
         drawCounts[posTag] = drawCounts[posTag] + 1;
     }
+}
+
+export function drawBar(text: string, verticalIndex: number, completion: number, visual: RoomVisual) {
+    completion = clamp(completion, 0, 1);
+    let width = 8;
+    visual.rect(49 - width, verticalIndex, width, 0.8, {
+        fill: "black"
+    });
+    visual.rect(49 - width * completion, verticalIndex, width * completion, 0.8, {
+        fill: "white"
+    });
+    visual.text(text, 48.8, verticalIndex + 0.6, {
+        color: "blue",
+        font: 0.6,
+        align: "right"
+    });
 }
 
 /**

@@ -1,9 +1,10 @@
+import { registerHaulingProvider, unregisterHaulingProvider } from "system/hauling/HaulerInterface";
 import { getMapData } from "system/scouting/ScoutInterface";
 import { getCreeps, registerCreepConfig, unregisterHandle } from "system/spawning/SpawnInterface";
 import { getMainStorage } from "system/storage/StorageInterface";
 import { Log } from "utils/logger/Logger";
 import { MemoryComponent, memoryWriter } from "utils/MemoryWriter";
-import { unpackPos, unpackPosList } from "utils/Packrat";
+import { packPos, unpackPos, unpackPosList } from "utils/Packrat";
 import { Traveler } from "utils/traveler/Traveler";
 import { getMultirooomDistance, samePos } from "utils/UtilityFunctions";
 import {
@@ -17,7 +18,7 @@ import {
 /*
     We don't want to do too much here. Calcuate the mining path, figure out our creep configs, and know how to run the logic
 */
-export class SourceMinerSystem implements MemoryComponent {
+export class SourceMinerSystem implements MemoryComponent, LogisticsNodeProvidor {
     roomName: string;
 
     private memory?: SourceMinerMemory;
@@ -27,6 +28,7 @@ export class SourceMinerSystem implements MemoryComponent {
     private freeSpaces: RoomPosition[] = [];
     private creepAssignments: { [creepName: string]: MinerAssignment } = {};
     private configs: CreepConfig[] = [];
+    private logisticsNodes: { [positionKey: string]: LogisticsNode } = {};
 
     get handle() {
         return `Mining:${this.parentRoomName}->${this.roomName}:${this.sourceId}`;
@@ -103,7 +105,7 @@ export class SourceMinerSystem implements MemoryComponent {
         }
     }
 
-    _reloadCreepConfigs() {
+    _reloadCreepConfigs(makeStarterCreep: boolean) {
         this.loadMemory();
 
         let parentRoom = Game.rooms[this.parentRoomName];
@@ -128,8 +130,18 @@ export class SourceMinerSystem implements MemoryComponent {
                         this.freeSpaces.length,
                         parentRoom,
                         this.memory!.pathLength,
-                        mapData
+                        mapData,
+                        this.pathLength
                     );
+                    if (makeStarterCreep) {
+                        this.configs.push({
+                            body: [WORK, MOVE],
+                            handle: handle,
+                            jobName: "Primordial",
+                            quantity: 1,
+                            subPriority: 0 //Make this spawn before all others, including the hauler
+                        });
+                    }
                 } else {
                     this.configs = [
                         _designCreepsForMineral(handle, this.freeSpaces.length, parentRoom, this.memory!.pathLength)
@@ -160,10 +172,12 @@ export class SourceMinerSystem implements MemoryComponent {
     _runCreeps() {
         this.loadMemory();
 
+        //TODO miners stop working sometimes... Not sure why yet
+
         let creeps = getCreeps(this.handle);
-        // Log.d(`Saw ${creeps.length} when running mining job with handle ${this.handle}`);
         if (creeps.length) {
             if (this.memory!.state === "Active") {
+                registerHaulingProvider(this.parentRoomName, this.handle, this);
                 for (let creep of creeps) {
                     if (!this.creepAssignments[creep.name]) {
                         let populationSize = _.sum(this.configs, c => c.quantity);
@@ -177,13 +191,16 @@ export class SourceMinerSystem implements MemoryComponent {
                     }
                     let assignment = this.creepAssignments[creep.name];
                     let primary = samePos(this.freeSpaces[0], assignment.placeToStand);
+                    // Log.d(`${creep.name} running with data ${primary}`);
                     if (this.isSource) {
                         _runSourceMiner(creep, assignment, primary);
+                        this.updateLogisticsNodes(creep, assignment);
                     } else {
                         //TODO Run mineral miner
                     }
                 }
             } else {
+                unregisterHaulingProvider(this.parentRoomName, this.handle);
                 for (let creep of creeps) {
                     if (_.random(0, 6) === 0) creep.swear();
                     let packedRally = getMapData(this.parentRoomName)?.pathingInfo?.packedRallyPos;
@@ -191,6 +208,10 @@ export class SourceMinerSystem implements MemoryComponent {
                 }
             }
         }
+    }
+
+    provideLogisticsNodes(): LogisticsNode[] {
+        return Object.values(this.logisticsNodes);
     }
 
     private clearStopReason(reason: MinerStopReason) {
@@ -263,6 +284,71 @@ export class SourceMinerSystem implements MemoryComponent {
         if (!Memory.sourceMinerMemory) Memory.sourceMinerMemory = {};
         if (this.memory) {
             Memory.sourceMinerMemory[this.sourceId as string] = this.memory;
+        }
+    }
+
+    private updateLogisticsNodes(creep: Creep, assignment: MinerAssignment) {
+        if (creep.pos.getRangeTo(assignment.placeToStand) != 0) {
+            return;
+        }
+
+        this.loadMemory();
+        let pathLength = this.memory!.pathLength;
+        let pathCost = this.memory!.pathCost;
+
+        const piles = creep.pos.lookFor(LOOK_RESOURCES).filter(pile => pile.resourceType === RESOURCE_ENERGY);
+        let pile: Resource | undefined;
+        if (piles.length) pile = piles[0];
+
+        let container = assignment.depositContainer ? Game.getObjectById(assignment.depositContainer) : undefined;
+
+        let positionKey = creep.name + ":" + packPos(creep.pos);
+        if (!container && !pile) {
+            delete this.logisticsNodes[positionKey];
+        } else {
+            let id: string;
+            let level: number, maxLevel: number;
+            let pos: RoomPosition;
+
+            if (container) {
+                id = container.id;
+                level = container.store.getUsedCapacity(RESOURCE_ENERGY);
+                maxLevel = container.store.getCapacity(RESOURCE_ENERGY);
+                pos = container.pos;
+            } else {
+                pile = pile!;
+                id = pile.id;
+                level = pile.amount;
+                maxLevel = 10000; //just an arbitrarily high number
+                pos = pile.pos;
+            }
+
+            //Dont waste cpu making a ton of object instaces
+            if (!this.logisticsNodes[positionKey]) {
+                this.logisticsNodes[positionKey] = {
+                    nodeId: positionKey,
+                    targetId: id,
+                    level: level,
+                    maxLevel: maxLevel,
+                    resource: RESOURCE_ENERGY,
+                    baseDrdt:
+                        creep.getBodyPower(WORK, "harvest", HARVEST_POWER) - (creep.getActiveBodyparts(CARRY) ? 0 : 1),
+                    type: "Source",
+                    lastKnownPosition: pos,
+                    serviceRoute: {
+                        pathLength: pathLength,
+                        pathCost: pathCost
+                    }
+                };
+            } else {
+                let node = this.logisticsNodes[positionKey];
+                node.targetId = id;
+                node.level = level;
+                node.maxLevel = maxLevel;
+                node.lastKnownPosition = pos;
+                node.serviceRoute.pathLength = pathLength;
+                node.serviceRoute.pathCost = pathCost;
+            }
         }
     }
 }

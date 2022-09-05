@@ -13,6 +13,8 @@ import { ScoutProcess } from "system/scouting/ScoutProcess";
 import { resetAllSystems } from "utils/SystemResetter";
 import { StorageProcess } from "system/storage/StorageProcess";
 import { MinerProcess } from "system/mining/MinerProcess";
+import { HaulerProcess } from "system/hauling/HaulerProcess";
+import { printSpawnQueues } from "system/spawning/SpawnInterface";
 
 let deferedInit = false;
 let globalRefresh = true;
@@ -49,6 +51,7 @@ function init() {
     global.runner.addProcess(new ScoutProcess());
     global.runner.addProcess(new StorageProcess());
     global.runner.addProcess(new MinerProcess());
+    global.runner.addProcess(new HaulerProcess());
 
     //===================================================================Initialize Global Functions
     global.processes = () => {
@@ -56,6 +59,7 @@ function init() {
     };
     global.setFeature = setFeature;
     global.toggleFeature = toggleFeature;
+    global.spawnQueues = printSpawnQueues;
 
     global.Profiler = Profiler.init();
 }

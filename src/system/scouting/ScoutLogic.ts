@@ -1,7 +1,7 @@
 import { distanceTransformDiag } from "utils/algorithms/DistanceTransform";
 import { floodFill } from "utils/algorithms/FloodFill";
 import { Log } from "utils/logger/Logger";
-import { packCoord, packCoordList, unpackCoord, packPos } from "utils/Packrat";
+import { packCoord, packCoordList, unpackCoord, packPos, packPosList } from "utils/Packrat";
 import { ROOMTYPE_CONTROLLER, Traveler } from "utils/traveler/Traveler";
 import {
     getFreeSpacesNextTo,
@@ -15,10 +15,8 @@ function evaluateSources(sources: [Source, ...Source[]]): [SourceInfo, ...Source
         return [
             {
                 id: sources[0].id,
-                packedPosition: packCoord(sources[0].pos.localCoords),
-                packedFreeSpots: packCoordList(
-                    getFreeSpacesNextTo(sources[0].pos, sources[0].room).map(p => p.localCoords)
-                )
+                packedPosition: packPos(sources[0].pos),
+                packedFreeSpots: packPosList(getFreeSpacesNextTo(sources[0].pos, sources[0].room))
             }
         ];
     }
@@ -86,6 +84,7 @@ function evaluateMining(room: Room): RoomMiningInfo | undefined {
 }
 
 function evaluateOwnership(room: Room): RoomOwnershipInfo | undefined {
+    // Log.d(`Checking ownership in room: ${room.name} with controller owner ${JSON.stringify(room.controller)}`);
     if (!room.controller?.owner && !room.controller?.reservation) return undefined;
 
     let ownerName = room.controller.owner?.username ?? room.controller.reservation!.username;
@@ -319,7 +318,7 @@ export function getRoomsToExplore(
         }
     }
 
-    Log.d(`Rooms to explore ${JSON.stringify(roomsToExplore)}`);
+    // Log.d(`Rooms to explore ${JSON.stringify(roomsToExplore)}`);
     return roomsToExplore;
 }
 

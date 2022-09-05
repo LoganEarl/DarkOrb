@@ -11,7 +11,7 @@ export function _maximizeBodyForTargetParts(
     targetPart: BodyPartConstant,
     targetNumber: number,
     maxCapacity: number,
-    maxCreeps?: number,
+    maxCreeps: number = 999,
     sorter?: BodySorter
 ): BodyPartConstant[][] {
     if (!sorter) sorter = DEFAULT_SORTER;
@@ -32,7 +32,7 @@ export function _maximizeBodyForTargetParts(
         while (
             bodyEnergyCost + repeatingCost <= maxCapacity &&
             currentBody.length + repeatingBody.length <= 50 &&
-            usedParts + repeatingBodyPartUsage <= targetNumber
+            usedParts < targetNumber
         ) {
             currentBody = currentBody.concat(repeatingBody);
             bodyEnergyCost += repeatingCost;
@@ -41,7 +41,7 @@ export function _maximizeBodyForTargetParts(
 
         currentBody.sort(sorter);
         bodies.push(currentBody);
-    } while (usedParts + baseBodyPartUsage <= targetNumber && (maxCreeps ?? bodies.length) >= bodies.length);
+    } while (usedParts < targetNumber && maxCreeps > bodies.length);
 
     return bodies;
 }

@@ -394,7 +394,7 @@ export class Traveler {
                             matrix.set(obstacle.pos.x, obstacle.pos.y, 0xff);
                         }
                     }
-                    if (reservations) {
+                    if (reservations && !options.ignoreCreeps) {
                         for (let reservation of reservations) {
                             matrix.set(reservation.x, reservation.y, RESERVE_COST);
                         }

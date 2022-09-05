@@ -171,9 +171,6 @@ export class SourceMinerSystem implements MemoryComponent, LogisticsNodeProvidor
 
     _runCreeps() {
         this.loadMemory();
-
-        //TODO miners stop working sometimes... Not sure why yet
-
         let creeps = getCreeps(this.handle);
         if (creeps.length) {
             if (this.memory!.state === "Active") {

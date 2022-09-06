@@ -1,6 +1,6 @@
+import { postAnalyticsEvent } from "system/storage/StorageInterface";
 import { FEATURE_VISUALIZE_HAULING } from "utils/featureToggles/FeatureToggleRegistry";
 import { getFeature } from "utils/featureToggles/FeatureToggles";
-import { Log } from "utils/logger/Logger";
 import { PriorityQueue } from "utils/PriorityQueue";
 import { Traveler } from "utils/traveler/Traveler";
 import { clamp } from "utils/UtilityFunctions";
@@ -11,6 +11,8 @@ export function _runHauler(
     assignment: LogisticsPairing,
     targetNode: LogisticsNode,
     storage: MainStorage,
+    parentRoomName: string,
+    analyticsCategories: string[],
     runResults?: HaulerRunResults
 ): HaulerRunResults {
     if (!assignment || !targetNode) {
@@ -62,7 +64,16 @@ export function _runHauler(
         } else if (!assignment.usesServiceRoute || runResults.newFreeCapacity === creep.store.getCapacity(resource)) {
             //head to target
             if (creep.pos.isNearTo(targetPos) && target && canTransferOrPickup(target, runResults)) {
-                withdrawFrom(creep, resource, Math.abs(assignment.deltaAtETA), target, runResults, targetNode);
+                withdrawFrom(
+                    creep,
+                    resource,
+                    Math.abs(assignment.deltaAtETA),
+                    target,
+                    runResults,
+                    targetNode,
+                    parentRoomName,
+                    analyticsCategories
+                );
                 creep.queueSay("🔽");
             } else if (!creep.pos.isNearTo(targetPos) && !runResults.usedMove) {
                 Traveler.travelTo(creep, targetPos);
@@ -372,26 +383,45 @@ function withdrawFrom(
     amount: number,
     target: LogisticsNodeTarget,
     runResults: HaulerRunResults,
-    logisticsNodeToUpdate: LogisticsNode
+    logisticsNodeToUpdate: LogisticsNode,
+    parentRoomName: string,
+    analyticsCategories: string[]
 ): void {
     if ((Memory.season1 && target instanceof ScoreCollector) || (Memory.season2 && target instanceof SymbolDecoder)) {
         console.log(
             `Hauler ${creep.name} tried to withdraw from an object of type ${typeof target}, which is not allowed`
         );
     } else if (target instanceof Resource) {
-        amount = Math.min(target.amount, creep.store.getFreeCapacity(target.resourceType));
+        amount = Math.min(target.amount, creep.store.getFreeCapacity(target.resourceType), runResults.newFreeCapacity);
         creep.pickup(target);
         logisticsNodeToUpdate.level -= amount;
         runResults.newUsedCapacity += amount;
         runResults.usedPickup = true;
         runResults.done = true;
+        postAnalyticsEvent(
+            parentRoomName,
+            amount,
+            ...analyticsCategories,
+            ...logisticsNodeToUpdate.analyticsCategories
+        );
     } else if (target instanceof Creep) {
-        amount = Math.min(amount, target.store.getUsedCapacity(resource), creep.store.getFreeCapacity(resource));
+        amount = Math.min(
+            amount,
+            target.store.getUsedCapacity(resource),
+            creep.store.getFreeCapacity(resource),
+            runResults.newFreeCapacity
+        );
         target.transfer(creep, resource, amount);
         logisticsNodeToUpdate.level -= amount;
         runResults.newUsedCapacity += amount;
         runResults.usedTransfer = true;
         runResults.done = true;
+        postAnalyticsEvent(
+            parentRoomName,
+            amount,
+            ...analyticsCategories,
+            ...logisticsNodeToUpdate.analyticsCategories
+        );
     } else if (target) {
         amount = Math.min(
             amount,
@@ -403,6 +433,12 @@ function withdrawFrom(
         logisticsNodeToUpdate.level -= amount;
         runResults.usedTransfer = true;
         runResults.done = true;
+        postAnalyticsEvent(
+            parentRoomName,
+            amount,
+            ...analyticsCategories,
+            ...logisticsNodeToUpdate.analyticsCategories
+        );
     } else {
         console.log(`Hauler ${creep.name} was unable to identify and withdraw from target ${JSON.stringify(target)}`);
     }

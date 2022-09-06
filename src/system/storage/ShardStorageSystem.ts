@@ -24,8 +24,21 @@ class ShardStorageSystem {
         }
     }
 
+    _postAnalyticsEvent(roomName: string, value: number, ...categories: string[]) {
+        if (this.roomStorageSystems[roomName])
+            this.roomStorageSystems[roomName]._postAnalyticsEvent(value, ...categories);
+    }
+
     _getMainStorage(roomName: string): MainStorage | undefined {
-        return this.roomStorageSystems[roomName].getMainStorage();
+        return this.roomStorageSystems[roomName]._getMainStorage();
+    }
+
+    _totalAnalytics(): void {
+        Object.values(this.roomStorageSystems).forEach(s => s._totalAnalytics());
+    }
+
+    _visualize(): void {
+        Object.values(this.roomStorageSystems).forEach(s => s._visualize());
     }
 }
 

@@ -31,7 +31,7 @@ export class SourceMinerSystem implements MemoryComponent, LogisticsNodeProvidor
     private logisticsNodes: { [positionKey: string]: LogisticsNode } = {};
 
     get handle() {
-        return `Mining:${this.parentRoomName}->${this.roomName}:${this.sourceId}`;
+        return `Mining:${this.parentRoomName}->${this.roomName}:${this.sourceId.substring(this.sourceId.length - 6)}`;
     }
 
     constructor(sourceId: Id<Source | Mineral>, isSource: boolean, roomName: string, parentRoomName: string) {
@@ -191,7 +191,7 @@ export class SourceMinerSystem implements MemoryComponent, LogisticsNodeProvidor
                     // Log.d(`${creep.name} running with data ${primary}`);
                     if (this.isSource) {
                         _runSourceMiner(creep, assignment, primary);
-                        this.updateLogisticsNodes(creep, assignment);
+                        this.updateSourceLogisticsNodes(creep, assignment);
                     } else {
                         //TODO Run mineral miner
                     }
@@ -284,7 +284,8 @@ export class SourceMinerSystem implements MemoryComponent, LogisticsNodeProvidor
         }
     }
 
-    private updateLogisticsNodes(creep: Creep, assignment: MinerAssignment) {
+    //TODO mineral support here
+    private updateSourceLogisticsNodes(creep: Creep, assignment: MinerAssignment) {
         if (creep.pos.getRangeTo(assignment.placeToStand) != 0) {
             return;
         }
@@ -331,6 +332,7 @@ export class SourceMinerSystem implements MemoryComponent, LogisticsNodeProvidor
                     baseDrdt:
                         creep.getBodyPower(WORK, "harvest", HARVEST_POWER) - (creep.getActiveBodyparts(CARRY) ? 0 : 1),
                     type: "Source",
+                    analyticsCategories: [this.handle, "Exhumer"],
                     lastKnownPosition: pos,
                     serviceRoute: {
                         pathLength: pathLength,

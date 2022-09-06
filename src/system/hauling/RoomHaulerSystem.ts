@@ -103,7 +103,7 @@ export class RoomHaulerSystem {
             if (pairing) {
                 this.haulerAssignments[creep.name] = pairing;
                 let node = this.getLogisticsNode(pairing.nodeId);
-                let results = _runHauler(creep, pairing, node, storage!);
+                let results = _runHauler(creep, pairing, node, storage!, this.roomName, [this.handle, "Drudge"]);
                 if (results.done) {
                     this.completeAssignment(creep);
                     toRunAgain[creep.name] = results;
@@ -131,7 +131,7 @@ export class RoomHaulerSystem {
             );
             if (pairing) {
                 let node = this.getLogisticsNode(pairing.nodeId);
-                _runHauler(hauler, pairing, node, storage!, lastResults);
+                _runHauler(hauler, pairing, node, storage!, this.roomName, [this.handle, "Drudge"], lastResults);
             }
         }
     }

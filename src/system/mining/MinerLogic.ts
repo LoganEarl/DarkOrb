@@ -1,5 +1,6 @@
 import { getMapData } from "system/scouting/ScoutInterface";
 import { bodyCost, maximizeBody, maximizeBodyForTargetParts } from "system/spawning/SpawnInterface";
+import { postAnalyticsEvent } from "system/storage/StorageInterface";
 import { Log } from "utils/logger/Logger";
 import { packPos } from "utils/Packrat";
 import { ROOMTYPE_CORE, ROOMTYPE_SOURCEKEEPER, Traveler } from "utils/traveler/Traveler";
@@ -75,15 +76,15 @@ export function _designCreepsForSource(
         bodies[0].push(CARRY);
     }
 
-    Log.d(
-        `Planning bodies for mining ${handle}.
-        ClaimedBy: ${mapData.ownership?.username},
-        Me: ${global.PLAYER_USERNAME}
-        E/t: ${energyPerTick}
-        Work parts: ${wantedWorkParts}
-        Bodies: ${JSON.stringify(bodies)}
-        MaxBodies: ${maxMiningSpots}`
-    );
+    // Log.d(
+    //     `Planning bodies for mining ${handle}.
+    //     ClaimedBy: ${mapData.ownership?.username},
+    //     Me: ${global.PLAYER_USERNAME}
+    //     E/t: ${energyPerTick}
+    //     Work parts: ${wantedWorkParts}
+    //     Bodies: ${JSON.stringify(bodies)}
+    //     MaxBodies: ${maxMiningSpots}`
+    // );
 
     let subHandle = 0;
     return bodies.map(body => {

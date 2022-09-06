@@ -21,7 +21,7 @@ const MIN_IMPASSIBLE_STRUCTURE_COST = 50;
 const MAX_IMAPSSIBLE_STRUCTURE_COST = 127;
 
 const RESERVE_TTL = 5;
-const RESERVE_COST = 6;
+const RESERVE_COST = 20;
 interface Reservation {
     position: RoomPosition;
     ttl: number;

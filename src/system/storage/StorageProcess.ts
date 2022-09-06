@@ -1,4 +1,6 @@
 import { Process } from "core/Process";
+import { FEATURE_VISUALIZE_STORAGE } from "utils/featureToggles/FeatureToggleRegistry";
+import { getFeature } from "utils/featureToggles/FeatureToggles";
 import { ScheduledJob } from "utils/ScheduledJob";
 import { _shardStorageSystem } from "./ShardStorageSystem";
 
@@ -12,11 +14,19 @@ export class StorageProcess extends Process {
     );
 
     constructor() {
-        super("StorageProcess", 1);
+        super("StorageProcess", 10);
         _shardStorageSystem._scanStorageSystems();
     }
 
     run(): void {
         this.periodicRoomScanner.run();
+    }
+
+    postRun(): void {
+        _shardStorageSystem._totalAnalytics();
+
+        if (getFeature(FEATURE_VISUALIZE_STORAGE)) {
+            _shardStorageSystem._visualize();
+        }
     }
 }

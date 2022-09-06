@@ -20,6 +20,7 @@ declare global {
         maxLevel: number; //The maximum the node can hold. Relevant for remote mining container's limited capacity
         resource: string; //The Type of resource
         type: LogisticsNodeType; //Whether we want delivered or we want it gone
+        analyticsCategories: string[]; //What categories we record the analytics data for
         priorityScalar?: number; //A scalar value to multiply the drdt calculation with to incentivize some transfers over others
         baseDrdt: number; //How quickly the resource level changes over time. Beware, can be +/-. Used in conjunction with service route to determine number of carry parts
         bodyDrdt?: number; //How much resource should be moved per tick. Replaces baseDrdt for the purposes of creep quotas.

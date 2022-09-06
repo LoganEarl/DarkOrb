@@ -4434,6 +4434,8 @@ interface TextStyle {
      * bold italic 1.5 Times New Roman
      */
     font?: number | string;
+
+    fontFamily?: string;
     /**
      * Stroke color in any web format, default is undefined (no stroke).
      */

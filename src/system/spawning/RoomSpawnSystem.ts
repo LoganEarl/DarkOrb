@@ -1,10 +1,11 @@
 //Keeps track of the spawns in a room.
 //Holds queued creep configs
 
+import { postAnalyticsEvent } from "system/storage/StorageInterface";
 import { Log } from "utils/logger/Logger";
 import { findStructure } from "utils/StructureFindCache";
 import { _creepManifest } from "./CreepManifest";
-import { _configShouldBeSpawned, _haveSufficientCapacity } from "./SpawnLogic";
+import { _bodyCost, _configShouldBeSpawned, _haveSufficientCapacity } from "./SpawnLogic";
 
 export class RoomSpawnSystem {
     public roomName: string;
@@ -65,6 +66,7 @@ export class RoomSpawnSystem {
                                 let i = readyToSpawn.indexOf(next);
                                 if (i > -1) readyToSpawn.splice(i, 1);
                             }
+                            postAnalyticsEvent(this.roomName, _bodyCost(next.body) * -1, next.handle, next.jobName);
                             Log.i(`Spawned creep for handle ${next.handle}`);
                         } else {
                             Log.e(

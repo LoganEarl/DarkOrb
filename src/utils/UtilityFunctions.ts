@@ -131,19 +131,26 @@ export function drawCircledItem(
     }
 }
 
-export function drawBar(text: string, verticalIndex: number, completion: number, visual: RoomVisual) {
+export function drawBar(
+    text: string,
+    verticalIndex: number,
+    completion: number,
+    visual: RoomVisual,
+    backColor: string = "white"
+) {
     completion = clamp(completion, 0, 1);
-    let width = 8;
+    let width = 10;
     visual.rect(49 - width, verticalIndex, width, 0.8, {
         fill: "black"
     });
     visual.rect(49 - width * completion, verticalIndex, width * completion, 0.8, {
-        fill: "white"
+        fill: backColor
     });
     visual.text(text, 48.8, verticalIndex + 0.6, {
-        color: "blue",
+        color: "gray",
         font: 0.6,
-        align: "right"
+        align: "right",
+        fontFamily: "Courier New"
     });
 }
 

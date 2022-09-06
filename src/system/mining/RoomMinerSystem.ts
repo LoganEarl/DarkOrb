@@ -73,7 +73,6 @@ export class RoomMinerSystem {
             first = false;
         });
     }
-
     _reloadAllPathInfo() {
         Object.values(this.sourceMinerSystems).forEach(s => s._reloadPathInfo());
     }

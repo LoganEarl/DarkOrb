@@ -53,20 +53,34 @@ export class RoomSpawnSystem {
                 .filter(c => _configShouldBeSpawned(c) && _haveSufficientCapacity(room, c));
 
             if (readyToSpawn.length && readySpawns.length) {
+                if (room.energyAvailable < 300) postAnalyticsEvent(room.name, 1, "SpawnGeneration");
+
                 for (let spawn of readySpawns) {
                     readyToSpawn.sort(this.priorityComparator);
                     let next = readyToSpawn[0];
                     let result = spawn.spawnCreep(next.body, "SPAWN_TEST:" + Math.random(), { dryRun: true });
                     if (result == OK) {
                         let name = _creepManifest._nextName(next.handle, next.jobName, next.subHandle);
-                        result = spawn.spawnCreep(next.body, name, { memory: next.memory });
+                        let memory = next.memory ?? {
+                            handle: next.handle,
+                            subHandle: next.subHandle,
+                            jobName: next.jobName
+                        };
+
+                        result = spawn.spawnCreep(next.body, name, { memory: memory });
                         if (result == OK) {
                             //Remove the spawned creep from the list of ready ones if there is more than one spawn
                             if (readySpawns.length > 1) {
                                 let i = readyToSpawn.indexOf(next);
                                 if (i > -1) readyToSpawn.splice(i, 1);
                             }
-                            postAnalyticsEvent(this.roomName, _bodyCost(next.body) * -1, next.handle, next.jobName);
+                            postAnalyticsEvent(
+                                this.roomName,
+                                _bodyCost(next.body) * -1,
+                                next.handle,
+                                next.jobName,
+                                "CreepSpawning"
+                            );
                             Log.i(`Spawned creep for handle ${next.handle}`);
                         } else {
                             Log.e(

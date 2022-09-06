@@ -401,6 +401,7 @@ function withdrawFrom(
         postAnalyticsEvent(
             parentRoomName,
             amount,
+            "GrossIncome",
             ...analyticsCategories,
             ...logisticsNodeToUpdate.analyticsCategories
         );
@@ -419,6 +420,7 @@ function withdrawFrom(
         postAnalyticsEvent(
             parentRoomName,
             amount,
+            "GrossIncome",
             ...analyticsCategories,
             ...logisticsNodeToUpdate.analyticsCategories
         );
@@ -436,6 +438,7 @@ function withdrawFrom(
         postAnalyticsEvent(
             parentRoomName,
             amount,
+            "GrossIncome",
             ...analyticsCategories,
             ...logisticsNodeToUpdate.analyticsCategories
         );

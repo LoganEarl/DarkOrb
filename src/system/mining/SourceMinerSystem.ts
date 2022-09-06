@@ -133,7 +133,7 @@ export class SourceMinerSystem implements MemoryComponent, LogisticsNodeProvidor
                         mapData,
                         this.pathLength
                     );
-                    if (makeStarterCreep) {
+                    if (makeStarterCreep && getCreeps(handle).length === 0) {
                         this.configs.push({
                             body: [WORK, MOVE],
                             handle: handle,
@@ -176,24 +176,29 @@ export class SourceMinerSystem implements MemoryComponent, LogisticsNodeProvidor
             if (this.memory!.state === "Active") {
                 registerHaulingProvider(this.parentRoomName, this.handle, this);
                 for (let creep of creeps) {
-                    if (!this.creepAssignments[creep.name]) {
-                        let populationSize = _.sum(this.configs, c => c.quantity);
-                        this.creepAssignments[creep.name] = _assignMiningSpace(
-                            creep,
-                            this.freeSpaces,
-                            this.sourceId,
-                            this.creepAssignments,
-                            populationSize
-                        );
-                    }
-                    let assignment = this.creepAssignments[creep.name];
-                    let primary = samePos(this.freeSpaces[0], assignment.placeToStand);
-                    // Log.d(`${creep.name} running with data ${primary}`);
-                    if (this.isSource) {
-                        _runSourceMiner(creep, assignment, primary);
-                        this.updateSourceLogisticsNodes(creep, assignment);
+                    if (this.freeSpaces.length < creeps.length && creep.memory.jobName === "Primordial") {
+                        creep.suicide();
+                        delete this.creepAssignments[creep.name];
                     } else {
-                        //TODO Run mineral miner
+                        if (!this.creepAssignments[creep.name]) {
+                            let populationSize = _.sum(this.configs, c => c.quantity);
+                            this.creepAssignments[creep.name] = _assignMiningSpace(
+                                creep,
+                                this.freeSpaces,
+                                this.sourceId,
+                                this.creepAssignments,
+                                populationSize
+                            );
+                        }
+                        let assignment = this.creepAssignments[creep.name];
+                        let primary = samePos(this.freeSpaces[0], assignment.placeToStand);
+                        // Log.d(`${creep.name} running with data ${primary}`);
+                        if (this.isSource) {
+                            _runSourceMiner(creep, assignment, primary);
+                            this.updateSourceLogisticsNodes(creep, assignment);
+                        } else {
+                            //TODO Run mineral miner
+                        }
                     }
                 }
             } else {

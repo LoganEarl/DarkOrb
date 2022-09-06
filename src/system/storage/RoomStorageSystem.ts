@@ -3,7 +3,7 @@ import { findStructure } from "utils/StructureFindCache";
 import { clamp, drawBar, exponentialMovingAverage, irregularExponentialMovingAverage } from "utils/UtilityFunctions";
 
 const ANALYTICS_WINDOW = 1500;
-const CATEGORY_ALL = "ALL";
+export const CATEGORY_ALL = "ALL";
 
 export class RoomStorageSystem implements MemoryComponent {
     public roomName: string;
@@ -25,6 +25,11 @@ export class RoomStorageSystem implements MemoryComponent {
         });
     }
 
+    public _getAnalyticsValue(category: string): number {
+        this.loadMemory();
+        return this.memory!.analytics[category]?.value ?? 0;
+    }
+
     public _visualize() {
         this.loadMemory();
         let analytics = Object.values(this.memory!.analytics);
@@ -44,13 +49,15 @@ export class RoomStorageSystem implements MemoryComponent {
             let index = 1;
             for (let entry of analytics) {
                 if (entry.category !== CATEGORY_ALL) {
-                    drawBar(
-                        entry.category + ":" + ("" + Math.round(entry.value)).padStart(4, " "),
-                        index++,
-                        Math.abs(entry.value) / Math.abs(analytics[0].value),
-                        visual,
-                        entry.value > 0 ? "blue" : "purple"
-                    );
+                    if (Math.round(entry.value) !== 0) {
+                        drawBar(
+                            entry.category + ":" + ("" + Math.round(entry.value)).padStart(4, " "),
+                            index++,
+                            Math.abs(entry.value) / Math.abs(analytics[0].value),
+                            visual,
+                            entry.value > 0 ? "blue" : "purple"
+                        );
+                    }
                 }
             }
         }

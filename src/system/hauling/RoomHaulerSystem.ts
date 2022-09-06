@@ -38,7 +38,10 @@ export class RoomHaulerSystem {
 
     public _reloadConfigs() {
         this.updateLogisticsNodes();
-        let spawnStarter = true;
+
+        let existingCreeps = getCreeps(this.handle);
+        let spawnStarter = existingCreeps.length === 0;
+
         let room = Game.rooms[this.roomName];
         if (room && (this.targetCarryParts > 0 || spawnStarter)) {
             let maxCreeps = room.controller!.level <= 3 ? MAX_HAULERS_PER_ROOM_LOW_RCL : MAX_HAULERS_PER_ROOM;

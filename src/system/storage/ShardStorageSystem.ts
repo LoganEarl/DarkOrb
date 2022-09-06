@@ -29,6 +29,11 @@ class ShardStorageSystem {
             this.roomStorageSystems[roomName]._postAnalyticsEvent(value, ...categories);
     }
 
+    _getAnalyticsValue(roomName: string, category: string) {
+        if (this.roomStorageSystems[roomName]) return this.roomStorageSystems[roomName]._getAnalyticsValue(category);
+        else return 0;
+    }
+
     _getMainStorage(roomName: string): MainStorage | undefined {
         return this.roomStorageSystems[roomName]._getMainStorage();
     }

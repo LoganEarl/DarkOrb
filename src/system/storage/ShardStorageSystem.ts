@@ -6,6 +6,8 @@ class ShardStorageSystem {
     private roomStorageSystems: { [roomName: string]: RoomStorageSystem } = {};
 
     _scanStorageSystems() {
+        Log.d("Rescanning storage rooms");
+
         //Check for registered rooms that are dead
         for (let system of Object.values(this.roomStorageSystems)) {
             if (!Game.rooms[system.roomName] || !Game.rooms[system.roomName].controller?.my) {

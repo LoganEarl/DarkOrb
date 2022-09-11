@@ -1,3 +1,4 @@
+import { object } from "lodash";
 import { distanceTransformDiag } from "utils/algorithms/DistanceTransform";
 import { floodFill } from "utils/algorithms/FloodFill";
 import { Log } from "utils/logger/Logger";
@@ -83,23 +84,26 @@ function evaluateMining(room: Room): RoomMiningInfo | undefined {
     };
 }
 
-function evaluateOwnership(room: Room): RoomOwnershipInfo | undefined {
-    // Log.d(`Checking ownership in room: ${room.name} with controller owner ${JSON.stringify(room.controller)}`);
-    if (!room.controller?.owner && !room.controller?.reservation) return undefined;
-
-    let ownerName = room.controller.owner?.username ?? room.controller.reservation!.username;
-    return {
-        lastUpdated: Game.time,
-        username: ownerName,
-        rcl: room.controller.level,
-        ownershipType: room.controller.owner ? "Claimed" : "Reserved"
-    };
-}
-
 const DANGEROUS_PARTS: BodyPartConstant[] = [RANGED_ATTACK, ATTACK, HEAL];
 const DANGEROUS_PARTS_OWNED_ROOM: BodyPartConstant[] = [RANGED_ATTACK, ATTACK, HEAL, WORK, CLAIM];
 
-function evaluateThreats(room: Room, isMyOwnedRoom: boolean): RoomThreatInfo | undefined {
+function evaluateOwnership(room: Room): [RoomThreatInfo | undefined, RoomOwnershipInfo | undefined] {
+    let ownershipInfo: RoomOwnershipInfo | undefined;
+    let threatInfo: RoomThreatInfo | undefined;
+
+    //Try to determine ownership with reservation or the controller
+    if (room.controller?.owner || room.controller?.reservation) {
+        let ownerName = room.controller.owner?.username ?? room.controller.reservation!.username;
+        ownershipInfo = {
+            lastUpdated: Game.time,
+            username: ownerName,
+            rcl: room.controller.level,
+            ownershipType: room.controller.owner ? "Claimed" : "Reserved"
+        };
+    }
+
+    let isMyOwnedRoom = ownershipInfo?.username === global.PLAYER_USERNAME;
+
     let dangerousParts = isMyOwnedRoom ? DANGEROUS_PARTS_OWNED_ROOM : DANGEROUS_PARTS;
 
     let hostileTowers = !isMyOwnedRoom
@@ -110,27 +114,52 @@ function evaluateThreats(room: Room, isMyOwnedRoom: boolean): RoomThreatInfo | u
         : [];
 
     let allEnemies = room.find(FIND_HOSTILE_CREEPS);
-    if (!allEnemies.length && !hostileTowers.length) {
-        return undefined;
+    if (allEnemies.length || hostileTowers.length) {
+        let allDangerous = allEnemies.filter(c => !c.my && _.any(c.body, p => dangerousParts.includes(p.type)));
+        let dangerousByPlayer: { [playerName: string]: Creep[] } = {};
+        allDangerous.forEach(c => {
+            if (!dangerousByPlayer[c.owner.username]) dangerousByPlayer[c.owner.username] = [];
+            dangerousByPlayer[c.owner.username].push(c);
+        });
+        let threatsByPlayer: { [playerName: string]: ThreatInfo } = {};
+        Object.keys(allDangerous).forEach(
+            player => (threatsByPlayer[player] = sumThreat(dangerousByPlayer[player] ?? [], hostileTowers, player))
+        );
+
+        let allPeaceful = allEnemies.filter(c => !c.my && !_.any(c.body, p => dangerousParts.includes(p.type)));
+        let peacefullByPlayer: { [playerName: string]: number } = {};
+        allPeaceful.forEach(
+            creep => (peacefullByPlayer[creep.owner.username] = (peacefullByPlayer[creep.owner.username] ?? 0) + 1)
+        );
+
+        threatInfo = {
+            lastUpdated: Game.time,
+            numCombatants: allDangerous.length,
+            numNonhostile: allPeaceful.length,
+            threatsByPlayer: threatsByPlayer
+        };
+
+        //If we didn't get ownership info from reservation info, use the creep info instead
+        if (!ownershipInfo) {
+            let maxThreat = _.max(
+                Object.values(threatsByPlayer),
+                t => t.towerDpt + t.healPt + t.meleeDpt + t.rangedDpt
+            );
+            let maxPeaceful = _.max(Object.keys(peacefullByPlayer), p => peacefullByPlayer[p]);
+
+            let owner = maxThreat?.playerName ?? maxPeaceful;
+            let type: RoomOwnershipType = maxThreat ? "Military" : "Economic";
+
+            ownershipInfo = {
+                lastUpdated: Game.time,
+                username: owner,
+                rcl: 0,
+                ownershipType: type
+            };
+        }
     }
 
-    let allDangerous = allEnemies.filter(c => _.any(c.body, p => dangerousParts.includes(p.type)));
-    let dangerousByPlayer: { [playerName: string]: Creep[] } = {};
-    allDangerous.forEach(c => {
-        if (!dangerousByPlayer[c.owner.username]) dangerousByPlayer[c.owner.username] = [];
-        dangerousByPlayer[c.owner.username].push(c);
-    });
-    let threatsByPlayer: { [playerName: string]: ThreatInfo } = {};
-    Object.keys(allDangerous).forEach(
-        player => (threatsByPlayer[player] = sumThreat(dangerousByPlayer[player] ?? [], hostileTowers, player))
-    );
-
-    return {
-        lastUpdated: Game.time,
-        numCombatants: allDangerous.length,
-        numNonhostile: allEnemies.length - allDangerous.length,
-        threatsByPlayer: threatsByPlayer
-    };
+    return [threatInfo, ownershipInfo];
 }
 
 function sumThreat(creeps: Creep[], allTowers: StructureTower[], owner: string): ThreatInfo {
@@ -153,6 +182,7 @@ function sumThreat(creeps: Creep[], allTowers: StructureTower[], owner: string):
     });
 
     return {
+        playerName: owner,
         towerDpt: totalTower,
         meleeDpt: totalAttack,
         rangedDpt: totalRanged,
@@ -239,17 +269,41 @@ function evaluatePathing(room: Room, exitsToRooms: string[]): RoomPathingInfo | 
     return undefined;
 }
 
-function evaluateRoomDepth(pathingInfo: RoomPathingInfo | undefined, exitsToRooms: string[], shardMap: ShardMap) {
-    let depthCheckRooms = pathingInfo?.pathableExits.map(roomName => shardMap[roomName]).filter(data => data);
-    if (!depthCheckRooms || depthCheckRooms.length === 0) {
-        depthCheckRooms = exitsToRooms.map(roomName => shardMap[roomName]).filter(data => data);
+function evaluateRoomDepth(
+    pathingInfo: RoomPathingInfo | undefined,
+    exitsToRooms: string[],
+    shardMap: ShardMap,
+    territoryRange: number
+): RoomTerritoryInfo {
+    let nearbyRooms = pathingInfo?.pathableExits.map(roomName => shardMap[roomName]).filter(data => data);
+    if (!nearbyRooms || nearbyRooms.length === 0) {
+        nearbyRooms = exitsToRooms.map(roomName => shardMap[roomName]).filter(data => data);
     }
-    Log.d(`depthRooms: ${JSON.stringify(depthCheckRooms)}`);
-    return (_.min(depthCheckRooms, roomData => roomData.roomSearchDepth)?.roomSearchDepth ?? 99) + 1;
+
+    let territories: { [roomName: string]: TerritoryInfo } = {};
+    for (let roomData of nearbyRooms) {
+        if (roomData.territoryInfo) {
+            for (let territory of roomData.territoryInfo) {
+                let existing = territories[territory.roomName];
+                if (!existing || existing.range > territory.range + 1) {
+                    territories[territory.roomName] = Object.assign({}, territory);
+                    territories[territory.roomName].range = territories[territory.roomName].range + 1;
+                }
+            }
+        }
+    }
+
+    let sortedTerritories: TerritoryInfo[] = Object.values(territories).filter(t => t.range <= territoryRange);
+    sortedTerritories.sort((a, b) => a.range - b.range);
+
+    // Log.d(`depthRooms: ${JSON.stringify(depthCheckRooms)}`);
+    return sortedTerritories as RoomTerritoryInfo;
 }
 
-export function scoutRoom(room: Room, shardMap: ShardMap): RoomScoutingInfo {
-    let ownership = evaluateOwnership(room);
+export function scoutRoom(room: Room, shardMap: ShardMap, territoryRange: number): RoomScoutingInfo {
+    let ownershipValues = evaluateOwnership(room);
+    let threatInfo = ownershipValues[0];
+    let ownership = ownershipValues[1];
 
     let exitsToRooms: string[] =
         _.unique(Object.values(Game.map.describeExits(room.name)))
@@ -257,16 +311,18 @@ export function scoutRoom(room: Room, shardMap: ShardMap): RoomScoutingInfo {
             .map(v => v!) ?? [];
     let pathingInfo = evaluatePathing(room, exitsToRooms);
     Log.i(`ownership: ${JSON.stringify(ownership)} username: ${global.PLAYER_USERNAME}`);
-    let roomDepth =
-        ownership?.username === global.PLAYER_USERNAME ? 0 : evaluateRoomDepth(pathingInfo, exitsToRooms, shardMap);
+    let territoryInfo: RoomTerritoryInfo =
+        ownership?.username === global.PLAYER_USERNAME && ownership?.ownershipType === "Claimed"
+            ? [{ roomName: room.name, range: 0 }]
+            : evaluateRoomDepth(pathingInfo, exitsToRooms, shardMap, territoryRange);
 
     return {
         roomName: room.name,
         roomType: Traveler.roomType(room.name),
-        roomSearchDepth: roomDepth,
         miningInfo: evaluateMining(room),
+        territoryInfo: territoryInfo,
         ownership: ownership,
-        hazardInfo: evaluateThreats(room, ownership?.username === global.PLAYER_USERNAME),
+        hazardInfo: threatInfo,
         exitsToRooms: exitsToRooms,
         pathingInfo: pathingInfo
     };
@@ -300,7 +356,7 @@ export function getRoomsToExplore(
     for (let roomName of cluster) {
         let scoutingInfo = scoutedRooms[roomName];
         //If the room is already far out, ignore it
-        if (scoutingInfo.roomSearchDepth >= maxDepth) continue;
+        if (scoutingInfo.territoryInfo[0].range >= maxDepth) continue;
 
         //Find rooms it connects to that aren't explored AND arent assigned already
         let eligibleExits = (scoutingInfo.pathingInfo?.pathableExits ?? []).filter(
@@ -309,10 +365,10 @@ export function getRoomsToExplore(
 
         if (eligibleExits.length) {
             //If there are rooms to explore, only add them to the list if they are among the closest to the cluster center
-            if (scoutingInfo.roomSearchDepth < minDepth) {
+            if (scoutingInfo.territoryInfo[0].range < minDepth) {
                 roomsToExplore = eligibleExits.slice();
-                minDepth = scoutingInfo.roomSearchDepth;
-            } else if (scoutingInfo.roomSearchDepth === minDepth) {
+                minDepth = scoutingInfo.territoryInfo[0].range;
+            } else if (scoutingInfo.territoryInfo[0].range === minDepth) {
                 roomsToExplore.push(...eligibleExits);
             }
         }
@@ -330,7 +386,7 @@ const EXCLUSION_ZONE = 2;
 
 //room position target locks with a TTL
 let controllerTargetLocks: { [creepName: string]: [RoomPosition, number] | undefined } = {};
-export function runScout(scout: Creep, roomToExplore: string, shardMap: ShardMap): boolean {
+export function runScout(scout: Creep, roomToExplore: string, shardMap: ShardMap, territoryRange: number): boolean {
     //If the room we are in is on our map but isn't signed by us
     if (scout.pos.room?.controller && shardMap[scout.pos.roomName] && !controllerTargetLocks[scout.name]) {
         let signature = getAppropriateControllerSignature(shardMap[scout.pos.roomName]);
@@ -363,7 +419,7 @@ export function runScout(scout: Creep, roomToExplore: string, shardMap: ShardMap
     }
     //If we are in the room we need to explore
     else if (scout.pos.roomName === roomToExplore && !shardMap[roomToExplore]) {
-        let roomData = scoutRoom(scout.room, shardMap);
+        let roomData = scoutRoom(scout.room, shardMap, territoryRange);
         //If it is a controller room, work on signing the controller if it isn't already done
         scout.queueSay("👁️✅");
         done = true;
@@ -401,7 +457,7 @@ function getAppropriateControllerSignature(roomData: RoomScoutingInfo): string {
         }
     }
 
-    if (roomData.roomSearchDepth <= EXCLUSION_ZONE && !room.controller?.owner && !room.controller?.reservation)
+    if (roomData.territoryInfo[0].range <= EXCLUSION_ZONE && !room.controller?.owner && !room.controller?.reservation)
         return EXCLUSION_SIGN;
 
     return SCOUTED_SIGN;

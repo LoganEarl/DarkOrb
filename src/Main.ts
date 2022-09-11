@@ -15,6 +15,7 @@ import { StorageProcess } from "system/storage/StorageProcess";
 import { MinerProcess } from "system/mining/MinerProcess";
 import { HaulerProcess } from "system/hauling/HaulerProcess";
 import { printSpawnQueues } from "system/spawning/SpawnInterface";
+import { WorkerProcess } from "system/working/WorkerProcess";
 
 let deferedInit = false;
 let globalRefresh = true;
@@ -52,6 +53,7 @@ function init() {
     global.runner.addProcess(new StorageProcess());
     global.runner.addProcess(new MinerProcess());
     global.runner.addProcess(new HaulerProcess());
+    global.runner.addProcess(new WorkerProcess());
 
     //===================================================================Initialize Global Functions
     global.processes = () => {
@@ -103,7 +105,7 @@ export const loop = () => {
         //Expend all creep speech queues
         sayAll();
 
-        // Automatically delete memory of missing creeps
+        // Automatically delete memory of missing creeps (not that we are using creep memory much)
         for (const name in Memory.creeps) {
             if (!(name in Game.creeps)) {
                 delete Memory.creeps[name];

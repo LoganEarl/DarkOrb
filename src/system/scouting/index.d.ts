@@ -1,8 +1,10 @@
 type RoomType = 0 | 1 | 2 | 3;
 
 type RoomOwnershipType =
-    | "Claimed" //They own the controller
-    | "Reserved"; //They reserved the controller
+    | "Claimed" //They own the controller. Superceeds other forms
+    | "Reserved" //They reserved the controller. Superceeds military and economic
+    | "Military" //They have combat creeps present. Superceeds economic
+    | "Economic"; //They have economic creeps present. Likely remotes.
 
 interface SourceInfo {
     id: string;
@@ -30,10 +32,17 @@ interface RoomOwnershipInfo {
 }
 
 interface ThreatInfo {
+    playerName: string;
     towerDpt: number;
     meleeDpt: number;
     rangedDpt: number;
     healPt: number;
+}
+
+type RoomTerritoryInfo = [TerritoryInfo, ...TerritoryInfo[]];
+interface TerritoryInfo {
+    roomName: string;
+    range: number;
 }
 
 interface RoomThreatInfo {
@@ -52,9 +61,10 @@ interface RoomPathingInfo {
 interface RoomScoutingInfo {
     roomName: string;
     roomType: RoomType;
-    roomSearchDepth: number; //How many rooms away this is from one of our claimed rooms
     exitsToRooms: string[];
+    territoryInfo: RoomTerritoryInfo; //Which of my rooms are near to this one. Needs to be at least one
 
+    // territoryInfo?:RoomTerritoryInfo[]; //Whi
     pathingInfo?: RoomPathingInfo; //If present, indicates this is an open enough room that we can rally creeps there.
     hazardInfo?: RoomThreatInfo; //Any invaders or hostile players displayed here
     miningInfo?: RoomMiningInfo; //Mining information on the room. Only present for Standard, Core, and Keeper rooms types

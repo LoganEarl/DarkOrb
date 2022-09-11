@@ -202,7 +202,7 @@ export function _assignMiningSpace(
 
 export function _runSourceMiner(creep: Creep, assignment: MinerAssignment, primaryMiner: boolean) {
     if (!samePos(creep.pos, assignment.placeToStand)) {
-        Traveler.travelTo(creep, assignment.placeToStand, { range: 0 });
+        Traveler.travelTo(creep, assignment.placeToStand);
     } else {
         Traveler.reservePosition(creep.pos);
 

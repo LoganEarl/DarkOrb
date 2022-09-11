@@ -379,10 +379,11 @@ export class Traveler {
                 }
 
                 let reservations = this.getReservedPositions(roomName);
-                // if (reservations) {
-                //   let visual = new RoomVisual()
-                //   reservations.forEach(pos => drawCircledItem(pos, "red", "solid", .35, undefined, visual))
-                // }
+                if (reservations) {
+                    reservations.forEach(pos =>
+                        drawCircledItem(pos, "red", "solid", 0.35, undefined, new RoomVisual(pos.roomName))
+                    );
+                }
 
                 if (options.obstacles || reservations.length) {
                     matrix = matrix!.clone();
@@ -394,9 +395,10 @@ export class Traveler {
                             matrix.set(obstacle.pos.x, obstacle.pos.y, 0xff);
                         }
                     }
-                    if (reservations && !options.ignoreCreeps) {
+                    if (reservations) {
                         for (let reservation of reservations) {
-                            matrix.set(reservation.x, reservation.y, RESERVE_COST);
+                            if (matrix.get(reservation.x, reservation.y) < RESERVE_COST)
+                                matrix.set(reservation.x, reservation.y, RESERVE_COST);
                         }
                     }
                 }

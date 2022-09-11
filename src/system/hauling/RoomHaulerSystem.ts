@@ -114,7 +114,7 @@ export class RoomHaulerSystem {
             } else {
                 let rally = getRallyPosition(this.roomName);
                 if (rally) {
-                    Traveler.travelTo(creep, rally);
+                    Traveler.travelTo(creep, rally, { range: 3 });
                 }
                 creep.sayWaiting();
             }

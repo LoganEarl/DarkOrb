@@ -6,7 +6,7 @@ class ShardHaulerSystem {
     private roomHaulerSystems: { [roomName: string]: RoomHaulerSystem } = {};
 
     public _rescanRooms() {
-        Log.d("Rescanning mining rooms");
+        Log.d("Rescanning hauling rooms");
         let minerRooms = Object.keys(this.roomHaulerSystems);
         minerRooms.forEach(roomName => {
             if (!Game.rooms[roomName] || Game.rooms[roomName].find(FIND_MY_SPAWNS).length === 0) {

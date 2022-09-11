@@ -105,7 +105,7 @@ export class SourceMinerSystem implements MemoryComponent, LogisticsNodeProvidor
         }
     }
 
-    _reloadCreepConfigs(makeStarterCreep: boolean) {
+    _reloadConfigs(makeStarterCreep: boolean) {
         this.loadMemory();
 
         let parentRoom = Game.rooms[this.parentRoomName];
@@ -115,13 +115,21 @@ export class SourceMinerSystem implements MemoryComponent, LogisticsNodeProvidor
             this.addStopReason("NoHomeRoom");
         }
 
+        //Determine if we own the room
+        let mapData: RoomScoutingInfo | undefined = getMapData(this.roomName);
+        if (mapData?.ownership && mapData.ownership.username !== global.PLAYER_USERNAME) {
+            if (mapData.ownership.ownershipType === "Claimed") this.addStopReason("ForeignOwnership");
+            else this.clearStopReason("ForeignOwnership");
+
+            if (mapData.ownership.ownershipType === "Reserved") this.addStopReason("ForeignReservation");
+            else this.clearStopReason("ForeignReservation");
+        }
+
         let handle = this.handle;
         if (this.memory!.state !== "Active") {
             //When we aren't active we prevent additional creep spawns. We DONT stop running though.
             unregisterHandle(handle, this.parentRoomName);
         } else {
-            //Get map data so we know how big to make our creep
-            let mapData: RoomScoutingInfo | undefined = getMapData(this.roomName);
             if (mapData) {
                 this.clearStopReason("NoMapData");
                 if (this.isSource) {

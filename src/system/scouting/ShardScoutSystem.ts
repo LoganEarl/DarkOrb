@@ -31,7 +31,7 @@ class ShardScoutSystem implements MemoryComponent {
             this.memory = Memory.scoutMemory ?? {
                 myRoomNames: rootRooms.map(r => r.name),
                 shardMap: _.mapKeys(
-                    rootRooms.map(room => scoutRoom(room, {})),
+                    rootRooms.map(room => scoutRoom(room, {}, MAX_SCOUT_DEPTH)),
                     s => s.roomName
                 ),
                 clusters: rootRooms.map(r => [r.name])
@@ -54,6 +54,9 @@ class ShardScoutSystem implements MemoryComponent {
     _subdivideSupercluster(): boolean {
         return false;
     }
+
+    //Registers room ownership to us, if there is no other form of ownership present.
+    _claimEconomically() {}
 
     _clearDeadCreepAssignments() {
         Object.keys(this.scoutAssignments).forEach(name => {
@@ -134,7 +137,7 @@ class ShardScoutSystem implements MemoryComponent {
 
                 let assignment = this.scoutAssignments[scout.name];
                 if (assignment) {
-                    let done = runScout(scout, assignment, shardMap);
+                    let done = runScout(scout, assignment, shardMap, MAX_SCOUT_DEPTH);
                     if (done) {
                         Log.i(`${scout.name} has finished scouting ${assignment}`);
                         if (!clusters[i].includes(assignment)) {

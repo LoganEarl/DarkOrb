@@ -10,3 +10,5 @@ export function getRallyPosition(roomName: string): RoomPosition | undefined {
     if (rawRally) return unpackPos(rawRally);
     return undefined;
 }
+
+export function claimRoomEconomically(roomName: string) {}

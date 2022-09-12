@@ -1,10 +1,11 @@
 import { getMainStorage } from "system/storage/StorageInterface";
 import { unpackCoordList, unpackPosList } from "utils/Packrat";
+import { drawBar } from "utils/UtilityFunctions";
 import { _calcualteMiningPath } from "./MinerLogic";
 import { SourceMinerSystem } from "./SourceMinerSystem";
 
 //TODO Hardcoded for now. Replace when I have spawn loading controls
-const MAX_MINING_OPERATIONS = 6;
+const MAX_MINING_OPERATIONS = 5;
 export class RoomMinerSystem {
     private sourceMinerSystems: { [sourceId: string]: SourceMinerSystem } = {};
     private roomName: string;
@@ -59,7 +60,17 @@ export class RoomMinerSystem {
     }
 
     _visualize() {
-        Object.values(this.sourceMinerSystems).forEach(s => s._visualize());
+        let systems = Object.values(this.sourceMinerSystems);
+        systems.forEach(s => s._visualize());
+
+        let totalWorkPartsWanted = _.sum(systems, s => s.targetWorkParts);
+        let numParts = _.sum(systems, s => s.currentParts);
+        drawBar(
+            `MinerParts: ${numParts}/${totalWorkPartsWanted}`,
+            3,
+            numParts / totalWorkPartsWanted,
+            Game.rooms[this.roomName].visual
+        );
     }
 
     _runCreeps() {

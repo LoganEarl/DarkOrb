@@ -136,7 +136,7 @@ export function drawBar(
     verticalIndex: number,
     completion: number,
     visual: RoomVisual,
-    backColor: string = "white"
+    backColor: string = "blue"
 ) {
     completion = clamp(completion, 0, 1);
     let width = 10;

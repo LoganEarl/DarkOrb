@@ -7,8 +7,10 @@ import {
     unregisterHandle
 } from "system/spawning/SpawnInterface";
 import { ANALYTICS_CATEGORY_IN, ANALYTICS_CATEGORY_OUT, getEnergyPerTick } from "system/storage/StorageInterface";
+import { Log } from "utils/logger/Logger";
 import { MemoryComponent, memoryWriter } from "utils/MemoryWriter";
 import { Traveler } from "utils/traveler/Traveler";
+import { drawBar } from "utils/UtilityFunctions";
 import {
     _constructionPriorities,
     _maintainencePriorities,
@@ -28,6 +30,7 @@ export class RoomWorkSystem implements MemoryComponent, LogisticsNodeProvidor {
     private memory?: WorkMemory;
 
     public roomName: string;
+    private targetWorkParts: number = 0;
 
     private creepAssignments: { [creepName: string]: string } = {};
     private logisticsNodes: { [creepName: string]: LogisticsNode } = {};
@@ -61,6 +64,14 @@ export class RoomWorkSystem implements MemoryComponent, LogisticsNodeProvidor {
                 }
             );
         });
+
+        let numWork = _.sum(getCreeps(this.handle), c => _.sum(c.body, p => (p.type === WORK ? 1 : 0)));
+        drawBar(
+            `WorkerParts: ${numWork}/${this.targetWorkParts}`,
+            2,
+            numWork / this.targetWorkParts,
+            Game.rooms[this.roomName].visual
+        );
     }
 
     _runCreeps() {
@@ -135,11 +146,13 @@ export class RoomWorkSystem implements MemoryComponent, LogisticsNodeProvidor {
 
             //Net energy not counting workers
             let availableEnergy =
-                getEnergyPerTick(this.roomName, ANALYTICS_CATEGORY_IN) -
-                getEnergyPerTick(this.roomName, "CreepSpawning") +
+                getEnergyPerTick(this.roomName, ANALYTICS_CATEGORY_IN) +
+                getEnergyPerTick(this.roomName, "CreepSpawning") -
                 getEnergyPerTick(this.roomName, "Artificer");
+            Log.d(`Available energy: ${availableEnergy}`);
             //If we are netting low, only make a single dude to maintain things
             if (availableEnergy < 0 || focus === "None") {
+                this.targetWorkParts = 1;
                 configs = [
                     {
                         handle: this.handle,
@@ -153,34 +166,35 @@ export class RoomWorkSystem implements MemoryComponent, LogisticsNodeProvidor {
                 let bodies: BodyPartConstant[][] = [];
                 if (focus === "Construction") {
                     //Each part is 5 e/t.
-                    let parts = Math.ceil(availableEnergy / BUILD_POWER);
+                    this.targetWorkParts = Math.ceil(availableEnergy / BUILD_POWER);
                     bodies = maximizeBodyForTargetParts(
                         [WORK, CARRY, CARRY, CARRY, MOVE],
                         [WORK, CARRY, MOVE],
                         WORK,
-                        parts,
+                        this.targetWorkParts,
                         Game.rooms[this.roomName]!.energyCapacityAvailable
                     );
                 } else if (focus === "Upgrade") {
-                    let parts = Math.ceil(availableEnergy / UPGRADE_CONTROLLER_POWER);
+                    this.targetWorkParts = Math.ceil(availableEnergy / UPGRADE_CONTROLLER_POWER);
                     bodies = maximizeBodyForTargetParts(
                         [WORK, WORK, CARRY, MOVE],
                         [WORK, WORK, CARRY, MOVE],
                         WORK,
-                        parts,
+                        this.targetWorkParts,
                         Game.rooms[this.roomName]!.energyCapacityAvailable
                     );
                 }
 
-                configs = bodies.map(body => {
-                    return {
+                configs = [];
+                for (let i = 0; i < bodies.length; i++) {
+                    configs.push({
                         handle: this.handle,
-                        subHandle: "Artificer",
-                        body: body,
+                        subHandle: "Artificer:" + i,
+                        body: bodies[i],
                         jobName: "Artificer",
                         quantity: 1
-                    };
-                });
+                    });
+                }
             }
             registerCreepConfig(this.handle, configs, this.roomName);
         } else {

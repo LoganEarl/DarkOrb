@@ -53,5 +53,6 @@ declare global {
         usedTransfer: boolean; //Whether we have transfered resources this tick
         usedPickup: boolean; //Whether we have picked up resources this tick
         done: boolean; //Whether we completed the job this tick
+        invalidNode: boolean; //Flag set when the node it tried to service was invalid in some way and should be deleted
     }
 }

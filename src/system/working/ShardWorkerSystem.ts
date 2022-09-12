@@ -99,6 +99,7 @@ class ShardWorkerSystem {
                     bestRoom._updateWorkDetail({
                         detailId: room.controller!.id,
                         detailType: "Upgrade",
+                        targetStructureType: STRUCTURE_CONTROLLER,
                         destPosition: room.controller!.pos,
                         targetId: room.controller!.id
                     });

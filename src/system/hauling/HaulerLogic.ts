@@ -1,6 +1,7 @@
 import { postAnalyticsEvent } from "system/storage/StorageInterface";
 import { FEATURE_VISUALIZE_HAULING } from "utils/featureToggles/FeatureToggleRegistry";
 import { getFeature } from "utils/featureToggles/FeatureToggles";
+import { Log } from "utils/logger/Logger";
 import { PriorityQueue } from "utils/PriorityQueue";
 import { Traveler } from "utils/traveler/Traveler";
 import { clamp } from "utils/UtilityFunctions";
@@ -16,14 +17,15 @@ export function _runHauler(
     runResults?: HaulerRunResults
 ): HaulerRunResults {
     if (!assignment || !targetNode) {
-        console.log(`Hauler ${creep.name} does not have job! This should not happen`);
+        Log.e(`Hauler ${creep.name} does not have job! This should not happen`);
         return {
             newUsedCapacity: creep.store.getUsedCapacity(),
             newFreeCapacity: creep.store.getFreeCapacity(),
             usedMove: false,
             usedTransfer: false,
             usedPickup: false,
-            done: true
+            done: true,
+            invalidNode: false
         };
     }
 
@@ -34,13 +36,21 @@ export function _runHauler(
             usedMove: false,
             usedTransfer: false,
             usedPickup: false,
-            done: false
+            done: false,
+            invalidNode: false
         };
     }
 
     let target: LogisticsNodeTarget | null = _lookupNodeTarget(targetNode.targetId);
     let targetPos = target?.pos ?? targetNode.lastKnownPosition;
     let resource = targetNode.resource as ResourceConstant;
+
+    //Sometimes we get bad nodes that crop up. Remove them when we find them
+    if (!target && creep.pos.roomName === targetPos.roomName) {
+        runResults.invalidNode = true;
+        runResults.done = true;
+        return runResults;
+    }
 
     if (getFeature(FEATURE_VISUALIZE_HAULING)) {
         let color = targetNode.type === "Sink" ? "green" : "yellow";

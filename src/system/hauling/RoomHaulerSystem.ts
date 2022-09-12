@@ -111,6 +111,10 @@ export class RoomHaulerSystem {
                     this.completeAssignment(creep);
                     toRunAgain[creep.name] = results;
                 }
+                if (results.invalidNode) {
+                    //Remove bad nodes
+                    delete this.logisticsNodes[node.nodeId];
+                }
             } else {
                 let rally = getRallyPosition(this.roomName);
                 if (rally) {
@@ -155,9 +159,15 @@ export class RoomHaulerSystem {
         }
 
         let numCarry = _.sum(getCreeps(this.handle), c => _.sum(c.body, p => (p.type === CARRY ? 1 : 0)));
+        Game.rooms[this.roomName]?.visual.text("Populations", 48.8, 0.6, {
+            color: "gray",
+            font: 0.6,
+            align: "right",
+            fontFamily: "Courier New"
+        });
         drawBar(
             `HaulerParts: ${numCarry}/${this.targetCarryParts}`,
-            0,
+            1,
             numCarry / this.targetCarryParts,
             Game.rooms[this.roomName].visual
         );

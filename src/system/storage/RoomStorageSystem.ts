@@ -2,6 +2,7 @@ import { MemoryComponent, memoryWriter } from "utils/MemoryWriter";
 import { findStructure } from "utils/StructureFindCache";
 import { clamp, drawBar, exponentialMovingAverage, irregularExponentialMovingAverage } from "utils/UtilityFunctions";
 
+const VISUAL_START_HEIGHT = 5;
 const ANALYTICS_WINDOW = 1500;
 export const _CATEGORY_ALL = "Net";
 export const _CATEGORY_GOSS_INCOME = "In";
@@ -46,14 +47,20 @@ export class RoomStorageSystem implements MemoryComponent {
         let allEntry = this.memory!.analytics[_CATEGORY_ALL];
 
         if (analytics[0].value !== 0) {
+            Game.rooms[this.roomName]?.visual.text("Analytics", 48.8, VISUAL_START_HEIGHT + 0.6, {
+                color: "gray",
+                font: 0.6,
+                align: "right",
+                fontFamily: "Courier New"
+            });
             drawBar(
                 "Total:" + ("" + Math.round(allEntry.value)).padStart(4, " "),
-                0,
+                VISUAL_START_HEIGHT + 1,
                 Math.abs(allEntry.value) / Math.abs(analytics[0].value),
                 visual,
                 allEntry.value > 0 ? "blue" : "purple"
             );
-            let index = 1;
+            let index = VISUAL_START_HEIGHT + 2;
             for (let entry of analytics) {
                 if (entry.category !== _CATEGORY_ALL) {
                     if (Math.round(entry.value) !== 0) {

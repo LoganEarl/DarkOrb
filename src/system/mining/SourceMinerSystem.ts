@@ -29,6 +29,11 @@ export class SourceMinerSystem implements MemoryComponent, LogisticsNodeProvidor
     private creepAssignments: { [creepName: string]: MinerAssignment } = {};
     private configs: CreepConfig[] = [];
     private logisticsNodes: { [positionKey: string]: LogisticsNode } = {};
+    public targetWorkParts: number = 0;
+
+    public get currentParts(): number {
+        return _.sum(getCreeps(this.handle), c => c.getActiveBodyparts(WORK));
+    }
 
     get handle() {
         return `Mining:${this.parentRoomName}->${this.roomName}:${this.sourceId.substring(this.sourceId.length - 6)}`;
@@ -129,6 +134,7 @@ export class SourceMinerSystem implements MemoryComponent, LogisticsNodeProvidor
         if (this.memory!.state !== "Active") {
             //When we aren't active we prevent additional creep spawns. We DONT stop running though.
             unregisterHandle(handle, this.parentRoomName);
+            this.targetWorkParts = 0;
         } else {
             if (mapData) {
                 this.clearStopReason("NoMapData");
@@ -155,6 +161,7 @@ export class SourceMinerSystem implements MemoryComponent, LogisticsNodeProvidor
                         _designCreepsForMineral(handle, this.freeSpaces.length, parentRoom, this.memory!.pathLength)
                     ];
                 }
+                this.targetWorkParts = _.sum(this.configs, c => _.sum(c.body, p => (p === WORK ? 1 : 0)));
                 registerCreepConfig(handle, this.configs, this.parentRoomName);
             } else {
                 this.addStopReason("NoMapData");

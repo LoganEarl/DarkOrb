@@ -1,7 +1,8 @@
 //Keeps track of the spawns in a room.
 //Holds queued creep configs
 
-import { registerHaulingProvider } from "system/hauling/HaulerInterface";
+import { getNode, registerNode, unregisterNode } from "system/hauling/HaulerInterface";
+import { ANALYTICS_SPAWNING, ANALYTICS_SPAWN_GENERATION } from "system/storage/AnalyticsConstants";
 import { getMainStorage, postAnalyticsEvent } from "system/storage/StorageInterface";
 import { Log } from "utils/logger/Logger";
 import { findStructure } from "utils/StructureFindCache";
@@ -9,7 +10,7 @@ import { getMultirooomDistance } from "utils/UtilityFunctions";
 import { _creepManifest } from "./CreepManifest";
 import { _bodyCost, _configShouldBeSpawned, _haveSufficientCapacity } from "./SpawnLogic";
 
-export class RoomSpawnSystem implements LogisticsNodeProvidor {
+export class RoomSpawnSystem {
     public roomName: string;
 
     private creepConfigs: { [handle: string]: CreepConfig[] } = {};
@@ -37,34 +38,45 @@ export class RoomSpawnSystem implements LogisticsNodeProvidor {
         this.roomName = room.name;
     }
 
-    provideLogisticsNodes(): LogisticsNode[] {
+    _updateLogisticsNodes() {
         let room = Game.rooms[this.roomName];
         let storage = getMainStorage(this.roomName);
         if (room && storage) {
-            let spawns = findStructure(room, FIND_MY_SPAWNS)
-                .map(s => s as StructureSpawn)
-                .filter(s => s.store.getFreeCapacity(RESOURCE_ENERGY) > 0);
-            return spawns.map(s => {
-                let dist = getMultirooomDistance(storage!.pos, s.pos);
-                return {
-                    nodeId: s.id,
-                    targetId: s.id,
-                    level: s.store.getUsedCapacity(RESOURCE_ENERGY),
-                    maxLevel: s.store.getCapacity(RESOURCE_ENERGY),
-                    resource: RESOURCE_ENERGY,
-                    baseDrdt: 0,
-                    type: "Sink",
-                    analyticsCategories: [],
-                    lastKnownPosition: s.pos,
-                    priorityScalar: 2,
-                    serviceRoute: {
-                        pathLength: dist,
-                        pathCost: dist * 2
+            let fillables = findStructure(room, FIND_MY_STRUCTURES)
+                .filter(s => s.structureType === STRUCTURE_SPAWN || s.structureType === STRUCTURE_EXTENSION)
+                .map(s => s as StructureSpawn | StructureExtension);
+
+            for (let fillable of fillables) {
+                let node = getNode(this.roomName, fillable.id);
+                if (node) {
+                    if (fillable.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                        node.level = fillable.store.getUsedCapacity(RESOURCE_ENERGY);
+                        node.maxLevel = fillable.store.getCapacity(RESOURCE_ENERGY);
+                    } else {
+                        unregisterNode(this.roomName, "Spawning", fillable.id);
                     }
-                };
-            });
+                } else if (fillable.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                    let dist = getMultirooomDistance(storage!.pos, fillable.pos);
+                    node = {
+                        nodeId: fillable.id,
+                        targetId: fillable.id,
+                        level: fillable.store.getUsedCapacity(RESOURCE_ENERGY),
+                        maxLevel: fillable.store.getCapacity(RESOURCE_ENERGY),
+                        resource: RESOURCE_ENERGY,
+                        baseDrdt: 0,
+                        type: "Sink",
+                        analyticsCategories: [],
+                        lastKnownPosition: fillable.pos,
+                        priorityScalar: 2,
+                        serviceRoute: {
+                            pathLength: dist,
+                            pathCost: dist * 2
+                        }
+                    };
+                    registerNode(this.roomName, "Spawning", node);
+                }
+            }
         }
-        return [];
     }
 
     _registerCreepConfig(handle: string, configs: CreepConfig[]) {
@@ -86,9 +98,7 @@ export class RoomSpawnSystem implements LogisticsNodeProvidor {
                 .filter(c => _configShouldBeSpawned(c) && _haveSufficientCapacity(room, c));
 
             if (readyToSpawn.length && readySpawns.length) {
-                registerHaulingProvider(this.roomName, "SpawnSystem" + this.roomName, this);
-
-                if (room.energyAvailable < 300) postAnalyticsEvent(room.name, 1, "SpawnGeneration");
+                if (room.energyAvailable < 300) postAnalyticsEvent(room.name, 1, ANALYTICS_SPAWN_GENERATION);
 
                 for (let spawn of readySpawns) {
                     readyToSpawn.sort(this.priorityComparator);
@@ -114,7 +124,7 @@ export class RoomSpawnSystem implements LogisticsNodeProvidor {
                                 _bodyCost(next.body) * -1,
                                 next.handle,
                                 next.jobName,
-                                "CreepSpawning"
+                                ANALYTICS_SPAWNING
                             );
                             Log.i(`Spawned creep for handle ${next.handle}`);
                         } else {

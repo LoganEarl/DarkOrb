@@ -42,10 +42,6 @@ declare global {
         usesServiceRoute: boolean; //whether or not creep should make a pit stop at the storage to sort out its store
     }
 
-    interface LogisticsNodeProvidor {
-        provideLogisticsNodes(): LogisticsNode[];
-    }
-
     interface HaulerRunResults {
         newUsedCapacity: number; //The amount creep capacity used by all resources the creep has
         newFreeCapacity: number; //The amount of free space the creep has for any resource

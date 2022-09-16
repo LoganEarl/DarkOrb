@@ -1,5 +1,11 @@
-import { registerHaulingProvider } from "system/hauling/HaulerInterface";
+import { getNode, registerNode, unregisterNode } from "system/hauling/HaulerInterface";
 import { getRallyPosition } from "system/scouting/ScoutInterface";
+import {
+    ANALYTICS_ARTIFICER,
+    ANALYTICS_CONSTRUCTION,
+    ANALYTICS_REPAIR,
+    ANALYTICS_UPGRADE
+} from "system/storage/AnalyticsConstants";
 import { getMainStorage, postAnalyticsEvent } from "system/storage/StorageInterface";
 import { Log } from "utils/logger/Logger";
 import { Traveler } from "utils/traveler/Traveler";
@@ -42,25 +48,20 @@ interface SortedDetails {
     build?: WorkDetail;
 }
 
-export interface WorkerRunResults {
-    done: boolean;
-    logisticsNode?: LogisticsNode;
-}
-
 //returns true when it completes the assignment
 export function _runCreep(
     creep: Creep,
     assignment: WorkDetail,
-    homeRoom: string,
-    analyticsCategories: string[],
-    logisticsNode?: LogisticsNode
-): WorkerRunResults {
+    parentRoomName: string,
+    handle: string,
+    analyticsCategories: string[]
+): boolean {
     let target;
     if (creep.pos.roomName === assignment.destPosition.roomName) {
         target = Game.getObjectById(assignment.targetId);
         if (!target) {
             creep.queueSay("✅");
-            return { done: true };
+            return true;
         }
     }
 
@@ -68,24 +69,24 @@ export function _runCreep(
     if (creep.pos.roomName !== assignment.destPosition.roomName || creep.pos.getRangeTo(assignment.destPosition) > 3) {
         Traveler.travelTo(creep, assignment.destPosition, { range: 3 });
         creep.queueSay("🚚");
+        unregisterNode(parentRoomName, handle, creep.name);
     } else if (assignment.detailType === "Construction" && target) {
         target = target as ConstructionSite;
         if (target.progress <= target.progressTotal && creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
             creep.build(target);
-            postAnalyticsEvent(homeRoom, -1 * creep.getActiveBodyparts(WORK) * BUILD_POWER, "Artificer");
+            postAnalyticsEvent(
+                parentRoomName,
+                -1 * creep.getActiveBodyparts(WORK) * BUILD_POWER,
+                ANALYTICS_ARTIFICER,
+                ANALYTICS_CONSTRUCTION
+            );
             creep.queueSay("🔨");
             Traveler.reservePosition(creep.pos);
         } else if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
             creep.sayWaiting();
         }
 
-        logisticsNode = updateNode(
-            creep,
-            creep.getBodyPower(WORK, "build", BUILD_POWER),
-            homeRoom,
-            analyticsCategories,
-            logisticsNode
-        );
+        updateNode(creep, creep.getBodyPower(WORK, "build", BUILD_POWER), parentRoomName, handle, analyticsCategories);
     } else if (assignment.detailType === "Reinforce") {
         if (assignment.currentProgress === undefined || assignment.targetProgress === undefined) {
             Log.e(
@@ -98,22 +99,22 @@ export function _runCreep(
                 creep.queueSay("🏗️");
                 creep.repair(target as Structure);
                 postAnalyticsEvent(
-                    homeRoom,
+                    parentRoomName,
                     -1 * creep.getActiveBodyparts(WORK) * BUILD_POWER * REPAIR_COST,
-                    "Artificer"
+                    ANALYTICS_ARTIFICER,
+                    ANALYTICS_REPAIR
                 );
                 Traveler.reservePosition(creep.pos);
             }
-            logisticsNode = updateNode(
+            updateNode(
                 creep,
                 creep.getBodyPower(WORK, "repair", REPAIR_POWER * REPAIR_COST),
-                homeRoom,
-                analyticsCategories,
-                logisticsNode
+                parentRoomName,
+                handle,
+                analyticsCategories
             );
         } else {
             done = true;
-            logisticsNode = undefined;
         }
     } else if (assignment.detailType === "Repair") {
         target = target as Structure;
@@ -122,22 +123,22 @@ export function _runCreep(
                 creep.queueSay("🔧");
                 creep.repair(target);
                 postAnalyticsEvent(
-                    homeRoom,
+                    parentRoomName,
                     -1 * creep.getActiveBodyparts(WORK) * BUILD_POWER * REPAIR_COST,
                     "Artificer"
                 );
                 Traveler.reservePosition(creep.pos);
             }
-            logisticsNode = updateNode(
+            updateNode(
                 creep,
                 creep.getBodyPower(WORK, "repair", REPAIR_POWER * REPAIR_COST),
-                homeRoom,
-                analyticsCategories,
-                logisticsNode
+                parentRoomName,
+                handle,
+                analyticsCategories
             );
         } else {
             done = true;
-            logisticsNode = undefined;
+            unregisterNode(parentRoomName, handle, creep.name);
         }
     } else if (assignment.detailType === "Upgrade") {
         target = target as StructureController;
@@ -146,7 +147,12 @@ export function _runCreep(
             creep.upgradeController(target);
             creep.queueSay("⚫");
             Traveler.reservePosition(creep.pos);
-            postAnalyticsEvent(homeRoom, -1 * creep.getActiveBodyparts(WORK) * UPGRADE_CONTROLLER_POWER, "Artificer");
+            postAnalyticsEvent(
+                parentRoomName,
+                -1 * creep.getActiveBodyparts(WORK) * UPGRADE_CONTROLLER_POWER,
+                ANALYTICS_ARTIFICER,
+                ANALYTICS_UPGRADE
+            );
         } else {
             creep.sayWaiting();
         }
@@ -158,19 +164,19 @@ export function _runCreep(
             assignment.currentProgress >= assignment.targetProgress
         ) {
             done = true;
-            logisticsNode = undefined;
+            unregisterNode(parentRoomName, handle, creep.name);
         } else {
-            logisticsNode = updateNode(
+            updateNode(
                 creep,
                 creep.getBodyPower(WORK, "upgradeController", UPGRADE_CONTROLLER_POWER),
-                homeRoom,
-                analyticsCategories,
-                logisticsNode
+                parentRoomName,
+                handle,
+                analyticsCategories
             );
         }
     }
 
-    return { done: done, logisticsNode: logisticsNode };
+    return done;
 }
 
 export function _constructionPriorities(sortedDetails: SortedDetails): WorkDetail | undefined {
@@ -262,23 +268,22 @@ export function _sortDetails(creep: Creep, details: WorkDetail[]): SortedDetails
     return results;
 }
 
-function updateNode(
-    creep: Creep,
-    drdt: number,
-    homeRoomName: string,
-    analyticsCategories: string[],
-    logisticsNode?: LogisticsNode
-): LogisticsNode {
-    let mainStoragePos = getMainStorage(homeRoomName)?.pos ?? getRallyPosition(homeRoomName);
-    let pathLength = 20;
-    let pathCost = 40;
-    if (mainStoragePos && mainStoragePos.roomName !== homeRoomName) {
-        pathLength = getMultirooomDistance(creep.pos, mainStoragePos) * 1.5;
-        pathCost = pathLength * 2;
-    }
+function updateNode(creep: Creep, drdt: number, parentRoomName: string, handle: string, analyticsCategories: string[]) {
+    let node = getNode(parentRoomName, creep.name);
+    if (node) {
+        node.baseDrdt = drdt;
+        node.level = creep.store.getUsedCapacity(RESOURCE_ENERGY);
+        node.maxLevel = creep.store.getCapacity(RESOURCE_ENERGY);
+    } else {
+        let mainStoragePos = getMainStorage(parentRoomName)?.pos ?? getRallyPosition(parentRoomName);
+        let pathLength = 20;
+        let pathCost = 40;
+        if (mainStoragePos && mainStoragePos.roomName !== parentRoomName) {
+            pathLength = getMultirooomDistance(creep.pos, mainStoragePos) * 1.5;
+            pathCost = pathLength * 2;
+        }
 
-    if (!logisticsNode) {
-        return {
+        registerNode(parentRoomName, handle, {
             nodeId: creep.name,
             targetId: creep.name,
             level: creep.store.getUsedCapacity(RESOURCE_ENERGY),
@@ -287,17 +292,12 @@ function updateNode(
             type: "Sink",
             analyticsCategories: analyticsCategories,
             baseDrdt: drdt,
+            bodyDrdt: 1, //Reduce amount of stuff we try to create for workers. They don't add much system load
             serviceRoute: {
                 pathLength: pathLength,
                 pathCost: pathCost
             },
             lastKnownPosition: creep.pos
-        };
+        });
     }
-
-    logisticsNode.level = creep.store.getUsedCapacity(RESOURCE_ENERGY);
-    logisticsNode.maxLevel = creep.store.getCapacity(RESOURCE_ENERGY);
-    logisticsNode.baseDrdt = drdt;
-    logisticsNode.lastKnownPosition = creep.pos;
-    return logisticsNode;
 }

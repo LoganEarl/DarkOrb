@@ -1,7 +1,7 @@
 import { getRallyPosition } from "system/scouting/ScoutInterface";
 import { getCreeps, maximizeBody, registerCreepConfig, unregisterHandle } from "system/spawning/SpawnInterface";
 import { getMainStorage } from "system/storage/StorageInterface";
-import { FEATURE_VISUALIZE_HAULING } from "utils/featureToggles/FeatureToggleRegistry";
+import { FEATURE_VISUALIZE_HAULING } from "utils/featureToggles/FeatureToggleConstants";
 import { getFeature } from "utils/featureToggles/FeatureToggles";
 import { Log } from "utils/logger/Logger";
 import { PriorityQueue } from "utils/PriorityQueue";
@@ -15,7 +15,7 @@ const MAX_ASSIGNMENTS_PER_NODE = 10; //No more than this many creeps assigned to
 const HAULER_SAFTEY_MARGIN = 1.5; //How many more haulers we will spawn than we think we need
 
 export class RoomHaulerSystem {
-    private logisticsNodeProviders: { [id: string]: LogisticsNodeProvidor } = {};
+    private nodeIdsByProvider: { [providerId: string]: Set<string> } = {};
     private logisticsNodes: { [id: string]: LogisticsNode } = {};
 
     private roomName: string;
@@ -37,7 +37,18 @@ export class RoomHaulerSystem {
     }
 
     public _reloadConfigs() {
-        this.updateLogisticsNodes();
+        this.targetCarryParts = 0;
+
+        //console.log(`Calculating logistics node creeps`)
+        for (let node of Object.values(this.logisticsNodes)) {
+            this.logisticsNodes[node.nodeId] = node;
+            this.nodeAssignments[node.nodeId] = new PriorityQueue(MAX_ASSIGNMENTS_PER_NODE, _pairingComparitor);
+            const carryParts = Math.ceil(
+                ((node.serviceRoute.pathLength * 2 * Math.abs(node.bodyDrdt ?? node.baseDrdt)) / 50) *
+                    HAULER_SAFTEY_MARGIN
+            );
+            this.targetCarryParts += carryParts;
+        }
 
         let existingCreeps = getCreeps(this.handle);
         let spawnStarter = existingCreeps.length === 0;
@@ -90,7 +101,6 @@ export class RoomHaulerSystem {
             // Log.d(`Current pairing for ${creep}, ${JSON.stringify(pairing)}`);
             //If we don't have a job for the creep get it one
             if (!pairing || !this.logisticsNodes[pairing.nodeId]) {
-                this.updateLogisticsNodes();
                 //Assign the job
                 pairing = _assignJobForHauler(
                     creep,
@@ -173,29 +183,6 @@ export class RoomHaulerSystem {
         );
     }
 
-    private updateLogisticsNodes() {
-        if (this.lastNodeUpdate === Game.time) return;
-        else this.lastNodeUpdate = Game.time;
-
-        this.logisticsNodes = {};
-        this.targetCarryParts = 0;
-
-        //console.log(`Calculating logistics node creeps`)
-        for (let provider of Object.values(this.logisticsNodeProviders)) {
-            //console.log(`Processing new provider`)
-            const nodes = provider.provideLogisticsNodes();
-            for (let node of nodes) {
-                this.logisticsNodes[node.nodeId] = node;
-                this.nodeAssignments[node.nodeId] = new PriorityQueue(MAX_ASSIGNMENTS_PER_NODE, _pairingComparitor);
-                const carryParts = Math.ceil(
-                    ((node.serviceRoute.pathLength * 2 * Math.abs(node.bodyDrdt ?? node.baseDrdt)) / 50) *
-                        HAULER_SAFTEY_MARGIN
-                );
-                this.targetCarryParts += carryParts;
-            }
-        }
-    }
-
     private getLogisticsNode(id: string): LogisticsNode {
         return this.logisticsNodes[id] ?? null;
     }
@@ -208,11 +195,30 @@ export class RoomHaulerSystem {
         }
     }
 
-    public _registerProvider(id: string, provider: LogisticsNodeProvidor) {
-        this.logisticsNodeProviders[id] = provider;
+    //We use the same object reference. This means you can update your object in place as long as the id doesn't change.
+    public _registerNode(providerId: string, node: LogisticsNode) {
+        this.logisticsNodes[node.nodeId] = node;
+        if (!this.nodeIdsByProvider[providerId]) this.nodeIdsByProvider[providerId] = new Set();
+        this.nodeIdsByProvider[providerId].add(node.nodeId);
     }
 
-    public _unregisterProvider(id: string) {
-        delete this.logisticsNodeProviders[id];
+    public _unregisterNodes(providerId: string) {
+        if (this.nodeIdsByProvider[providerId]) {
+            for (let nodeId of this.nodeIdsByProvider[providerId]) {
+                delete this.logisticsNodes[nodeId];
+            }
+            this.nodeIdsByProvider[providerId].clear();
+        }
+    }
+
+    public _unregisterNode(providerId: string, nodeId: string) {
+        if (this.nodeIdsByProvider[providerId]?.has(nodeId)) {
+            delete this.logisticsNodes[nodeId];
+            this.nodeIdsByProvider[providerId].delete(nodeId);
+        }
+    }
+
+    public _getNode(nodeId: string): LogisticsNode | undefined {
+        return this.logisticsNodes[nodeId];
     }
 }

@@ -1,5 +1,5 @@
 import { postAnalyticsEvent } from "system/storage/StorageInterface";
-import { FEATURE_VISUALIZE_HAULING } from "utils/featureToggles/FeatureToggleRegistry";
+import { FEATURE_VISUALIZE_HAULING } from "utils/featureToggles/FeatureToggleConstants";
 import { getFeature } from "utils/featureToggles/FeatureToggles";
 import { Log } from "utils/logger/Logger";
 import { PriorityQueue } from "utils/PriorityQueue";
@@ -183,25 +183,30 @@ export function _assignJobForHauler(
     });
     if (servicableNodes.length) {
         const possiblePairings: { [nodeId: string]: LogisticsPairing } = {};
-        servicableNodes.forEach(
-            node => (possiblePairings[node.nodeId] = generatePair(creep, node, storage!, nodeAssignments, prevResults))
-        );
+        servicableNodes.forEach(node => {
+            let pair = generatePair(creep, node, storage!, nodeAssignments, prevResults);
+            if (Math.abs(pair.drdt) > 1 && !node.priorityScalar) possiblePairings[node.nodeId] = pair;
+
+            possiblePairings[node.nodeId] = pair;
+        });
         const bestPairing = _.max(possiblePairings, pairing => pairing.drdt);
 
-        // Log.d(`All nodes: ${JSON.stringify(logisticsNodes)}`);
-        // Log.d(`Servicable nodes: ${JSON.stringify(servicableNodes)}`);
-        // Log.d(`Previous assignments: ${JSON.stringify(nodeAssignments)}`);
-        // Log.d("Possible pairings: " + JSON.stringify(possiblePairings));
-        // Log.d("Best pairing: " + JSON.stringify(bestPairing));
-        nodeAssignments[bestPairing.nodeId].enqueue(bestPairing);
-        haulerAssignments[creep.name] = bestPairing;
+        if (bestPairing && nodeAssignments[bestPairing.nodeId]) {
+            // Log.d(`All nodes: ${JSON.stringify(logisticsNodes)}`);
+            // Log.d(`Servicable nodes: ${JSON.stringify(servicableNodes)}`);
+            // Log.d(`Previous assignments: ${JSON.stringify(nodeAssignments)}`);
+            // Log.d("Possible pairings: " + JSON.stringify(possiblePairings));
+            // Log.d("Best pairing: " + JSON.stringify(bestPairing));
+            nodeAssignments[bestPairing.nodeId].enqueue(bestPairing);
+            haulerAssignments[creep.name] = bestPairing;
 
-        //If you shortcut another creep's assignment, make sure they pick new jobs
-        let truncated = nodeAssignments[bestPairing.nodeId].truncateAfter(bestPairing);
-        for (let removedPairing of truncated) {
-            delete haulerAssignments[removedPairing.haulerName];
+            //If you shortcut another creep's assignment, make sure they pick new jobs
+            let truncated = nodeAssignments[bestPairing.nodeId].truncateAfter(bestPairing);
+            for (let removedPairing of truncated) {
+                delete haulerAssignments[removedPairing.haulerName];
+            }
+            return bestPairing;
         }
-        return bestPairing;
     }
     return null;
 }
@@ -273,7 +278,7 @@ function generatePair(
     let serviceResourceLevel = node.level;
 
     //Currently, the directDelta and serviceDelta only represent the best the creep can do. They don't factor in
-    //the other pairing we already have. We have to factor those in here. Sadly, this is a pain
+    //the other pairings we already have. We have to factor those in here. Sadly, this is a pain
     let lastDirectUpdate = 0;
     let lastServiceUpdate = 0;
     let otherNodePairings = nodeAssignments[node.nodeId]?.items ?? [];
@@ -316,7 +321,7 @@ function generatePair(
     }
 
     //All that work for this one little flag...
-    let useServiceRoute = serviceDrdt >= directDrdt;
+    let useServiceRoute = serviceDrdt > directDrdt;
 
     // console.log(`Drdt readouts for node:${node.id} direct:${directDrdt} service:${serviceDrdt}`)
 

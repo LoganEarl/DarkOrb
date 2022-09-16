@@ -1,6 +1,6 @@
 import { Process } from "core/Process";
 import { _shardMinerSystem } from "system/mining/ShardMinerSystem";
-import { FEATURE_VISUALIZE_HAULING } from "utils/featureToggles/FeatureToggleRegistry";
+import { FEATURE_VISUALIZE_HAULING } from "utils/featureToggles/FeatureToggleConstants";
 import { getFeature } from "utils/featureToggles/FeatureToggles";
 import { ScheduledJob } from "utils/ScheduledJob";
 import { _shardHaulerSystem } from "./ShardHaulerSystem";

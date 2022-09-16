@@ -1,5 +1,5 @@
 import { Process } from "core/Process";
-import { FEATURE_VISUALIZE_SCOUTING } from "utils/featureToggles/FeatureToggleRegistry";
+import { FEATURE_VISUALIZE_SCOUTING } from "utils/featureToggles/FeatureToggleConstants";
 import { getFeature } from "utils/featureToggles/FeatureToggles";
 import { ScheduledJob } from "utils/ScheduledJob";
 import { _shardScoutSystem } from "./ShardScoutSystem";

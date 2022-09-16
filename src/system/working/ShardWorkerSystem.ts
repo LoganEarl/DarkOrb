@@ -10,6 +10,9 @@ class ShardWorkerSystem {
     private roomWorkSystems: { [roomName: string]: RoomWorkSystem } = {};
     private lastWorkScan: { [roomName: string]: number } = {};
 
+    //Keep track of the current controller levels so we can tell when they change
+    private lastControllerLevels: { [roomName: string]: number } = {};
+
     _scanWorkSystems() {
         Log.d("Rescanning work rooms");
         //Check for registered rooms that are dead
@@ -151,13 +154,38 @@ class ShardWorkerSystem {
             });
         });
     }
-
+    //After each new RCL build for 1000 ticks and until we run out of construction projects
     private determineFocus(system: RoomWorkSystem) {
         let room = Game.rooms[system.roomName];
+        //The min time before we can toggle from construction to upgrading
+        let minUpdateTime = system.lastFocusUpdate + 1000;
+        //What the controller level was last time we checked the focus
+        let lastControllerLevel = this.lastControllerLevels[room.name] ?? 0;
         if (room) {
-            if (room.controller!.level === 1) system._setFocus("Upgrade");
-            else if (getMainStorage(system.roomName)?.structureType === STRUCTURE_SPAWN)
-                system._setFocus("Construction");
+            let hasConstructionJobs = system._hasWorkDetailsOfType("Construction");
+            //Start off the room by upgrading to rcl 2
+            if (room.controller!.level === 1) {
+                system.focus = "Upgrade";
+            } else if (hasConstructionJobs) {
+                system.focus = "Construction";
+            }
+            //If we just now upgraded switch over to building new buildings
+            else if (lastControllerLevel != room.controller!.level) {
+                system.focus = "Construction";
+                this.lastControllerLevels[room.name] = room.controller!.level;
+            }
+            //Check if we finished the construction period and need to move onto pushing for the next upgrade
+            else if (Game.time > minUpdateTime) {
+                let doneBuilding = !hasConstructionJobs;
+                if (room.controller!.level < 8 && doneBuilding) {
+                    system.focus = "Upgrade";
+                }
+
+                //No point in focusing once we hit max
+                else if (room.controller!.level === 8 && doneBuilding) {
+                    system.focus = "None";
+                }
+            }
         }
     }
 }

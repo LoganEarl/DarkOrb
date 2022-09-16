@@ -1,12 +1,13 @@
 import { MemoryComponent, memoryWriter } from "utils/MemoryWriter";
 import { findStructure } from "utils/StructureFindCache";
 import { clamp, drawBar, exponentialMovingAverage, irregularExponentialMovingAverage } from "utils/UtilityFunctions";
+import {} from "./AnalyticsConstants";
 
 const VISUAL_START_HEIGHT = 5;
 const ANALYTICS_WINDOW = 1500;
-export const _CATEGORY_ALL = "Net";
-export const _CATEGORY_GOSS_INCOME = "In";
-export const _CATEGORY_EXPENDATURE = "Out";
+export const _ANALYTICS_GOSS_INCOME = "In";
+export const _ANALYTICS_ALL = "Net";
+export const _ANALYTICS_EXPENDATURE = "Out";
 
 export class RoomStorageSystem implements MemoryComponent {
     public roomName: string;
@@ -20,11 +21,11 @@ export class RoomStorageSystem implements MemoryComponent {
     public _postAnalyticsEvent(value: number, ...categories: string[]) {
         this.loadMemory();
         let analytics = this.memory!.analytics;
-        analytics[_CATEGORY_ALL].nextTotal += value;
+        analytics[_ANALYTICS_ALL].nextTotal += value;
         if (value > 0) {
-            analytics[_CATEGORY_GOSS_INCOME].nextTotal += value;
+            analytics[_ANALYTICS_GOSS_INCOME].nextTotal += value;
         } else if (value < 0) {
-            analytics[_CATEGORY_EXPENDATURE].nextTotal += value;
+            analytics[_ANALYTICS_EXPENDATURE].nextTotal += value;
         }
 
         categories.forEach(category => {
@@ -44,7 +45,7 @@ export class RoomStorageSystem implements MemoryComponent {
         let visual = new RoomVisual(this.roomName);
 
         analytics.sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
-        let allEntry = this.memory!.analytics[_CATEGORY_ALL];
+        let allEntry = this.memory!.analytics[_ANALYTICS_ALL];
 
         if (analytics[0].value !== 0) {
             Game.rooms[this.roomName]?.visual.text("Analytics", 48.8, VISUAL_START_HEIGHT + 0.6, {
@@ -62,7 +63,7 @@ export class RoomStorageSystem implements MemoryComponent {
             );
             let index = VISUAL_START_HEIGHT + 2;
             for (let entry of analytics) {
-                if (entry.category !== _CATEGORY_ALL) {
+                if (entry.category !== _ANALYTICS_ALL) {
                     if (Math.round(entry.value) !== 0) {
                         drawBar(
                             entry.category + ":" + ("" + Math.round(entry.value)).padStart(4, " "),
@@ -153,12 +154,12 @@ export class RoomStorageSystem implements MemoryComponent {
             this.memory = Memory.storageMemory ?? {
                 analytics: {}
             };
-            if (!this.memory!.analytics[_CATEGORY_ALL])
-                this.memory!.analytics[_CATEGORY_ALL] = this.newAnalytics(_CATEGORY_ALL);
-            if (!this.memory!.analytics[_CATEGORY_EXPENDATURE])
-                this.memory!.analytics[_CATEGORY_EXPENDATURE] = this.newAnalytics(_CATEGORY_EXPENDATURE);
-            if (!this.memory!.analytics[_CATEGORY_GOSS_INCOME])
-                this.memory!.analytics[_CATEGORY_GOSS_INCOME] = this.newAnalytics(_CATEGORY_GOSS_INCOME);
+            if (!this.memory!.analytics[_ANALYTICS_ALL])
+                this.memory!.analytics[_ANALYTICS_ALL] = this.newAnalytics(_ANALYTICS_ALL);
+            if (!this.memory!.analytics[_ANALYTICS_EXPENDATURE])
+                this.memory!.analytics[_ANALYTICS_EXPENDATURE] = this.newAnalytics(_ANALYTICS_EXPENDATURE);
+            if (!this.memory!.analytics[_ANALYTICS_GOSS_INCOME])
+                this.memory!.analytics[_ANALYTICS_GOSS_INCOME] = this.newAnalytics(_ANALYTICS_GOSS_INCOME);
         }
     }
 

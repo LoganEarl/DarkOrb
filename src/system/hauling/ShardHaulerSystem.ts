@@ -40,15 +40,28 @@ class ShardHaulerSystem {
         Object.values(this.roomHaulerSystems).forEach(s => s._visualize());
     }
 
-    public _registerNodeProvider(roomName: string, id: string, provider: LogisticsNodeProvidor) {
+    public _getNode(roomName: string, nodeId: string): LogisticsNode | undefined {
         if (this.roomHaulerSystems[roomName]) {
-            this.roomHaulerSystems[roomName]._registerProvider(id, provider);
+            return this.roomHaulerSystems[roomName]._getNode(nodeId);
+        }
+        return undefined;
+    }
+
+    public _registerNode(roomName: string, providerId: string, node: LogisticsNode) {
+        if (this.roomHaulerSystems[roomName]) {
+            this.roomHaulerSystems[roomName]._registerNode(providerId, node);
         }
     }
 
-    public _unregisterNodeProvider(roomName: string, id: string) {
+    public _unregisterNodes(roomName: string, providerId: string) {
         if (this.roomHaulerSystems[roomName]) {
-            this.roomHaulerSystems[roomName]._unregisterProvider(id);
+            this.roomHaulerSystems[roomName]._unregisterNodes(providerId);
+        }
+    }
+
+    public _unregisterNode(roomName: string, providerId: string, nodeId: string) {
+        if (this.roomHaulerSystems[roomName]) {
+            this.roomHaulerSystems[roomName]._unregisterNode(providerId, nodeId);
         }
     }
 }

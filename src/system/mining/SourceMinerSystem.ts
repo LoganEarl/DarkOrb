@@ -1,4 +1,4 @@
-import { registerHaulingProvider, unregisterHaulingProvider } from "system/hauling/HaulerInterface";
+import { getNode, registerNode, unregisterNode, unregisterNodes } from "system/hauling/HaulerInterface";
 import { getMapData } from "system/scouting/ScoutInterface";
 import { getCreeps, registerCreepConfig, unregisterHandle } from "system/spawning/SpawnInterface";
 import { getMainStorage } from "system/storage/StorageInterface";
@@ -18,7 +18,7 @@ import {
 /*
     We don't want to do too much here. Calcuate the mining path, figure out our creep configs, and know how to run the logic
 */
-export class SourceMinerSystem implements MemoryComponent, LogisticsNodeProvidor {
+export class SourceMinerSystem implements MemoryComponent {
     roomName: string;
 
     private memory?: SourceMinerMemory;
@@ -28,7 +28,7 @@ export class SourceMinerSystem implements MemoryComponent, LogisticsNodeProvidor
     private freeSpaces: RoomPosition[] = [];
     private creepAssignments: { [creepName: string]: MinerAssignment } = {};
     private configs: CreepConfig[] = [];
-    private logisticsNodes: { [positionKey: string]: LogisticsNode } = {};
+
     public targetWorkParts: number = 0;
 
     public get currentParts(): number {
@@ -151,6 +151,7 @@ export class SourceMinerSystem implements MemoryComponent, LogisticsNodeProvidor
                         this.configs.push({
                             body: [WORK, MOVE],
                             handle: handle,
+                            subHandle: "StarterMiner",
                             jobName: "Primordial",
                             quantity: 1,
                             subPriority: 0 //Make this spawn before all others, including the hauler
@@ -189,7 +190,11 @@ export class SourceMinerSystem implements MemoryComponent, LogisticsNodeProvidor
         let creeps = getCreeps(this.handle);
         if (creeps.length) {
             if (this.memory!.state === "Active") {
-                registerHaulingProvider(this.parentRoomName, this.handle, this);
+                let creepNames = Object.keys(this.creepAssignments);
+                creepNames.forEach(name => {
+                    if (!Game.creeps[name]) delete this.creepAssignments[name];
+                });
+
                 for (let creep of creeps) {
                     if (this.freeSpaces.length < creeps.length && creep.memory.jobName === "Primordial") {
                         creep.suicide();
@@ -217,7 +222,7 @@ export class SourceMinerSystem implements MemoryComponent, LogisticsNodeProvidor
                     }
                 }
             } else {
-                unregisterHaulingProvider(this.parentRoomName, this.handle);
+                unregisterNodes(this.parentRoomName, this.handle);
                 for (let creep of creeps) {
                     if (_.random(0, 6) === 0) creep.swear();
                     let packedRally = getMapData(this.parentRoomName)?.pathingInfo?.packedRallyPos;
@@ -225,10 +230,6 @@ export class SourceMinerSystem implements MemoryComponent, LogisticsNodeProvidor
                 }
             }
         }
-    }
-
-    provideLogisticsNodes(): LogisticsNode[] {
-        return Object.values(this.logisticsNodes);
     }
 
     private clearStopReason(reason: MinerStopReason) {
@@ -320,9 +321,9 @@ export class SourceMinerSystem implements MemoryComponent, LogisticsNodeProvidor
 
         let container = assignment.depositContainer ? Game.getObjectById(assignment.depositContainer) : undefined;
 
-        let positionKey = creep.name + ":" + packPos(creep.pos);
+        let positionKey = pile?.resourceType + ":" + packPos(creep.pos);
         if (!container && !pile) {
-            delete this.logisticsNodes[positionKey];
+            unregisterNode(this.parentRoomName, this.handle, positionKey);
         } else {
             let id: string;
             let level: number, maxLevel: number;
@@ -341,9 +342,16 @@ export class SourceMinerSystem implements MemoryComponent, LogisticsNodeProvidor
                 pos = pile.pos;
             }
 
-            //Dont waste cpu making a ton of object instaces
-            if (!this.logisticsNodes[positionKey]) {
-                this.logisticsNodes[positionKey] = {
+            let existingNode = getNode(this.parentRoomName, positionKey);
+            if (existingNode) {
+                existingNode.targetId = id;
+                existingNode.level = level;
+                existingNode.maxLevel = maxLevel;
+                existingNode.lastKnownPosition = pos;
+                existingNode.serviceRoute.pathLength = pathLength;
+                existingNode.serviceRoute.pathCost = pathCost;
+            } else {
+                registerNode(this.parentRoomName, this.handle, {
                     nodeId: positionKey,
                     targetId: id,
                     level: level,
@@ -358,15 +366,7 @@ export class SourceMinerSystem implements MemoryComponent, LogisticsNodeProvidor
                         pathLength: pathLength,
                         pathCost: pathCost
                     }
-                };
-            } else {
-                let node = this.logisticsNodes[positionKey];
-                node.targetId = id;
-                node.level = level;
-                node.maxLevel = maxLevel;
-                node.lastKnownPosition = pos;
-                node.serviceRoute.pathLength = pathLength;
-                node.serviceRoute.pathCost = pathCost;
+                });
             }
         }
     }

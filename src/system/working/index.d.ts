@@ -32,6 +32,7 @@ interface WorkDetail {
 interface WorkMemory {
     details: { [id: string]: WorkDetail };
     focus: WorkFocus;
+    lastFocusUpdate: number;
 }
 
 interface Memory {

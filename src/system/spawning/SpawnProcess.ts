@@ -9,12 +9,13 @@ export class SpawnProcess extends Process {
     periodicRoomScanner: ScheduledJob = new ScheduledJob(_shardSpawnSystem._scanSpawnSystems, _shardSpawnSystem, 10);
 
     constructor() {
-        super("SpawnProcess", 1);
+        super("SpawnProcess", 0);
         _shardSpawnSystem._scanSpawnSystems();
     }
 
     run(): void {
         this.periodicRoomScanner.run();
+        _shardSpawnSystem._updateLogisticsNodes();
         _shardSpawnSystem._spawnCreeps();
     }
 }

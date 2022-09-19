@@ -413,12 +413,6 @@ function withdrawFrom(
         runResults.newUsedCapacity += amount;
         runResults.usedPickup = true;
         runResults.done = true;
-        postAnalyticsEvent(
-            parentRoomName,
-            amount,
-            ...analyticsCategories,
-            ...logisticsNodeToUpdate.analyticsCategories
-        );
     } else if (target instanceof Creep) {
         amount = Math.min(
             amount,
@@ -431,12 +425,6 @@ function withdrawFrom(
         runResults.newUsedCapacity += amount;
         runResults.usedTransfer = true;
         runResults.done = true;
-        postAnalyticsEvent(
-            parentRoomName,
-            amount,
-            ...analyticsCategories,
-            ...logisticsNodeToUpdate.analyticsCategories
-        );
     } else if (target) {
         amount = Math.min(
             amount,
@@ -448,12 +436,6 @@ function withdrawFrom(
         logisticsNodeToUpdate.level -= amount;
         runResults.usedTransfer = true;
         runResults.done = true;
-        postAnalyticsEvent(
-            parentRoomName,
-            amount,
-            ...analyticsCategories,
-            ...logisticsNodeToUpdate.analyticsCategories
-        );
     } else {
         console.log(`Hauler ${creep.name} was unable to identify and withdraw from target ${JSON.stringify(target)}`);
     }

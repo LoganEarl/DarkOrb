@@ -214,7 +214,7 @@ export class SourceMinerSystem implements MemoryComponent {
                         let primary = samePos(this.freeSpaces[0], assignment.placeToStand);
                         // Log.d(`${creep.name} running with data ${primary}`);
                         if (this.isSource) {
-                            _runSourceMiner(creep, assignment, primary);
+                            _runSourceMiner(creep, this.parentRoomName, this.handle, assignment, primary);
                             this.updateSourceLogisticsNodes(creep, assignment);
                         } else {
                             //TODO Run mineral miner

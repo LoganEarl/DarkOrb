@@ -160,9 +160,9 @@ export class RoomWorkSystem implements MemoryComponent {
                 getEnergyPerTick(this.roomName, ANALYTICS_GOSS_INCOME) +
                 getEnergyPerTick(this.roomName, ANALYTICS_SPAWNING) -
                 getEnergyPerTick(this.roomName, ANALYTICS_ARTIFICER);
-            availableEnergy *= 1.5;
+            availableEnergy *= 0.9;
 
-            Log.d(`Available energy: ${availableEnergy}`);
+            // Log.d(`Available energy: ${availableEnergy}`);
             //If we are netting low, only make a single dude to maintain things
             if (availableEnergy < 0 || focus === "None") {
                 this.targetWorkParts = 1;

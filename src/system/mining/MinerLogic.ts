@@ -200,7 +200,13 @@ export function _assignMiningSpace(
     return assignment;
 }
 
-export function _runSourceMiner(creep: Creep, assignment: MinerAssignment, primaryMiner: boolean) {
+export function _runSourceMiner(
+    creep: Creep,
+    parentRoomName: string,
+    handle: string,
+    assignment: MinerAssignment,
+    primaryMiner: boolean
+) {
     if (!samePos(creep.pos, assignment.placeToStand)) {
         Traveler.travelTo(creep, assignment.placeToStand);
     } else {
@@ -234,8 +240,9 @@ export function _runSourceMiner(creep: Creep, assignment: MinerAssignment, prima
             }
         }
 
-        let source = Game.getObjectById(assignment.mineId);
-        if (source) {
+        let source = Game.getObjectById(assignment.mineId) as Source;
+        if (source.energy > 0) {
+            postAnalyticsEvent(parentRoomName, creep.getBodyPower(WORK, "harvest", HARVEST_POWER), handle);
             creep.harvest(source);
         }
     }

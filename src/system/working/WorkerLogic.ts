@@ -71,6 +71,8 @@ export function _runCreep(
         creep.queueSay("🚚");
         unregisterNode(parentRoomName, handle, creep.name);
     } else if (assignment.detailType === "Construction" && target) {
+        Traveler.reservePosition(creep.pos);
+
         target = target as ConstructionSite;
         if (target.progress <= target.progressTotal && creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
             creep.build(target);
@@ -81,13 +83,14 @@ export function _runCreep(
                 ANALYTICS_CONSTRUCTION
             );
             creep.queueSay("🔨");
-            Traveler.reservePosition(creep.pos);
         } else if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
             creep.sayWaiting();
         }
 
         updateNode(creep, creep.getBodyPower(WORK, "build", BUILD_POWER), parentRoomName, handle, analyticsCategories);
     } else if (assignment.detailType === "Reinforce") {
+        Traveler.reservePosition(creep.pos);
+
         if (assignment.currentProgress === undefined || assignment.targetProgress === undefined) {
             Log.e(
                 `There is a reinfoce task without progress limits for creep:${creep.name} 
@@ -104,7 +107,6 @@ export function _runCreep(
                     ANALYTICS_ARTIFICER,
                     ANALYTICS_REPAIR
                 );
-                Traveler.reservePosition(creep.pos);
             }
             updateNode(
                 creep,
@@ -117,6 +119,8 @@ export function _runCreep(
             done = true;
         }
     } else if (assignment.detailType === "Repair") {
+        Traveler.reservePosition(creep.pos);
+
         target = target as Structure;
         if (target.hits < target.hitsMax || (target.structureType === STRUCTURE_RAMPART && target.hits < 20000)) {
             if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
@@ -127,7 +131,6 @@ export function _runCreep(
                     -1 * creep.getActiveBodyparts(WORK) * BUILD_POWER * REPAIR_COST,
                     "Artificer"
                 );
-                Traveler.reservePosition(creep.pos);
             }
             updateNode(
                 creep,
@@ -141,12 +144,12 @@ export function _runCreep(
             unregisterNode(parentRoomName, handle, creep.name);
         }
     } else if (assignment.detailType === "Upgrade") {
-        target = target as StructureController;
+        Traveler.reservePosition(creep.pos);
 
+        target = target as StructureController;
         if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
             creep.upgradeController(target);
             creep.queueSay("⚫");
-            Traveler.reservePosition(creep.pos);
             postAnalyticsEvent(
                 parentRoomName,
                 -1 * creep.getActiveBodyparts(WORK) * UPGRADE_CONTROLLER_POWER,

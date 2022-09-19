@@ -17,6 +17,11 @@ import { HaulerProcess } from "system/hauling/HaulerProcess";
 import { printSpawnQueues } from "system/spawning/SpawnInterface";
 import { WorkerProcess } from "system/working/WorkerProcess";
 
+import "./utils/visual/RoomVisual.js";
+import { drawStructureGroup } from "system/planning/PlannerLogic";
+import { FAST_FILLER_GROUP, FAST_FILLER_JSON } from "system/planning/stamp/FastFiller";
+import { EXTENSION_GROUP } from "system/planning/stamp/ExtensionPod";
+
 let deferedInit = false;
 let globalRefresh = true;
 
@@ -99,6 +104,10 @@ export const loop = () => {
         }
 
         global.runner.runAll();
+
+        // let structureGroup = EXTENSION_GROUP[(Game.time % 8) + 1];
+        // drawStructureGroup(Game.rooms["W3N7"].visual, structureGroup);
+        // Game.rooms["W3N7"].visual.connectRoads({});
 
         memoryWriter.updateAll();
 

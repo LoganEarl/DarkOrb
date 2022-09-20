@@ -1,5 +1,6 @@
 import { getMapData } from "system/scouting/ScoutInterface";
 import { bodyCost, maximizeBody, maximizeBodyForTargetParts } from "system/spawning/SpawnInterface";
+import { ANALYTICS_CONSTRUCTION } from "system/storage/AnalyticsConstants";
 import { postAnalyticsEvent } from "system/storage/StorageInterface";
 import { Log } from "utils/logger/Logger";
 import { packPos } from "utils/Packrat";
@@ -212,6 +213,23 @@ export function _runSourceMiner(
     } else {
         Traveler.reservePosition(creep.pos);
 
+        //Start building container
+        if (
+            primaryMiner &&
+            !assignment.constructionProject &&
+            !assignment.depositContainer &&
+            creep.getActiveBodyparts(CARRY) > 0
+        ) {
+            let cSite = creep.pos
+                .lookFor(LOOK_CONSTRUCTION_SITES)
+                .filter(c => c.my && c.structureType === STRUCTURE_CONTAINER);
+            if (cSite.length) {
+                assignment.constructionProject = cSite[0].id;
+            } else {
+                creep.room.createConstructionSite(creep.pos, STRUCTURE_CONTAINER);
+            }
+        }
+
         let container: StructureContainer | null = null;
         if (primaryMiner && creep.getActiveBodyparts(CARRY) > 0) {
             if (assignment.constructionProject && creep.store.getUsedCapacity(RESOURCE_ENERGY) >= 30) {
@@ -219,6 +237,16 @@ export function _runSourceMiner(
                 if (project) {
                     creep.queueSay("🔨");
                     creep.build(project);
+                    postAnalyticsEvent(
+                        parentRoomName,
+                        creep.getBodyPower(WORK, "build", BUILD_POWER) * -1,
+                        handle,
+                        ANALYTICS_CONSTRUCTION
+                    );
+                    let piles = creep.pos.lookFor(LOOK_ENERGY);
+                    if (piles.length) creep.pickup(piles[0]);
+                } else {
+                    assignment.constructionProject = undefined;
                 }
             }
 
@@ -229,8 +257,7 @@ export function _runSourceMiner(
                         creep.queueSay("🔧");
                         creep.repair(container) === OK;
                         return;
-                    } else if (creep.store.getUsedCapacity(RESOURCE_ENERGY) >= 30)
-                        creep.transfer(container, RESOURCE_ENERGY);
+                    }
                 }
             }
 

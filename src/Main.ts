@@ -18,7 +18,7 @@ import { printSpawnQueues } from "system/spawning/SpawnInterface";
 import { WorkerProcess } from "system/working/WorkerProcess";
 
 import "./utils/visual/RoomVisual.js";
-import { drawStructureGroup } from "system/planning/PlannerLogic";
+import { drawPlacedStructureGroup, drawStructureGroup, placeStorageCore } from "system/planning/PlannerLogic";
 import { FAST_FILLER_GROUP, FAST_FILLER_JSON } from "system/planning/stamp/FastFiller";
 import { EXTENSION_GROUP } from "system/planning/stamp/ExtensionPod";
 
@@ -105,9 +105,11 @@ export const loop = () => {
 
         global.runner.runAll();
 
-        // let structureGroup = EXTENSION_GROUP[(Game.time % 8) + 1];
-        // drawStructureGroup(Game.rooms["W3N7"].visual, structureGroup);
-        // Game.rooms["W3N7"].visual.connectRoads({});
+        // for (let room in Game.rooms) {
+        //     let placement = placeStorageCore(Game.rooms[room]);
+        //     if (placement) drawPlacedStructureGroup(Game.rooms[room].visual, placement);
+        //     Game.rooms[room].visual.connectRoads({});
+        // }
 
         memoryWriter.updateAll();
 

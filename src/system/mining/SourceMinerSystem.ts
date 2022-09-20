@@ -321,7 +321,7 @@ export class SourceMinerSystem implements MemoryComponent {
 
         let container = assignment.depositContainer ? Game.getObjectById(assignment.depositContainer) : undefined;
 
-        let positionKey = pile?.resourceType + ":" + packPos(creep.pos);
+        let positionKey = RESOURCE_ENERGY + ":" + packPos(creep.pos);
         if (!container && !pile) {
             unregisterNode(this.parentRoomName, this.handle, positionKey);
         } else {

@@ -1,349 +1,124 @@
+import { floodFill } from "utils/algorithms/FloodFill";
 import { Log } from "utils/logger/Logger";
-
-export function parseStructures(structureJsons: string[]): StructureGroup[] {
-    let rawGroups = structureJsons.map(json => JSON.parse(json) as StructureGroup);
-    let groupsByRcl: StructureGroup[] = [];
-    // Log.d(`Parsed raw groups: ${JSON.stringify(rawGroups)}`);
-    let lastGroup: StructureGroup = {
-        rcl: 0,
-        buildings: {}
-    };
-
-    let groupIndex = 0;
-    for (let rcl = 1; rcl <= 8; rcl++) {
-        // Log.d(`Looping for rcl: ${rcl}`);
-        if (groupIndex < rawGroups.length) {
-            let group = rawGroups[groupIndex];
-            //If we have reached the rcl where we should place the building
-            if (rcl >= group.rcl) {
-                // Log.d(`Used group ${groupIndex} for rcl ${rcl}`);
-                groupsByRcl[rcl] = Object.assign({}, group);
-                lastGroup = group;
-                groupIndex++;
-            }
-            //The group starts at a higher rcl. don't increase the group index, but do increase the rcl
-            else {
-                // Log.d(`No plans registered for RCL: ${rcl}, going with last group`);
-                groupsByRcl[rcl] = Object.assign({}, lastGroup);
-            }
-        } else {
-            // Log.d(`No plans registered for RCL: ${rcl} because it is greater than the number of groups.`);
-            groupsByRcl[rcl] = Object.assign({}, lastGroup);
-        }
-
-        groupsByRcl[rcl].rcl = rcl;
-    }
-
-    Log.d(JSON.stringify(Array.from(groupsByRcl.entries())));
-
-    return groupsByRcl;
-}
+import { PriorityQueue, PriorityQueueItem } from "utils/PriorityQueue";
+import { isWalkableOwnedRoom, manhattanDistance } from "utils/UtilityFunctions";
+import { STORAGE_CORE_GROUP } from "./stamp/StorageCore";
 
 export function drawStructureGroup(visual: RoomVisual, group: StructureGroup) {
-    Log.d(JSON.stringify(group));
     for (let building in group.buildings) {
         let coords = group.buildings[building]!.pos;
         coords.forEach(c => visual.structure(c.x, c.y, building as BuildableStructureConstant, {}));
     }
 }
 
-const colors = {
-    gray: "#555555",
-    light: "#AAAAAA",
-    road: "#666",
-    energy: "#FFE87B",
-    power: "#F53547",
-    dark: "#181818",
-    outline: "#8FBB93",
-    speechText: "#000000",
-    speechBackground: "#2ccf3b"
-};
-
-function drawStructure(
-    visual: RoomVisual,
-    x: number,
-    y: number,
-    type: BuildableStructureConstant,
-    opts: { opacity?: number }
-) {
-    opts = Object.assign(
-        {
-            opacity: 1
-        },
-        opts
-    );
-    switch (type) {
-        case "extension":
-            visual.circle(x, y, {
-                radius: 0.5,
-                fill: colors.dark,
-                stroke: colors.outline,
-                strokeWidth: 0.05,
-                opacity: opts.opacity
-            });
-            visual.circle(x, y, {
-                radius: 0.35,
-                fill: colors.gray,
-                opacity: opts.opacity
-            });
-            break;
-        case "spawn":
-            visual.circle(x, y, {
-                radius: 0.7,
-                fill: colors.dark,
-                stroke: "#CCCCCC",
-                strokeWidth: 0.1,
-                opacity: opts.opacity
-            });
-            break;
-        case "link": {
-            let osize = 0.3;
-            let isize = 0.2;
-            let outer: [number, number][] = [
-                [0.0, -0.5],
-                [0.4, 0.0],
-                [0.0, 0.5],
-                [-0.4, 0.0]
-            ];
-            let inner: [number, number][] = [
-                [0.0, -0.3],
-                [0.25, 0.0],
-                [0.0, 0.3],
-                [-0.25, 0.0]
-            ];
-            outer = relPoly(x, y, outer);
-            inner = relPoly(x, y, inner);
-            outer.push(outer[0]);
-            inner.push(inner[0]);
-            visual.poly(outer, {
-                fill: colors.dark,
-                stroke: colors.outline,
-                strokeWidth: 0.05,
-                opacity: opts.opacity
-            });
-            visual.poly(inner, {
-                fill: colors.gray,
-                stroke: undefined,
-                opacity: opts.opacity
-            });
-            break;
-        }
-        case "terminal": {
-            let outer: [number, number][] = [
-                [0.0, -0.8],
-                [0.55, -0.55],
-                [0.8, 0.0],
-                [0.55, 0.55],
-                [0.0, 0.8],
-                [-0.55, 0.55],
-                [-0.8, 0.0],
-                [-0.55, -0.55]
-            ];
-            let inner: [number, number][] = [
-                [0.0, -0.65],
-                [0.45, -0.45],
-                [0.65, 0.0],
-                [0.45, 0.45],
-                [0.0, 0.65],
-                [-0.45, 0.45],
-                [-0.65, 0.0],
-                [-0.45, -0.45]
-            ];
-            outer = relPoly(x, y, outer);
-            inner = relPoly(x, y, inner);
-            outer.push(outer[0]);
-            inner.push(inner[0]);
-            visual.poly(outer, {
-                fill: colors.dark,
-                stroke: colors.outline,
-                strokeWidth: 0.05,
-                opacity: opts.opacity
-            });
-            visual.poly(inner, {
-                fill: colors.light,
-                stroke: undefined,
-                opacity: opts.opacity
-            });
-            visual.rect(x - 0.45, y - 0.45, 0.9, 0.9, {
-                fill: colors.gray,
-                stroke: colors.dark,
-                strokeWidth: 0.1,
-                opacity: opts.opacity
-            });
-            break;
-        }
-        case "lab":
-            visual.circle(x, y - 0.025, {
-                radius: 0.55,
-                fill: colors.dark,
-                stroke: colors.outline,
-                strokeWidth: 0.05,
-                opacity: opts.opacity
-            });
-            visual.circle(x, y - 0.025, {
-                radius: 0.4,
-                fill: colors.gray,
-                opacity: opts.opacity
-            });
-            visual.rect(x - 0.45, y + 0.3, 0.9, 0.25, {
-                fill: colors.dark,
-                stroke: undefined,
-                opacity: opts.opacity
-            });
-            {
-                let box: [number, number][] = [
-                    [-0.45, 0.3],
-                    [-0.45, 0.55],
-                    [0.45, 0.55],
-                    [0.45, 0.3]
-                ];
-                box = relPoly(x, y, box);
-                visual.poly(box, {
-                    stroke: colors.outline,
-                    strokeWidth: 0.05,
-                    opacity: opts.opacity
-                });
-            }
-            break;
-        case "tower":
-            visual.circle(x, y, {
-                radius: 0.6,
-                // fill: colors.dark,
-                fill: "transparent",
-                stroke: colors.outline,
-                strokeWidth: 0.05,
-                opacity: opts.opacity
-            });
-            visual.rect(x - 0.4, y - 0.3, 0.8, 0.6, {
-                fill: colors.gray,
-                opacity: opts.opacity
-            });
-            visual.rect(x - 0.2, y - 0.9, 0.4, 0.5, {
-                fill: colors.light,
-                stroke: colors.dark,
-                strokeWidth: 0.07,
-                opacity: opts.opacity
-            });
-            break;
-        case "rampart":
-            visual.circle(x, y, {
-                radius: 0.65,
-                fill: "#434C43",
-                stroke: "#5D735F",
-                strokeWidth: 0.1,
-                opacity: 0.3
-            });
-            break;
-        case "observer":
-            visual.circle(x, y, {
-                fill: colors.dark,
-                radius: 0.45,
-                stroke: colors.outline,
-                strokeWidth: 0.05,
-                opacity: opts.opacity
-            });
-            visual.circle(x + 0.225, y, {
-                fill: colors.outline,
-                radius: 0.2,
-                opacity: opts.opacity
-            });
-            break;
-        case "nuker":
-            let outline: [number, number][] = [
-                [0, -1],
-                [-0.47, 0.2],
-                [-0.5, 0.5],
-                [0.5, 0.5],
-                [0.47, 0.2],
-                [0, -1]
-            ];
-            outline = relPoly(x, y, outline);
-            visual.poly(outline, {
-                stroke: colors.outline,
-                strokeWidth: 0.05,
-                fill: colors.dark,
-                opacity: opts.opacity
-            });
-            let inline: [number, number][] = [
-                [0, -0.8],
-                [-0.4, 0.2],
-                [0.4, 0.2],
-                [0, -0.8]
-            ];
-            inline = relPoly(x, y, inline);
-            visual.poly(inline, {
-                stroke: colors.outline,
-                strokeWidth: 0.01,
-                fill: colors.gray,
-                opacity: opts.opacity
-            });
-            break;
-        case "storage":
-            let outline1 = relPoly(x, y, [
-                [-0.45, -0.55],
-                [0, -0.65],
-                [0.45, -0.55],
-                [0.55, 0],
-                [0.45, 0.55],
-                [0, 0.65],
-                [-0.45, 0.55],
-                [-0.55, 0],
-                [-0.45, -0.55]
-            ]);
-            visual.poly(outline1, {
-                stroke: colors.outline,
-                strokeWidth: 0.05,
-                fill: colors.dark,
-                opacity: opts.opacity
-            });
-            visual.rect(x - 0.35, y - 0.45, 0.7, 0.9, {
-                fill: colors.energy,
-                opacity: opts.opacity
-            });
-            break;
-        case "container":
-            visual.rect(x - 0.225, y - 0.3, 0.45, 0.6, {
-                fill: colors.gray,
-                opacity: opts.opacity,
-                stroke: colors.dark,
-                strokeWidth: 0.09
-            });
-            visual.rect(x - 0.17, y + 0.07, 0.34, 0.2, {
-                fill: colors.energy,
-                opacity: opts.opacity
-            });
-            break;
-
-        case "powerSpawn":
-            visual.circle(x, y, {
-                radius: 0.65,
-                fill: colors.dark,
-                stroke: colors.power,
-                strokeWidth: 0.1,
-                opacity: opts.opacity
-            });
-            visual.circle(x, y, {
-                radius: 0.4,
-                fill: colors.energy,
-                opacity: opts.opacity
-            });
-            break;
-        default:
-            visual.circle(x, y, {
-                fill: colors.light,
-                radius: 0.35,
-                stroke: colors.dark,
-                strokeWidth: 0.2,
-                opacity: opts.opacity
-            });
-            break;
+export function drawPlacedStructureGroup(visual: RoomVisual, placed: PlacedStructureGroup) {
+    for (let building in placed.group.buildings) {
+        let coords = placed.group.buildings[building]!.pos;
+        coords.forEach(c =>
+            visual.structure(
+                c.x * placed.sx + placed.dx,
+                c.y * placed.sy + placed.dy,
+                building as BuildableStructureConstant,
+                {}
+            )
+        );
     }
 }
 
-function relPoly(x: number, y: number, poly: [number, number][]) {
-    return poly.map(p => {
-        p[0] += x;
-        p[1] += y;
-        return p;
-    });
+interface ScoredCoord extends Coord, PriorityQueueItem {
+    score: number; //Lower is better
+    queueIndex: number;
+}
+
+const MIN_EDGE_DISTANCE = 6;
+const MIN_CONSTROLLER_DISTANCE = 4;
+const MIN_CONSTROLLER_RANGE = 4;
+
+export function placeStorageCore(room: Room): PlacedStructureGroup | undefined {
+    let controllerPos = room.controller!.pos;
+
+    //First flood fill from the controller to get available positions.
+    let controllerMatrix = floodFill(room, [room.controller!.pos], true);
+    let possibleCoords: PriorityQueue<ScoredCoord> = new PriorityQueue(48 * 48, (a, b) => a.score - b.score);
+
+    //Second, flood fill from the edges so we can sort out places too close to edges.
+    //We need to flood fill because being near to edges is fine as long as we aren't also near to exits
+    let edgeMatrix = floodFill(
+        room,
+        room.find(FIND_EXIT).map(p => p.localCoords),
+        true
+    );
+
+    for (let y = 2; y < 48; y++) {
+        for (let x = 2; x < 48; x++) {
+            if (controllerMatrix.get(x, y) >= MIN_CONSTROLLER_DISTANCE && edgeMatrix.get(x, y) >= MIN_EDGE_DISTANCE) {
+                possibleCoords.enqueue({
+                    x: x,
+                    y: y,
+                    score: controllerMatrix.get(x, y) * 4 - edgeMatrix.get(x, y),
+                    queueIndex: 0 //Will get overwritten
+                });
+            }
+        }
+    }
+
+    let invalidator = (coord: Coord): boolean => {
+        return (
+            edgeMatrix.get(coord.x, coord.y) < MIN_EDGE_DISTANCE ||
+            controllerMatrix.get(coord.x, coord.y) < MIN_CONSTROLLER_DISTANCE
+        );
+    };
+    let placement: PlacedStructureGroup | undefined;
+    while (!placement && possibleCoords.length > 0) {
+        let testPosition = possibleCoords.dequeue()!;
+        let controllerRange = manhattanDistance(testPosition.x, testPosition.y, controllerPos.x, controllerPos.y);
+        if (controllerRange >= MIN_CONSTROLLER_RANGE) {
+            let testPlacement: PlacedStructureGroup = {
+                dx: testPosition.x,
+                dy: testPosition.y,
+                sx: 1,
+                sy: 1,
+                group: STORAGE_CORE_GROUP[8]
+            };
+            if (isValidPlacement(room, testPlacement, [], invalidator)) return testPlacement;
+            testPlacement.sx = -1;
+            if (isValidPlacement(room, testPlacement, [], invalidator)) return testPlacement;
+            testPlacement.sy = -1;
+            if (isValidPlacement(room, testPlacement, [], invalidator)) return testPlacement;
+            testPlacement.sx = 1;
+            if (isValidPlacement(room, testPlacement, [], invalidator)) return testPlacement;
+        }
+    }
+
+    return undefined;
+}
+
+//Returns true if all buildings do not cross over walls, or overlap in an illegal way
+function isValidPlacement(
+    room: Room,
+    placed: PlacedStructureGroup,
+    existingStructures: BuildableStructureConstant[][][],
+    ...invalidators: ((coord: Coord) => boolean)[] //functions that return true to invalidate the square
+): boolean {
+    let terrain = room.getTerrain();
+    for (let structureType of Object.keys(placed.group.buildings)) {
+        for (let pos of Object.values(placed.group.buildings[structureType].pos)) {
+            let roomCoord: Coord = { x: pos.x * placed.sx + placed.dx, y: pos.y * placed.sy + placed.dy };
+            let plannedHere: BuildableStructureConstant[] = existingStructures[roomCoord.y]?.[roomCoord.x] ?? [];
+
+            if (
+                roomCoord.x <= 1 ||
+                roomCoord.x >= 49 ||
+                roomCoord.y <= 1 ||
+                roomCoord.y >= 49 ||
+                _.any(invalidators, i => i(roomCoord)) ||
+                terrain.get(roomCoord.x, roomCoord.y) === TERRAIN_MASK_WALL ||
+                _.any(plannedHere, s => !isWalkableOwnedRoom(s))
+            ) {
+                return false;
+            }
+        }
+    }
+
+    return true;
 }

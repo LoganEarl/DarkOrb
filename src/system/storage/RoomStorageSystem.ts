@@ -106,6 +106,7 @@ export class RoomStorageSystem implements MemoryComponent {
     public _getMainStorage(): MainStorage | undefined {
         let room = Game.rooms[this.roomName];
         if (room) {
+            let spawns = findStructure(room, FIND_MY_SPAWNS);
             let storageStructures = findStructure(room, FIND_STRUCTURES).filter(
                 s =>
                     s.structureType === STRUCTURE_CONTAINER ||
@@ -127,7 +128,10 @@ export class RoomStorageSystem implements MemoryComponent {
                     if (s.isActive()) {
                         if (s.structureType === STRUCTURE_STORAGE) storage = s as StructureStorage;
                         if (s.structureType === STRUCTURE_TERMINAL) terminal = s as StructureTerminal;
-                        if (s.structureType === STRUCTURE_CONTAINER) container = s as StructureContainer;
+                        if (s.structureType === STRUCTURE_CONTAINER) {
+                            if (!container || spawns[0].pos.getRangeTo(container.pos) > spawns[0].pos.getRangeTo(s.pos))
+                                container = s as StructureContainer;
+                        }
                         if (s.structureType === STRUCTURE_SPAWN) spawn = s as StructureSpawn;
                     }
                 });

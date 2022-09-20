@@ -291,6 +291,10 @@ function rotateMatrix<T>(matrix: T[][]): void {
     }
 }
 
+export function isWalkableOwnedRoom(type: StructureConstant): boolean {
+    return type == STRUCTURE_ROAD || type == STRUCTURE_CONTAINER || type == STRUCTURE_RAMPART;
+}
+
 /**
  * Create a shallow copy of a 2D array
  */

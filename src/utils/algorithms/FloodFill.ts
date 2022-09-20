@@ -6,6 +6,7 @@ const roomDimensions = 50;
 
 type Rect = { x1: number; x2: number; y1: number; y2: number };
 
+//Produces a matrix where each slot is the distance from the nearest seed. Solid walls, blocking structures, and seeds result in a 0.
 export function floodFill(
     room: Room,
     seeds: Coord[],

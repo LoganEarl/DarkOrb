@@ -1,4 +1,4 @@
-import { parseStructures } from "../PlannerLogic";
+import { parseStructures } from "./StampLogic";
 
 const STORAGE_CORE_JSON: string[] = [
     `{"name":"","shard":"","rcl":3,"buildings":{"road":{"pos":[{"x":1,"y":0},{"x":0,"y":1},{"x":0,"y":2},{"x":0,"y":3},{"x":2,"y":0},{"x":3,"y":0},{"x":4,"y":1},{"x":5,"y":2},{"x":6,"y":3},{"x":7,"y":4},{"x":7,"y":5},{"x":6,"y":6},{"x":5,"y":7},{"x":1,"y":4},{"x":2,"y":5},{"x":3,"y":6},{"x":4,"y":7},{"x":5,"y":5},{"x":4,"y":4},{"x":3,"y":3},{"x":2,"y":2}]}}}`,

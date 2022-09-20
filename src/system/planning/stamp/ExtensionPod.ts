@@ -1,4 +1,4 @@
-import { parseStructures } from "../PlannerLogic";
+import { parseStructures } from "./StampLogic";
 
 export const EXTENSION_POD_JSON: string[] = [
     //Can't build until rcl 3

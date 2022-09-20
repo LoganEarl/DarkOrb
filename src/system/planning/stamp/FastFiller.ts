@@ -1,4 +1,4 @@
-import { parseStructures } from "../PlannerLogic";
+import { parseStructures } from "./StampLogic";
 
 export const FAST_FILLER_JSON: string[] = [
     `{"name":"","shard":"","rcl":1,"buildings":{"spawn":{"pos":[{"x":1,"y":3}]}}}`,

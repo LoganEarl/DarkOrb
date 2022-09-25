@@ -55,9 +55,6 @@ class ShardScoutSystem implements MemoryComponent {
         return false;
     }
 
-    //Registers room ownership to us, if there is no other form of ownership present.
-    _claimEconomically() {}
-
     _clearDeadCreepAssignments() {
         Object.keys(this.scoutAssignments).forEach(name => {
             if (!Game.creeps[name]) delete this.scoutAssignments[name];

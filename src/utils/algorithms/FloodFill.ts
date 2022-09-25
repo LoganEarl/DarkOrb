@@ -6,20 +6,21 @@ const roomDimensions = 50;
 
 type Rect = { x1: number; x2: number; y1: number; y2: number };
 
-//Produces a matrix where each slot is the distance from the nearest seed. Solid walls, blocking structures, and seeds result in a 0.
+//Produces a matrix where each slot is the distance from the nearest seed. Spreads out from the seed positions, and does not modify positions not covered by the fill
 export function floodFill(
-    room: Room,
+    roomName: string,
     seeds: Coord[],
-    enableVisuals: boolean,
-    floodCM: CostMatrix = new PathFinder.CostMatrix()
+    visual: RoomVisual | undefined,
+    floodCM: CostMatrix = new PathFinder.CostMatrix(),
+    structuresBlock: boolean = true
 ): CostMatrix {
     // Get the terrain
-    const terrain = room.getTerrain();
+    const terrain = Game.map.getRoomTerrain(roomName);
     // Construct a cost matrix for visited tiles and add seeds to it
     const visitedCM = new PathFinder.CostMatrix();
 
     //We will always get a matrix here because we have room visibility
-    const blockingStructureMatrix = Traveler.getStructureMatrix(room.name, true, false)!;
+    const blockingStructureMatrix = Traveler.getStructureMatrix(roomName, true, false);
 
     // Construct values for the flood
     let depth = 0;
@@ -42,13 +43,16 @@ export function floodFill(
             // If the depth isn't 0
             if (depth != 0) {
                 // Iterate if the terrain is a wall
-                if (terrain.get(pos.x, pos.y) == TERRAIN_MASK_WALL || blockingStructureMatrix.get(pos.x, pos.y) == 255)
+                if (
+                    terrain.get(pos.x, pos.y) == TERRAIN_MASK_WALL ||
+                    (structuresBlock && blockingStructureMatrix?.get(pos.x, pos.y) == 255)
+                )
                     continue;
                 // Otherwise so long as the pos isn't a wall record its depth in the flood cost matrix
                 floodCM.set(pos.x, pos.y, depth);
                 // If visuals are enabled, show the depth on the pos
-                if (enableVisuals)
-                    room.visual.rect(pos.x - 0.5, pos.y - 0.5, 1, 1, {
+                if (visual)
+                    visual.rect(pos.x - 0.5, pos.y - 0.5, 1, 1, {
                         fill: "hsl(" + 200 + depth * 2 + ", 100%, 60%)",
                         opacity: 0.4
                     });
@@ -81,7 +85,7 @@ export function floodFill(
     return floodCM;
 }
 
-function findPositionsInsideRect(rect: Rect) {
+export function findPositionsInsideRect(rect: Rect) {
     const positions = [];
 
     for (let x = rect.x1; x <= rect.x2; x++) {

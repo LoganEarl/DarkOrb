@@ -4,14 +4,13 @@ const roomDimensions = 50;
 
 export function distanceTransformDiag(
     initialCM: CostMatrix,
-    enableVisuals: boolean,
-    room: Room,
+    visual?: RoomVisual,
     x1 = 0,
     y1 = 0,
     x2 = roomDimensions - 1,
     y2 = roomDimensions - 1,
     closeRoom: boolean = false
-) {
+): CostMatrix {
     const distanceCM = new PathFinder.CostMatrix();
 
     let x;
@@ -52,12 +51,12 @@ export function distanceTransformDiag(
         }
     }
 
-    if (enableVisuals) {
+    if (visual) {
         // Loop through the xs and ys inside the bounds
 
         for (x = x1; x <= x2; x += 1) {
             for (y = y1; y <= y2; y += 1) {
-                room.visual.rect(x - 0.5, y - 0.5, 1, 1, {
+                visual.rect(x - 0.5, y - 0.5, 1, 1, {
                     fill: `hsl(${200}${distanceCM.get(x, y) * 10}, 100%, 60%)`,
                     opacity: 0.4
                 });

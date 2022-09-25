@@ -5,3 +5,4 @@ export const FEATURE_VISUALIZE_SCOUTING = "drawScouting";
 export const FEATURE_VISUALIZE_HAULING = "drawHauling";
 export const FEATURE_VISUALIZE_STORAGE = "drawStorage";
 export const FEATURE_VISUALIZE_WORK = "drawWork";
+export const FEATURE_VISUALIZE_PLANNING = "drawPlanning";

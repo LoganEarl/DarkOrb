@@ -18,9 +18,7 @@ import { printSpawnQueues } from "system/spawning/SpawnInterface";
 import { WorkerProcess } from "system/working/WorkerProcess";
 
 import "./utils/visual/RoomVisual.js";
-import { drawPlacedStructureGroup, drawStructureGroup, placeStorageCore } from "system/planning/PlannerLogic";
-import { FAST_FILLER_GROUP, FAST_FILLER_JSON } from "system/planning/stamp/FastFiller";
-import { EXTENSION_GROUP } from "system/planning/stamp/ExtensionPod";
+import { LagoonDetector } from "utils/algorithms/LagoonFlow";
 
 let deferedInit = false;
 let globalRefresh = true;
@@ -71,6 +69,8 @@ function init() {
     global.Profiler = Profiler.init();
 }
 
+let lagoon = new LagoonDetector(Object.values(Game.spawns)[0].room, 100);
+
 //===================================================================Main Loop
 export const loop = () => {
     try {
@@ -104,12 +104,8 @@ export const loop = () => {
         }
 
         global.runner.runAll();
-
-        // for (let room in Game.rooms) {
-        //     let placement = placeStorageCore(Game.rooms[room]);
-        //     if (placement) drawPlacedStructureGroup(Game.rooms[room].visual, placement);
-        //     Game.rooms[room].visual.connectRoads({});
-        // }
+        for (let i = 0; i < 5; i++) lagoon.advanceFlow();
+        lagoon.visualize();
 
         memoryWriter.updateAll();
 

@@ -202,7 +202,7 @@ function findRallyPoint(room: Room): RoomPosition | undefined {
         for (let y = 0; y <= 49; y++) for (let x = 0; x <= 49; x++) matrix.set(x, y, 255);
         //Flood fill from the controller pos, setting open spaces to 0s.
         //Anything not connected to controller will stay as 255s (solid rock)
-        matrix = floodFill(room, [room.controller!.pos.localCoords], false, matrix);
+        matrix = floodFill(room.name, [room.controller!.pos.localCoords], undefined, matrix);
     } else {
         let terrain = Game.map.getRoomTerrain(room.name);
         for (let y = 0; y <= 49; y++) {
@@ -215,7 +215,7 @@ function findRallyPoint(room: Room): RoomPosition | undefined {
     }
 
     //Use the distance transform to find open spots, passing the matrix from before
-    matrix = distanceTransformDiag(matrix, false, room, 0, 0, 49, 49, true);
+    matrix = distanceTransformDiag(matrix, undefined, 0, 0, 49, 49, true);
     //Find the max value in the resulting matrix, it is now the rally point! Tiebreak with favoring
     // distance to the center of the room
     let highest: number = -1;

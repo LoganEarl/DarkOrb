@@ -18,7 +18,9 @@ class StructureIdCache {
 
 type FindStructure = FIND_STRUCTURES | FIND_MY_SPAWNS | FIND_MY_STRUCTURES | FIND_HOSTILE_STRUCTURES;
 
-export function findStructure(room: Room, find: FindStructure): Structure[] {
+export function findStructure(room: Room | undefined, find: FindStructure): Structure[] {
+    if (!room) return [];
+
     let lookupKey = room.name + "|" + find;
 
     if (Game.time != lastCheckTick) gameObjectCache = {};

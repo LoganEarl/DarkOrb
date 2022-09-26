@@ -7,6 +7,7 @@ import { Log } from "utils/logger/Logger";
 import { PriorityQueue } from "utils/PriorityQueue";
 import { Traveler } from "utils/traveler/Traveler";
 import { clamp, drawBar, drawCircledItem } from "utils/UtilityFunctions";
+import { getNode, getNodes, unregisterNode } from "./HaulerInterface";
 import { _assignJobForHauler, _lookupNodeTarget, _pairingComparitor, _runHauler } from "./HaulerLogic";
 
 const MAX_HAULERS_PER_ROOM = 25; //Total haulers a single room can have after rcl3
@@ -15,9 +16,6 @@ const MAX_ASSIGNMENTS_PER_NODE = 10; //No more than this many creeps assigned to
 const HAULER_SAFTEY_MARGIN = 1.5; //How many more haulers we will spawn than we think we need
 
 export class RoomHaulerSystem {
-    private nodeIdsByProvider: { [providerId: string]: Set<string> } = {};
-    private logisticsNodes: { [id: string]: LogisticsNode } = {};
-
     private roomName: string;
 
     //These both hold the same data, they are just indexed differently. Need to keep them in sync
@@ -38,10 +36,9 @@ export class RoomHaulerSystem {
 
     public _reloadConfigs() {
         this.targetCarryParts = 0;
-
+        let nodes = getNodes(this.roomName);
         //console.log(`Calculating logistics node creeps`)
-        for (let node of Object.values(this.logisticsNodes)) {
-            this.logisticsNodes[node.nodeId] = node;
+        for (let node of Object.values(nodes)) {
             this.nodeAssignments[node.nodeId] = new PriorityQueue(MAX_ASSIGNMENTS_PER_NODE, _pairingComparitor);
             const carryParts = Math.ceil(
                 ((node.serviceRoute.pathLength * 2 * Math.abs(node.bodyDrdt ?? node.baseDrdt)) / 50) *
@@ -94,36 +91,32 @@ export class RoomHaulerSystem {
         let storage = getMainStorage(this.roomName);
         if (!storage) return;
 
+        let nodes = getNodes(this.roomName);
+
         let creeps = getCreeps(this.handle);
         let toRunAgain: { [creepName: string]: HaulerRunResults } = {};
         for (let creep of creeps) {
             let pairing: LogisticsPairing | null = this.haulerAssignments[creep.name];
             // Log.d(`Current pairing for ${creep}, ${JSON.stringify(pairing)}`);
             //If we don't have a job for the creep get it one
-            if (!pairing || !this.logisticsNodes[pairing.nodeId]) {
+            if (!pairing || !nodes[pairing.nodeId]) {
                 //Assign the job
-                pairing = _assignJobForHauler(
-                    creep,
-                    this.haulerAssignments,
-                    this.nodeAssignments,
-                    this.logisticsNodes,
-                    storage
-                );
+                pairing = _assignJobForHauler(creep, this.haulerAssignments, this.nodeAssignments, nodes, storage);
             }
 
             // Log.d(`Assigned pairing for ${creep}, ${JSON.stringify(pairing)}`);
 
             if (pairing) {
                 this.haulerAssignments[creep.name] = pairing;
-                let node = this.getLogisticsNode(pairing.nodeId);
-                let results = _runHauler(creep, pairing, node, storage!, this.roomName, [this.handle, "Drudge"]);
+                let node = getNode(this.roomName, pairing.nodeId);
+                let results = _runHauler(creep, pairing, node!, storage!, this.roomName, [this.handle, "Drudge"]);
                 if (results.done) {
                     this.completeAssignment(creep);
                     toRunAgain[creep.name] = results;
                 }
-                if (results.invalidNode) {
+                if (results.invalidNode && node) {
                     //Remove bad nodes
-                    delete this.logisticsNodes[node.nodeId];
+                    delete nodes[node.nodeId];
                 }
             } else {
                 let rally = getRallyPosition(this.roomName);
@@ -142,22 +135,23 @@ export class RoomHaulerSystem {
                 hauler,
                 this.haulerAssignments,
                 this.nodeAssignments,
-                this.logisticsNodes,
+                nodes,
                 storage,
                 lastResults
             );
             if (pairing) {
-                let node = this.getLogisticsNode(pairing.nodeId);
-                _runHauler(hauler, pairing, node, storage!, this.roomName, [this.handle, "Drudge"], lastResults);
+                let node = getNode(this.roomName, pairing.nodeId);
+                _runHauler(hauler, pairing, node!, storage!, this.roomName, [this.handle, "Drudge"], lastResults);
             }
         }
     }
 
     public _visualize() {
         if (!getFeature(FEATURE_VISUALIZE_HAULING)) return;
+        let nodes = getNodes(this.roomName);
 
         let visuals: { [roomName: string]: RoomVisual } = {};
-        for (const node of Object.values(this.logisticsNodes)) {
+        for (const node of Object.values(nodes)) {
             const roomName = node.lastKnownPosition.roomName;
             if (!visuals[roomName]) visuals[roomName] = new RoomVisual(roomName);
 
@@ -183,42 +177,11 @@ export class RoomHaulerSystem {
         );
     }
 
-    private getLogisticsNode(id: string): LogisticsNode {
-        return this.logisticsNodes[id] ?? null;
-    }
-
     private completeAssignment(hauler: Creep) {
         let pairing = this.haulerAssignments[hauler.name];
         if (pairing) {
             delete this.haulerAssignments[hauler.name];
             this.nodeAssignments[pairing.nodeId]?.remove(pairing);
         }
-    }
-
-    //We use the same object reference. This means you can update your object in place as long as the id doesn't change.
-    public _registerNode(providerId: string, node: LogisticsNode) {
-        this.logisticsNodes[node.nodeId] = node;
-        if (!this.nodeIdsByProvider[providerId]) this.nodeIdsByProvider[providerId] = new Set();
-        this.nodeIdsByProvider[providerId].add(node.nodeId);
-    }
-
-    public _unregisterNodes(providerId: string) {
-        if (this.nodeIdsByProvider[providerId]) {
-            for (let nodeId of this.nodeIdsByProvider[providerId]) {
-                delete this.logisticsNodes[nodeId];
-            }
-            this.nodeIdsByProvider[providerId].clear();
-        }
-    }
-
-    public _unregisterNode(providerId: string, nodeId: string) {
-        if (this.nodeIdsByProvider[providerId]?.has(nodeId)) {
-            delete this.logisticsNodes[nodeId];
-            this.nodeIdsByProvider[providerId].delete(nodeId);
-        }
-    }
-
-    public _getNode(nodeId: string): LogisticsNode | undefined {
-        return this.logisticsNodes[nodeId];
     }
 }

@@ -6,7 +6,7 @@ import "./prototypes/Structures";
 import "./prototypes/Creep";
 import { hasRespawned } from "utils/UtilityFunctions";
 import { setFeature, toggleFeature } from "utils/featureToggles/FeatureToggles";
-import { memoryWriter } from "utils/MemoryWriter";
+import { updateAllMemory } from "utils/MemoryWriter";
 import { Log } from "utils/logger/Logger";
 import { SpawnProcess } from "system/spawning/SpawnProcess";
 import { ScoutProcess } from "system/scouting/ScoutProcess";
@@ -19,6 +19,7 @@ import { WorkerProcess } from "system/working/WorkerProcess";
 
 import "./utils/visual/RoomVisual.js";
 import { LagoonDetector } from "utils/algorithms/LagoonFlow";
+import { PlannerPRocess as PlannerProcess } from "system/planning/PlannerProcess";
 
 let deferedInit = false;
 let globalRefresh = true;
@@ -57,6 +58,7 @@ function init() {
     global.runner.addProcess(new MinerProcess());
     global.runner.addProcess(new HaulerProcess());
     global.runner.addProcess(new WorkerProcess());
+    global.runner.addProcess(new PlannerProcess());
 
     //===================================================================Initialize Global Functions
     global.processes = () => {
@@ -68,8 +70,6 @@ function init() {
 
     global.Profiler = Profiler.init();
 }
-
-let lagoon = new LagoonDetector(Object.values(Game.spawns)[0].room, 100);
 
 //===================================================================Main Loop
 export const loop = () => {
@@ -104,10 +104,8 @@ export const loop = () => {
         }
 
         global.runner.runAll();
-        for (let i = 0; i < 5; i++) lagoon.advanceFlow();
-        lagoon.visualize();
 
-        memoryWriter.updateAll();
+        updateAllMemory();
 
         //Expend all creep speech queues
         sayAll();

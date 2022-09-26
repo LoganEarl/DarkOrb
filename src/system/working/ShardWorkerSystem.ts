@@ -1,4 +1,4 @@
-import { getMapData } from "system/scouting/ScoutInterface";
+import { getRoomData } from "system/scouting/ScoutInterface";
 import { getMainStorage } from "system/storage/StorageInterface";
 import { Log } from "utils/logger/Logger";
 import { registerResetFunction } from "utils/SystemResetter";
@@ -53,7 +53,7 @@ class ShardWorkerSystem {
         for (let roomName in Game.rooms) {
             let room = Game.rooms[roomName];
             let lastScan = this.lastWorkScan[roomName];
-            let mapData = getMapData(roomName);
+            let mapData = getRoomData(roomName);
 
             //If we own the room and havent scanned it recently
             if (

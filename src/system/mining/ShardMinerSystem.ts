@@ -1,4 +1,4 @@
-import { getMapData } from "system/scouting/ScoutInterface";
+import { getRoomData } from "system/scouting/ScoutInterface";
 import { Log } from "utils/logger/Logger";
 import { unpackPos } from "utils/Packrat";
 import { registerResetFunction } from "utils/SystemResetter";
@@ -41,7 +41,7 @@ export class ShardMinerSystem {
         //Get the sources in range to each spawn room
         let sourceInfosPerSpawnRoom: { [spawnRoomName: string]: SourceInfo[] } = {};
         Object.keys(this.roomMinerSystems).forEach(spawnRoom => {
-            sourceInfosPerSpawnRoom[spawnRoom] = _findAllSourcesInRange(getMapData(spawnRoom), 2, true);
+            sourceInfosPerSpawnRoom[spawnRoom] = _findAllSourcesInRange(getRoomData(spawnRoom), 2, true);
         });
 
         //Find the optimal spawn room for each source
@@ -58,7 +58,7 @@ export class ShardMinerSystem {
 
                 //We already assigned it. Give it to whomever is closer
                 if (existingAssignment) {
-                    let mapData: RoomScoutingInfo = getMapData(sourceRoomName)!;
+                    let mapData: RoomScoutingInfo = getRoomData(sourceRoomName)!;
                     let existingLength = existingAssignment._getLengthToSource(sourceId, mapData);
                     let testLength = roomMinerSystem._getLengthToSource(sourceId, mapData);
                     if (testLength < existingLength) {
@@ -80,7 +80,7 @@ export class ShardMinerSystem {
                     system._unregisterSource(sourceId);
                 }
             });
-            assignedSources[sourceId]._registerSource(sourceId as Id<Source>, getMapData(sourceRoomNames[sourceId])!);
+            assignedSources[sourceId]._registerSource(sourceId as Id<Source>, getRoomData(sourceRoomNames[sourceId])!);
         });
     }
 

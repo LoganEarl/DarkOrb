@@ -1,4 +1,5 @@
 import { object } from "lodash";
+import { planRoom } from "system/planning/PlannerInterface";
 import { distanceTransformDiag } from "utils/algorithms/DistanceTransform";
 import { floodFill } from "utils/algorithms/FloodFill";
 import { Log } from "utils/logger/Logger";
@@ -315,6 +316,11 @@ export function scoutRoom(room: Room, shardMap: ShardMap, territoryRange: number
         ownership?.username === global.PLAYER_USERNAME && ownership?.ownershipType === "Claimed"
             ? [{ roomName: room.name, range: 0 }]
             : evaluateRoomDepth(pathingInfo, exitsToRooms, shardMap, territoryRange);
+
+    if (!shardMap[room.name]?.roomPlan) {
+        Log.d(`Ownership: ${JSON.stringify(ownershipValues)} Territory: ${JSON.stringify(territoryInfo)}`);
+        planRoom(room, territoryInfo[0].range);
+    }
 
     return {
         roomName: room.name,

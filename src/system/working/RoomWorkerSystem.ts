@@ -14,7 +14,7 @@ import {
 } from "system/storage/AnalyticsConstants";
 import { getEnergyPerTick } from "system/storage/StorageInterface";
 import { Log } from "utils/logger/Logger";
-import { MemoryComponent, memoryWriter } from "utils/MemoryWriter";
+import { MemoryComponent, updateMemory } from "utils/MemoryWriter";
 import { Traveler } from "utils/traveler/Traveler";
 import { drawBar } from "utils/UtilityFunctions";
 import {
@@ -46,7 +46,7 @@ export class RoomWorkSystem implements MemoryComponent {
         let details = this.memory!.details;
         //We store work details in memory, so to avoid mistakes always store a copy not the real thing
         details[detail.detailId] = Object.assign({}, detail);
-        memoryWriter.updateComponent(this);
+        updateMemory(this);
     }
 
     _visualize() {
@@ -109,7 +109,7 @@ export class RoomWorkSystem implements MemoryComponent {
                 if (results) {
                     delete this.creepAssignments[creep.name];
                     delete this.memory!.details[assignment.detailId];
-                    memoryWriter.updateComponent(this);
+                    updateMemory(this);
                 }
             } else {
                 let rally = getRallyPosition(this.roomName);
@@ -128,7 +128,7 @@ export class RoomWorkSystem implements MemoryComponent {
             this.creepAssignments = {};
             this.memory!.focus = focus;
             this.memory!.lastFocusUpdate = Game.time;
-            memoryWriter.updateComponent(this);
+            updateMemory(this);
         }
     }
 

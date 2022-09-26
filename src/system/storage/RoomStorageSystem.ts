@@ -1,4 +1,4 @@
-import { MemoryComponent, memoryWriter } from "utils/MemoryWriter";
+import { MemoryComponent, updateMemory } from "utils/MemoryWriter";
 import { findStructure } from "utils/StructureFindCache";
 import { clamp, drawBar, exponentialMovingAverage, irregularExponentialMovingAverage } from "utils/UtilityFunctions";
 import {} from "./AnalyticsConstants";
@@ -100,7 +100,7 @@ export class RoomStorageSystem implements MemoryComponent {
                 entry.nextTotal = 0;
             }
         }
-        memoryWriter.updateComponent(this);
+        updateMemory(this);
     }
 
     public _getMainStorage(): MainStorage | undefined {

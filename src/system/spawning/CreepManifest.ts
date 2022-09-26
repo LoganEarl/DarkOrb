@@ -1,7 +1,7 @@
 //Persists a mapping of unique identifiers to creep names.
 //Also keeps track of process id's and associates creep names to it so you can find all
 
-import { MemoryComponent, memoryWriter } from "utils/MemoryWriter";
+import { MemoryComponent, updateMemory } from "utils/MemoryWriter";
 import { Log } from "utils/logger/Logger";
 import { FIRST_NAMES } from "./creepNames/FirstNames";
 import { LAST_NAMES } from "./creepNames/LastNames";
@@ -26,7 +26,7 @@ class CreepManifest implements MemoryComponent {
             if (deadCreepNames.length > 0) {
                 Log.d("Clearing memory for creeps with names: " + JSON.stringify(deadCreepNames));
                 byHandle[subHandle] = byHandle[subHandle].filter(name => Game.creeps[name]);
-                memoryWriter.updateComponent(this);
+                updateMemory(this);
             }
 
             return (byHandle[subHandle] ?? []).map(name => Game.creeps[name]).filter(c => c && !c.spawning) ?? [];
@@ -39,7 +39,7 @@ class CreepManifest implements MemoryComponent {
                 Log.d("Clearing memory for creeps with names: " + JSON.stringify(deadCreepNames));
                 for (let subHandle of Object.keys(byHandle))
                     byHandle[subHandle] = byHandle[subHandle].filter(name => Game.creeps[name]);
-                memoryWriter.updateComponent(this);
+                updateMemory(this);
             }
 
             return (
@@ -76,7 +76,7 @@ class CreepManifest implements MemoryComponent {
                     this.memory.creepNamesByHandle[creepHandle][subHandle] ?? []
                 ).concat(name);
                 this.memory.previousNameIndex = nextIndex;
-                memoryWriter.updateComponent(this);
+                updateMemory(this);
                 return name;
             }
         } while (nextIndex != this.memory.previousNameIndex);

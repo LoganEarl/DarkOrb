@@ -69,16 +69,19 @@ interface RoomScoutingInfo {
     hazardInfo?: RoomThreatInfo; //Any invaders or hostile players displayed here
     miningInfo?: RoomMiningInfo; //Mining information on the room. Only present for Standard, Core, and Keeper rooms types
     ownership?: RoomOwnershipInfo; //Who owns the room.
+    roomPlan?: PlannedRoom;
 }
 
-type ShardMap = { [roomName: string]: RoomScoutingInfo };
+interface ShardMap {
+    [roomName: string]: RoomScoutingInfo;
+}
 
 interface ScoutMemory {
     myRoomNames: string[];
-    shardMap: ShardMap;
     //array of clusters, each cluster is a string[] of room names in the cluster
     clusters: string[][];
 }
 interface Memory {
     scoutMemory?: ScoutMemory;
+    mapData?: ShardMap;
 }

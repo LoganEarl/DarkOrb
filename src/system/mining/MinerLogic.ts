@@ -1,4 +1,4 @@
-import { getMapData } from "system/scouting/ScoutInterface";
+import { getRoomData } from "system/scouting/ScoutInterface";
 import { bodyCost, maximizeBody, maximizeBodyForTargetParts } from "system/spawning/SpawnInterface";
 import { ANALYTICS_CONSTRUCTION } from "system/storage/AnalyticsConstants";
 import { postAnalyticsEvent } from "system/storage/StorageInterface";
@@ -147,7 +147,7 @@ export function _findAllSourcesInRange(
     visited.add(sourceRoom.roomName);
     exits.forEach(exitRoomName => {
         if (!visited!.has(exitRoomName)) {
-            sources.push(..._findAllSourcesInRange(getMapData(exitRoomName), range - 1, false, visited));
+            sources.push(..._findAllSourcesInRange(getRoomData(exitRoomName), range - 1, false, visited));
         }
     });
     return sources;

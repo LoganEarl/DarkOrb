@@ -16,7 +16,8 @@ export function drawStructureGroup(visual: RoomVisual, group: StructureGroup) {
     }
 }
 
-export function drawPlacedStructureGroup(visual: RoomVisual, placed: PlacedStructureGroup) {
+export function drawPlacedStructureGroup(visual: RoomVisual, placed?: PlacedStructureGroup) {
+    if (!placed) return;
     for (let building in placed.group[8].buildings) {
         let coords = placed.group[8].buildings[building]!.pos;
         coords.forEach(c =>
@@ -30,7 +31,7 @@ export function drawPlacedStructureGroup(visual: RoomVisual, placed: PlacedStruc
     }
 }
 
-export function planRoom(
+export function planStructures(
     roomName: string,
     lagoonFlow: CostMatrix,
     controllerPos: RoomPosition,
@@ -114,13 +115,16 @@ export function planRoom(
 
     if (pods?.length) {
         return {
-            unsuitable: false,
+            score: 100, //TODO find a way to score it
             storageCore: storageCore!,
             fastFiller: fastFiller,
             extensionPods: pods
         };
     }
-    return undefined;
+
+    return {
+        score: 0
+    };
 }
 interface ScoredCoord extends Coord, PriorityQueueItem {
     score: number; //Lower is better

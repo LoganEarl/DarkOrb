@@ -27,16 +27,22 @@ export class ScoutProcess extends Process {
 
     constructor() {
         super("ScoutProcess", 1);
-        _shardScoutSystem._createSuperclusters();
-        _shardScoutSystem._subdivideSupercluster();
-        _shardScoutSystem._registerCreepConfigs();
     }
 
+    private first = true;
+
     run(): void {
-        this.jobChecker.run();
-        this.clusterRecreator.run();
-        this.clusterSubdivider.run();
-        this.creepConfigUpdater.run();
+        if (this.first) {
+            this.first = false;
+            _shardScoutSystem._createSuperclusters();
+            _shardScoutSystem._subdivideSupercluster();
+            _shardScoutSystem._registerCreepConfigs();
+        } else {
+            this.jobChecker.run();
+            this.clusterRecreator.run();
+            this.clusterSubdivider.run();
+            this.creepConfigUpdater.run();
+        }
         _shardScoutSystem._runCreeps();
 
         if (getFeature(FEATURE_VISUALIZE_SCOUTING)) {

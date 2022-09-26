@@ -1,9 +1,9 @@
 import { getNode, registerNode, unregisterNode, unregisterNodes } from "system/hauling/HaulerInterface";
-import { getMapData } from "system/scouting/ScoutInterface";
+import { getRoomData } from "system/scouting/ScoutInterface";
 import { getCreeps, registerCreepConfig, unregisterHandle } from "system/spawning/SpawnInterface";
 import { getMainStorage } from "system/storage/StorageInterface";
 import { Log } from "utils/logger/Logger";
-import { MemoryComponent, memoryWriter } from "utils/MemoryWriter";
+import { MemoryComponent, updateMemory } from "utils/MemoryWriter";
 import { packPos, unpackPos, unpackPosList } from "utils/Packrat";
 import { Traveler } from "utils/traveler/Traveler";
 import { getMultirooomDistance, samePos } from "utils/UtilityFunctions";
@@ -70,7 +70,7 @@ export class SourceMinerSystem implements MemoryComponent {
 
     private loadFreeSpaces(): void {
         //Does not require room memory for a reason!!
-        let roomData = getMapData(this.roomName);
+        let roomData = getRoomData(this.roomName);
         if (this.isSource && roomData?.miningInfo) {
             let ourSourceData = _.find(roomData!.miningInfo!.sources, s => s.id == (this.sourceId as string));
             if (ourSourceData) {
@@ -121,7 +121,7 @@ export class SourceMinerSystem implements MemoryComponent {
         }
 
         //Determine if we own the room
-        let mapData: RoomScoutingInfo | undefined = getMapData(this.roomName);
+        let mapData: RoomScoutingInfo | undefined = getRoomData(this.roomName);
         if (mapData?.ownership && mapData.ownership.username !== global.PLAYER_USERNAME) {
             if (mapData.ownership.ownershipType === "Claimed") this.addStopReason("ForeignOwnership");
             else this.clearStopReason("ForeignOwnership");
@@ -176,7 +176,7 @@ export class SourceMinerSystem implements MemoryComponent {
             Log.i(`Started mining operation ${this.parentRoomName}->${this.roomName}:${this.sourceId}`);
             this.memory!.state = "Active";
             this.clearStopReason("Mandated");
-            memoryWriter.updateComponent(this);
+            updateMemory(this);
         }
     }
 
@@ -225,7 +225,7 @@ export class SourceMinerSystem implements MemoryComponent {
                 unregisterNodes(this.parentRoomName, this.handle);
                 for (let creep of creeps) {
                     if (_.random(0, 6) === 0) creep.swear();
-                    let packedRally = getMapData(this.parentRoomName)?.pathingInfo?.packedRallyPos;
+                    let packedRally = getRoomData(this.parentRoomName)?.pathingInfo?.packedRallyPos;
                     if (packedRally !== undefined) Traveler.travelTo(creep, unpackPos(packedRally));
                 }
             }
@@ -251,7 +251,7 @@ export class SourceMinerSystem implements MemoryComponent {
                     )}`
                 );
             }
-            memoryWriter.updateComponent(this);
+            updateMemory(this);
         }
     }
 
@@ -259,14 +259,14 @@ export class SourceMinerSystem implements MemoryComponent {
         this.loadMemory();
         if (this.memory!.state === "Stopped" && !this.memory!.stopReasons.includes(reason)) {
             this.memory!.stopReasons.push(reason);
-            memoryWriter.updateComponent(this);
+            updateMemory(this);
             Log.i(
                 `Adding ${reason} to the list of reasons why mining operation ${this.parentRoomName}->${this.roomName}:${this.sourceId} is stopped`
             );
         }
         if (this.memory!.state !== "Stopped" && !this.memory!.stopReasons.includes(reason)) {
             this.memory!.stopReasons.push(reason);
-            memoryWriter.updateComponent(this);
+            updateMemory(this);
             Log.w(
                 `Stopping mining operation ${this.parentRoomName}->${this.roomName}:${this.sourceId} because of reason:${reason}`
             );
@@ -293,7 +293,7 @@ export class SourceMinerSystem implements MemoryComponent {
                     pathCost: pathEstimate * 2
                 };
 
-                memoryWriter.updateComponent(this);
+                updateMemory(this);
             }
         }
     }

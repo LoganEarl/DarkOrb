@@ -48,7 +48,7 @@ export class PriorityQueue<T extends PriorityQueueItem> {
     }
 
     public enqueue(item: T): void {
-        const index = this._length + 1;
+        const index = this._length;
         if (index < this.capacity) {
             this._length++;
             this.items[index] = item;

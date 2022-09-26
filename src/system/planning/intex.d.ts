@@ -16,13 +16,9 @@ interface PlacedStructureGroup {
 }
 
 interface PlannedRoom {
-    unsuitable: boolean;
+    score: number; //0-100, where 100 is a perfect score and a 0 is a hard no
     storageCore?: PlacedStructureGroup;
     fastFiller?: PlacedStructureGroup;
     extensionPods?: PlacedStructureGroup[];
-}
-
-type PlannerMemory = { [roomName: string]: PlannedRoom };
-interface Memory {
-    plannerMemory: PlannerMemory;
+    extensions?: PlacedStructureGroup;
 }

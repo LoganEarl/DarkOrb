@@ -53,9 +53,27 @@ export class LagoonDetector {
             }
         }
         if (this.iteration === this.targetIteration) {
+            this.trimDistances(writeMatrix);
             return writeMatrix;
         }
         return undefined;
+    }
+
+    private trimDistances(lagoonMatrix: CostMatrix) {
+        let terrainMatrix: CostMatrix = new PathFinder.CostMatrix();
+        let terrain = Game.map.getRoomTerrain(this.roomName);
+        for (let y = 0; y <= 49; y++) {
+            for (let x = 0; x <= 49; x++) {
+                if (terrain.get(x, y) === TERRAIN_MASK_WALL) terrainMatrix.set(x, y, 255);
+            }
+        }
+
+        let dTransform = distanceTransformDiag(terrainMatrix);
+        for (let y = 1; y < 49; y++) {
+            for (let x = 1; x < 49; x++) {
+                if (dTransform.get(x, y) <= 3) lagoonMatrix.set(x, y, 255);
+            }
+        }
     }
 
     public visualize() {

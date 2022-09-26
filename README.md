@@ -45,7 +45,7 @@ The type definitions for Screeps come from [typed-screeps](https://github.com/sc
 This bot is organized into systems. Anything within the `src/system/` directory is considered a system. Each package is composed of multiple files
 
 -   `index.d.ts`: Place any publicly accessible data types, interfaces, and Memory additions here.
--   `[System name]Interface.ts`: The entrypoint for the system. Code that needs methods described in the system must go through the functions and interfaces in this file.
+-   `[System name]Interface.ts`: The storage interface for the system. Any code that does not rely on internal components should go here. An example is the shard map in the scouting system. Since other modules need scouting info too, this must be part of the interface.
 -   `[SystemName]Logic.ts`: For complicated calculations and creep logic.
 -   `[Scoppe][System Name]System.ts`: Files deliniating systems by their scope. For instance, there is a Shard level spawning system and a room level one. The shard level one is responsible for multi-room creeps and coordinating spawning operations between multiple rooms. Room level ones are just that, room level
 

@@ -67,7 +67,7 @@ export class RoomSpawnSystem {
                         type: "Sink",
                         analyticsCategories: [],
                         lastKnownPosition: fillable.pos,
-                        priorityScalar: 2,
+                        priorityScalar: 10,
                         serviceRoute: {
                             pathLength: dist,
                             pathCost: dist * 2

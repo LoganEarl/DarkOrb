@@ -5,7 +5,7 @@ import { registerResetFunction } from "utils/SystemResetter";
 import { getCreeps, registerCreepConfig, unregisterHandle } from "system/spawning/SpawnInterface";
 import { unpackCoord, unpackPos } from "utils/Packrat";
 import { hslToHex } from "utils/UtilityFunctions";
-import { getRoomData, getShardData, MAX_SCOUT_DEPTH } from "./ScoutInterface";
+import { getRoomData, getShardData, MAX_SCOUT_DEPTH, saveMapData } from "./ScoutInterface";
 
 const SCOUTS_PER_CLUSTER = 1;
 class ShardScoutSystem implements MemoryComponent {
@@ -129,6 +129,7 @@ class ShardScoutSystem implements MemoryComponent {
                         Log.i(`${scout.name} has finished scouting ${assignment}`);
                         if (!clusters[i].includes(assignment)) {
                             clusters[i].push(assignment);
+                            saveMapData();
                             updateMemory(this);
                         }
                         delete this.scoutAssignments[scout.name];

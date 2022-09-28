@@ -5,13 +5,12 @@ import { MemoryComponent } from "utils/MemoryWriter";
 import { PriorityQueue, PriorityQueueItem } from "utils/PriorityQueue";
 import { registerResetFunction } from "utils/SystemResetter";
 import { _queuedJobs } from "./PlannerInterface";
-import { planStructures } from "./PlannerLogic";
 
 class ShardPlannerSystem {
     public _continuePlanning(): void {
         let job = _queuedJobs.peek();
         if (job) {
-            let result = job.run();
+            let result = job.continuePlanning();
             if (result) {
                 let mapData = getRoomData(job.roomName);
                 if (mapData) {

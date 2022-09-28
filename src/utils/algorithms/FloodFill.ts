@@ -1,10 +1,7 @@
 //Credit to Carson Burke. https://github.com/CarsonBurke/Screeps-Tutorials/blob/Master/basePlanningAlgorithms/floodFill.js
 
 import { Traveler } from "utils/traveler/Traveler";
-
-const roomDimensions = 50;
-
-type Rect = { x1: number; x2: number; y1: number; y2: number };
+import { findPositionsInsideRect } from "utils/UtilityFunctions";
 
 //Produces a matrix where each slot is the distance from the nearest seed. Spreads out from the seed positions, and does not modify positions not covered by the fill
 export function floodFill(
@@ -58,9 +55,7 @@ export function floodFill(
                     });
             }
 
-            // Construct a rect and get the positions in a range of 1
-            const rect = { x1: pos.x - 1, y1: pos.y - 1, x2: pos.x + 1, y2: pos.y + 1 },
-                adjacentPositions = findPositionsInsideRect(rect);
+            const adjacentPositions = findPositionsInsideRect(pos.x - 1, pos.y - 1, pos.x + 1, pos.y + 1);
 
             // Loop through adjacent positions
             for (const adjacentPos of adjacentPositions) {
@@ -83,20 +78,4 @@ export function floodFill(
     }
 
     return floodCM;
-}
-
-export function findPositionsInsideRect(rect: Rect) {
-    const positions = [];
-
-    for (let x = rect.x1; x <= rect.x2; x++) {
-        for (let y = rect.y1; y <= rect.y2; y++) {
-            // Iterate if the pos doesn't map onto a room
-            if (x < 0 || x >= roomDimensions || y < 0 || y >= roomDimensions) continue;
-
-            // Otherwise ass the x and y to positions
-            positions.push({ x, y });
-        }
-    }
-
-    return positions;
 }

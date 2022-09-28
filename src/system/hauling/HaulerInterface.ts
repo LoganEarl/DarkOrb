@@ -40,8 +40,8 @@ export function unregisterNodes(roomName: string, providerId: string) {
 
 export function unregisterNode(roomName: string, providerId: string, nodeId: string) {
     let nodes = nodesByRoomName[roomName];
-    if (nodes?.nodeIdsByProvider[providerId]?.has(nodeId)) {
+    if (nodes) {
         delete nodes.logisticsNodes[nodeId];
-        nodes.nodeIdsByProvider[providerId].delete(nodeId);
+        nodes.nodeIdsByProvider[providerId]?.delete(nodeId);
     }
 }

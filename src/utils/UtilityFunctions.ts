@@ -7,22 +7,27 @@ export function hasRespawned() {
         Memory.respawnTick = Game.time;
         return true;
     }
+
     // check for 0 creeps
     if (Object.keys(Game.creeps).length) return false;
+
     // check for only 1 room
     var rNames = Object.keys(Game.rooms);
     if (rNames.length !== 1) return false;
+
     // check for controller, progress and safe mode
     var room = Game.rooms[rNames[0]];
+    Log.d(room?.controller?.safeMode + "");
     if (
         !room.controller ||
         !room.controller.my ||
         room.controller.level !== 1 ||
         room.controller.progress ||
         !room.controller.safeMode ||
-        room.controller.safeMode <= SAFE_MODE_DURATION - 1
-    )
+        (room.controller.safeMode < SAFE_MODE_DURATION - 1 && (Memory.respawnTick ?? 0) < Game.time - 2)
+    ) {
         return false;
+    }
     // check for 1 spawn
     if (Object.keys(Game.spawns).length !== 1) return false;
     // if all cases point to a respawn, you've respawned
@@ -278,7 +283,7 @@ export function logHeapStats(): void {
 /**
  * Rotate a square matrix in place clockwise by 90 degrees
  */
-function rotateMatrix<T>(matrix: T[][]): void {
+export function rotateMatrix<T>(matrix: T[][]): void {
     // reverse the rows
     matrix.reverse();
     // swap the symmetric elements
@@ -303,12 +308,26 @@ export function clone2DArray<T>(a: T[][]): T[][] {
 }
 
 /**
- * Return a copy of a 2D array rotated by specified number of clockwise 90 turns
+ * Rotate the given matrix the given number of times
  */
-export function rotatedMatrix<T>(matrix: T[][], clockwiseTurns: 0 | 1 | 2 | 3): T[][] {
-    const mat = clone2DArray(matrix);
+export function rotateMatrixTurns<T>(matrix: T[][], clockwiseTurns: 0 | 1 | 2 | 3): void {
     for (let i = 0; i < clockwiseTurns; i++) {
-        rotateMatrix(mat);
+        rotateMatrix(matrix);
     }
-    return mat;
+}
+
+export function findPositionsInsideRect(x1: number, y1: number, x2: number, y2: number): Coord[] {
+    const positions: Coord[] = [];
+
+    for (let x = x1; x <= x2; x++) {
+        for (let y = y1; y <= y2; y++) {
+            // Iterate if the pos doesn't map onto a room
+            if (x < 0 || x >= 50 || y < 0 || y >= 50) continue;
+
+            // Otherwise pass the x and y to positions
+            positions.push({ x, y });
+        }
+    }
+
+    return positions;
 }

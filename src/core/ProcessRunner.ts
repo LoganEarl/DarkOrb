@@ -112,7 +112,7 @@ export class ProcessRunner {
     }
 
     addProcess(process: Process) {
-        Log.i(`Added process: ${JSON.stringify(process)}`);
+        // Log.i(`Added process: ${JSON.stringify(process)}`);
         if (!this.processIds.has(process.processId)) {
             this.allProcesses.push(process);
             this.processIds.add(process.processId);

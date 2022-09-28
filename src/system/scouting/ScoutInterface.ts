@@ -1,5 +1,6 @@
 import { MemoryComponent, updateMemory } from "utils/MemoryWriter";
 import { unpackPos } from "utils/Packrat";
+import { registerResetFunction } from "utils/SystemResetter";
 import { scoutRoom } from "./ScoutLogic";
 import { _shardScoutSystem } from "./ShardScoutSystem";
 
@@ -28,7 +29,8 @@ class MapMemory implements MemoryComponent {
     }
 }
 
-const memory: MapMemory = new MapMemory();
+let memory: MapMemory = new MapMemory();
+registerResetFunction(() => (memory = new MapMemory()));
 
 export function getRoomData(roomName: string): RoomScoutingInfo | undefined {
     memory.loadMemory();

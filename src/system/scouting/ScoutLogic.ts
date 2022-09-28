@@ -311,18 +311,13 @@ export function scoutRoom(room: Room, shardMap: ShardMap, territoryRange: number
             .filter(v => v)
             .map(v => v!) ?? [];
     let pathingInfo = evaluatePathing(room, exitsToRooms);
-    Log.i(`ownership: ${JSON.stringify(ownership)} username: ${global.PLAYER_USERNAME}`);
+    // Log.i(`ownership: ${JSON.stringify(ownership)} username: ${global.PLAYER_USERNAME}`);
     let territoryInfo: RoomTerritoryInfo =
         ownership?.username === global.PLAYER_USERNAME && ownership?.ownershipType === "Claimed"
             ? [{ roomName: room.name, range: 0 }]
             : evaluateRoomDepth(pathingInfo, exitsToRooms, shardMap, territoryRange);
 
-    if (!shardMap[room.name]?.roomPlan) {
-        Log.d(`Ownership: ${JSON.stringify(ownershipValues)} Territory: ${JSON.stringify(territoryInfo)}`);
-        planRoom(room, territoryInfo[0].range);
-    }
-
-    return {
+    let result = {
         roomName: room.name,
         roomType: Traveler.roomType(room.name),
         miningInfo: evaluateMining(room),
@@ -332,6 +327,12 @@ export function scoutRoom(room: Room, shardMap: ShardMap, territoryRange: number
         exitsToRooms: exitsToRooms,
         pathingInfo: pathingInfo
     };
+
+    if (!shardMap[room.name]?.roomPlan && room.controller) {
+        planRoom(room, result);
+    }
+
+    return result;
 }
 
 export function assignRoomToScout(

@@ -1,17 +1,22 @@
-import { getRoomData } from "system/scouting/ScoutInterface";
+import { pad } from "lodash";
+import { off } from "process";
 import { floodFill } from "utils/algorithms/FloodFill";
 import { LagoonDetector } from "utils/algorithms/LagoonFlow";
+import { getCutTiles, Rectangle } from "utils/algorithms/MinCut";
 import { FEATURE_VISUALIZE_PLANNING } from "utils/featureToggles/FeatureToggleConstants";
 import { getFeature } from "utils/featureToggles/FeatureToggles";
+import { Log } from "utils/logger/Logger";
 import { unpackCoordList, unpackPosList } from "utils/Packrat";
 import { PriorityQueue, PriorityQueueItem } from "utils/PriorityQueue";
 import {
+    clamp,
     clone2DArray,
+    euclidianDistance,
     findPositionsInsideRect,
-    getFreeSpacesNextTo,
     isWalkableOwnedRoom,
     rotateMatrix
 } from "utils/UtilityFunctions";
+import { EXTENSION_GROUP } from "./stamp/ExtensionPod";
 import { FAST_FILLER_GROUP, FAST_FILLER_SPAWN_COORD } from "./stamp/FastFiller";
 import { rotateGroup } from "./stamp/StampLogic";
 import { STORAGE_CORE_GROUP } from "./stamp/StorageCore";
@@ -22,10 +27,12 @@ type PlanningState =
     | "PlacingFillerUsingSpawn" //We do this when we just spawned and we want to build the filler around the spawn
     | "RunningLagoonFlow"
     | "PlacingCore"
+    | "BuildingStorageGradient"
     | "PlacingFiller"
     | "PlacingExtensionStamps"
-    | "CreatingMiningRoutes"
+    | "PlacingRoads"
     | "PlacingWalls"
+    | "PlacingTowers"
     | "Failed"
     | "Done";
 
@@ -36,33 +43,41 @@ interface ScoredCoord extends Coord, PriorityQueueItem {
 
 const MIN_EDGE_DISTANCE = 5;
 const LAGOON_FLOW_ITERATIONS_PER_TICK = 5;
+const ROWS_SCANNED_PER_TICK = 4;
 
 export class RoomPlanner implements PriorityQueueItem {
     public queueIndex: number = 0; //Ignore this
     public roomName: string;
     public roomDepth: number;
 
+    private planningState: PlanningState = "ReservingSpaces";
     private terrain: RoomTerrain;
     private roomData: RoomScoutingInfo;
     private exitCoords: Coord[];
     private controllerPos: RoomPosition;
-    private spawnPosition: RoomPosition | undefined;
+    private spawnPos: RoomPosition | undefined;
+    private storagePos: RoomPosition | undefined;
     private failReason: string | undefined;
+
+    //Temporary variables used for calculations extending over multiple ticks
+    private lastScannedY: number = 1;
+    private scoredCoords: PriorityQueue<ScoredCoord> = new PriorityQueue(49 * 49, (a, b) => a.score - b.score);
 
     //Stores all tiles that we forbid building blocking structures on (not ramps)
     private forbiddenMatrix: CostMatrix | undefined;
-    //Stores the planned positions of all roads. 1 == road, 2 == plain, 4 == swamp, 255 == wall
-    private roadMatrix: CostMatrix | undefined;
-    //Stores all blocking structures and walls
-    private blockingMatrix: CostMatrix | undefined;
+    //Stores the planned positions of all roads. 1 == road, 2 == plain, 4 == swamp, 255 == wall/placed structure
+    private pathMatrix: CostMatrix | undefined;
     //Stores lagoon info used to find good places to build
     private lagoonMatrix: CostMatrix | undefined;
     private laggonDetector: LagoonDetector;
-
+    //Stores a sorted list of coords, sorted by path distance to the main storage
+    private storageGradient: Coord[] | undefined;
     private placedFastFiller: PlacedStructureGroup | undefined;
     private placedStorageCore: PlacedStructureGroup | undefined;
-
-    private planningState: PlanningState = "ReservingSpaces";
+    private placedExtensionPods: PlacedStructureGroup[] | undefined;
+    private placedRoads: Coord[] | undefined;
+    private placedWalls: Coord[] | undefined;
+    private placedTowers: Coord[] | undefined;
 
     constructor(room: Room, roomData: RoomScoutingInfo) {
         this.roomName = room.name;
@@ -74,7 +89,7 @@ export class RoomPlanner implements PriorityQueueItem {
         this.laggonDetector = new LagoonDetector(room, 100);
 
         let spawns = room.find(FIND_MY_SPAWNS);
-        if (spawns.length === 1) this.spawnPosition = spawns[0].pos;
+        if (spawns.length === 1) this.spawnPos = spawns[0].pos;
         else if (spawns.length > 1) this.fail("Room too advanced for replanning");
     }
 
@@ -82,7 +97,7 @@ export class RoomPlanner implements PriorityQueueItem {
         if (this.planningState === "ReservingSpaces") {
             this.loadTerrainData();
             this.reserveSpaces();
-            if (this.spawnPosition) this.planningState = "PlacingFillerUsingSpawn";
+            if (this.spawnPos) this.planningState = "PlacingFillerUsingSpawn";
             else this.planningState = "RunningLagoonFlow";
         } else if (this.planningState === "PlacingFillerUsingSpawn") {
             this.placeFillerUsingSpawn();
@@ -95,10 +110,35 @@ export class RoomPlanner implements PriorityQueueItem {
             }
         } else if (this.planningState === "PlacingCore") {
             this.placeStorageCore();
-            if (this.placedStorageCore && !this.placedFastFiller) {
+            this.planningState = "BuildingStorageGradient";
+        } else if (this.planningState === "BuildingStorageGradient") {
+            this.buildStorageGradient();
+            if (this.storageGradient && !this.placedFastFiller) {
                 this.planningState = "PlacingFiller";
-            } else if (this.placedStorageCore) {
+            } else if (this.storageGradient) {
                 this.planningState = "PlacingExtensionStamps";
+            }
+        } else if (this.planningState === "PlacingFiller") {
+        } else if (this.planningState === "PlacingExtensionStamps") {
+            this.placeExtensionsPods();
+            this.planningState = "PlacingRoads";
+        } else if (this.planningState === "PlacingRoads") {
+            if (this.placeRoadPaths()) this.planningState = "PlacingWalls";
+        } else if (this.planningState === "PlacingWalls") {
+            this.placeWalls();
+            this.planningState = "PlacingTowers";
+        } else if (this.planningState === "PlacingTowers") {
+            this.placeTowers();
+            this.planningState = "Done";
+        } else if (this.planningState === "Done") {
+            if (getFeature(FEATURE_VISUALIZE_PLANNING)) {
+                let visual = new RoomVisual(this.roomName);
+                this.placedWalls!.forEach(pos => visual.structure(pos.x, pos.y, STRUCTURE_RAMPART, {}));
+                this.placedExtensionPods!.forEach(p => drawPlacedStructureGroup(visual, p));
+                drawPlacedStructureGroup(visual, this.placedStorageCore);
+                drawPlacedStructureGroup(visual, this.placedFastFiller);
+                for (let roadPos of this.placedRoads!) visual.structure(roadPos.x, roadPos.y, STRUCTURE_ROAD, {});
+                visual.connectRoads();
             }
         }
 
@@ -108,27 +148,24 @@ export class RoomPlanner implements PriorityQueueItem {
     }
 
     private loadTerrainData() {
-        let blockingMatrix = new PathFinder.CostMatrix();
-        let roadMatrix = new PathFinder.CostMatrix();
+        let pathMatrix = new PathFinder.CostMatrix();
         for (let y = 0; y < 50; y++) {
             for (let x = 0; x < 50; x++) {
                 if (this.terrain.get(x, y) === TERRAIN_MASK_WALL) {
-                    blockingMatrix.set(x, y, 255);
-                    roadMatrix.set(x, y, 255);
+                    pathMatrix.set(x, y, 255);
                 } else if (this.terrain.get(x, y) === TERRAIN_MASK_SWAMP) {
-                    roadMatrix.set(x, y, 4);
+                    pathMatrix.set(x, y, 4);
                 } else {
-                    roadMatrix.set(x, y, 2);
+                    pathMatrix.set(x, y, 2);
                 }
             }
         }
 
         if (getFeature(FEATURE_VISUALIZE_PLANNING)) {
-            drawRoadMatrix(new RoomVisual(this.roomName), roadMatrix);
+            drawPathMatrix(new RoomVisual(this.roomName), pathMatrix);
         }
 
-        this.blockingMatrix = blockingMatrix;
-        this.roadMatrix = roadMatrix;
+        this.pathMatrix = pathMatrix;
     }
 
     private reserveSpaces() {
@@ -171,14 +208,16 @@ export class RoomPlanner implements PriorityQueueItem {
         }
 
         this.forbiddenMatrix = forbiddenMatrix;
+
+        return true;
     }
 
     private placeFillerUsingSpawn() {
-        if (this.spawnPosition) {
+        if (this.spawnPos) {
             //We don't rotate the fast filler ever. Makes spawning fillers annoying
             let buildings = FAST_FILLER_GROUP[8].buildings;
-            let stampX = this.spawnPosition.x - FAST_FILLER_SPAWN_COORD.x;
-            let stampY = this.spawnPosition.y - FAST_FILLER_SPAWN_COORD.y;
+            let stampX = this.spawnPos.x - FAST_FILLER_SPAWN_COORD.x;
+            let stampY = this.spawnPos.y - FAST_FILLER_SPAWN_COORD.y;
             if (!this.place({ x: stampX, y: stampY }, buildings)) this.fail("Bad spawn position");
             else {
                 this.placedFastFiller = {
@@ -191,9 +230,8 @@ export class RoomPlanner implements PriorityQueueItem {
             if (getFeature(FEATURE_VISUALIZE_PLANNING)) {
                 let visual = new RoomVisual(this.roomName);
                 drawPlacedStructureGroup(visual, this.placedFastFiller);
-                visual.connectRoads({});
-                drawRoadMatrix(visual, this.roadMatrix!);
-                drawBlockedMatrix(visual, this.blockingMatrix!);
+                visual.connectRoads();
+                drawPathMatrix(visual, this.pathMatrix!);
             }
         }
     }
@@ -204,11 +242,30 @@ export class RoomPlanner implements PriorityQueueItem {
             lagoonMatrix = this.laggonDetector.advanceFlow();
         }
 
+        //Bias the lagoon flow toward our fast filler a bit
+        if (lagoonMatrix && this.placedFastFiller) {
+            for (let y = 1; y < 49; y++) {
+                for (let x = 1; x < 49; x++) {
+                    let offset = Math.floor(this.placedFastFiller.group[8].buildings.length / 2);
+                    let euclidian = euclidianDistance(
+                        x,
+                        y,
+                        this.placedFastFiller.dx + offset,
+                        this.placedFastFiller.dy + offset
+                    );
+                    //max euclidian distance is 50, so being far away counts as up to 10 more flow value
+                    let score = clamp(lagoonMatrix.get(x, y) / 2 + (euclidian * 5) / 3, 0, 255);
+                    lagoonMatrix.set(x, y, score);
+                }
+            }
+        }
+
         if (getFeature(FEATURE_VISUALIZE_PLANNING)) {
             let visual = new RoomVisual(this.roomName);
-            this.laggonDetector.visualize(visual);
+            if (lagoonMatrix) drawLagoonMatrix(visual, lagoonMatrix);
+            else this.laggonDetector.visualize(visual);
             drawPlacedStructureGroup(visual, this.placedFastFiller);
-            visual.connectRoads({});
+            visual.connectRoads();
         }
 
         return lagoonMatrix;
@@ -220,7 +277,7 @@ export class RoomPlanner implements PriorityQueueItem {
 
         for (let y = 0; y < 50; y++) {
             for (let x = 0; x < 50; x++) {
-                if (this.blockingMatrix?.get(x, y) === 0 && this.forbiddenMatrix?.get(x, y) === 0) {
+                if (this.pathMatrix?.get(x, y) !== 255 && this.forbiddenMatrix?.get(x, y) === 0) {
                     placementOptions.enqueue({ x: x, y: y, score: this.lagoonMatrix!.get(x, y), queueIndex: 0 });
                 }
             }
@@ -233,16 +290,28 @@ export class RoomPlanner implements PriorityQueueItem {
         while (!placedPos && placementOptions.length) {
             let pos = placementOptions.dequeue()!;
             checkedCoords.push(pos);
-            for (let rotations = 0; rotations < 4; rotations++) {
-                if (this.place(pos, toPlace)) {
-                    placedPos = pos;
+            for (let rotations = 0; rotations < 4 && !placedPos; rotations++) {
+                let offset = this.placeCentered(pos, toPlace);
+                if (offset !== false) {
+                    placedPos = { x: pos.x - offset, y: pos.y - offset };
                     placedRotation = rotations as 0 | 1 | 2 | 3;
-                }
-                rotateMatrix(toPlace);
+                } else rotateMatrix(toPlace);
             }
         }
 
         if (placedPos) {
+            outer: for (let y = 0; y < toPlace.length; y++) {
+                for (let x = 0; x < toPlace[y].length; x++) {
+                    if (toPlace[y][x].includes(STRUCTURE_STORAGE)) {
+                        this.storagePos = new RoomPosition(x + placedPos.x, y + placedPos.y, this.roomName);
+                        break outer;
+                    }
+                }
+            }
+
+            //Fill in the middle of the structure. This will help with our E pod placement.
+            this.pathMatrix?.set(placedPos.x + 3, placedPos.y + 3, 255);
+
             this.placedStorageCore = {
                 dx: placedPos.x,
                 dy: placedPos.y,
@@ -256,22 +325,220 @@ export class RoomPlanner implements PriorityQueueItem {
             drawPlacedStructureGroup(visual, this.placedStorageCore);
             drawForbiddenMatrix(visual, this.forbiddenMatrix!);
             fillCoords(visual, checkedCoords);
-            visual.connectRoads({});
+            visual.connectRoads();
         }
     }
 
+    private buildStorageGradient(): boolean {
+        if (!this.storagePos) return this.fail("Unable to create storage gradient without a placed storage");
+        if (!this.pathMatrix) return this.fail("Unable to process without pathing matrix");
+        if (!this.forbiddenMatrix) return this.fail("Unable to process without forbidden matrix");
+
+        let target = clamp(this.lastScannedY + ROWS_SCANNED_PER_TICK, 1, 49);
+        let callback = (roomName: string) => (this.roomName === roomName ? this.pathMatrix! : false);
+        while (this.lastScannedY < target) {
+            let y = this.lastScannedY;
+            this.lastScannedY++;
+            for (let x = 1; x < 49; x++) {
+                if (this.pathMatrix.get(x, y) !== 255 && this.forbiddenMatrix.get(x, y) === 0) {
+                    let path = PathFinder.search(
+                        new RoomPosition(x, y, this.roomName),
+                        { pos: this.storagePos, range: 1 },
+                        { roomCallback: callback }
+                    );
+
+                    //Slightly prefer it when they are closer in euclidian terms. Serves as a tiebreaker
+                    let euclidian = euclidianDistance(x, y, this.storagePos.x, this.storagePos.y);
+                    let score = path.cost + clamp(euclidian / 100, 0, 0.9);
+
+                    if (!path.incomplete) {
+                        let coord: ScoredCoord = { x: x, y: y, score: score, queueIndex: 0 };
+                        this.scoredCoords.enqueue(coord);
+                    }
+                }
+            }
+        }
+
+        //If we have filled every spot
+        if (target === 49) {
+            let results: Coord[] = [];
+            while (this.scoredCoords.length > 0) results.push(this.scoredCoords.dequeue()!);
+            this.storageGradient = results;
+        }
+
+        if (getFeature(FEATURE_VISUALIZE_PLANNING)) {
+            let visual = new RoomVisual(this.roomName);
+            fillCoords(visual, this.storageGradient ?? this.scoredCoords.items);
+            drawPlacedStructureGroup(visual, this.placedStorageCore);
+            drawPlacedStructureGroup(visual, this.placedFastFiller);
+            visual.connectRoads();
+        }
+
+        return true;
+    }
+
+    private placeExtensionsPods() {
+        if (!this.storagePos) return this.fail("Cannot place extension pods without a storage position");
+        if (!this.storageGradient) return this.fail("Unable to plan without a storage gradient");
+
+        let toPlace: BuildableStructureConstant[][][] = clone2DArray(EXTENSION_GROUP[8].buildings);
+        let placedPos: Coord[] = [];
+        let targetPlaced = 8;
+
+        let checkedTo = 0;
+        for (let i = 0; i < this.storageGradient.length && placedPos.length < targetPlaced; i++) {
+            //Dont bother with rotations here
+            let offSet = this.placeCentered(this.storageGradient[i], toPlace);
+            if (offSet !== false) {
+                placedPos.push({ x: this.storageGradient[i].x - offSet, y: this.storageGradient[i].y - offSet });
+            }
+            checkedTo = i;
+        }
+
+        this.placedExtensionPods = placedPos.map(p => {
+            return {
+                dx: p.x,
+                dy: p.y,
+                group: EXTENSION_GROUP
+            };
+        });
+
+        if (getFeature(FEATURE_VISUALIZE_PLANNING)) {
+            let visual = new RoomVisual(this.roomName);
+            fillCoords(visual, this.storageGradient.slice(0, checkedTo + 1));
+            this.placedExtensionPods.forEach(p => drawPlacedStructureGroup(visual, p));
+            drawPlacedStructureGroup(visual, this.placedStorageCore);
+            drawPlacedStructureGroup(visual, this.placedFastFiller);
+            visual.connectRoads();
+        }
+
+        return true;
+    }
+
+    private placeRoadPaths(): boolean {
+        if (!this.storagePos) return this.fail("Cannot load mining paths without a storage position");
+        if (!this.placedExtensionPods) return this.fail("Cannot load mining paths placed extension pods");
+        if (!this.placedFastFiller) return this.fail("Cannot load mining paths placed fast filler pods");
+        if (!this.roomData.miningInfo || !this.roomData.pathingInfo)
+            return this.fail("Cannot load mining paths without a storage position");
+
+        let pathingTargets: RoomPosition[] = [];
+        //Add the fast filler station
+        let fillerOffset = Math.floor(this.placedFastFiller.group[8].buildings.length / 2);
+        pathingTargets.push(
+            new RoomPosition(
+                this.placedFastFiller.dx + fillerOffset,
+                this.placedFastFiller.dy + fillerOffset,
+                this.roomName
+            )
+        );
+        //Add the sources in the room
+        this.roomData.miningInfo!.sources.forEach(s => pathingTargets.push(unpackPosList(s.packedFreeSpots)[0]));
+        //Add a path to the mineral
+        pathingTargets.push(unpackPosList(this.roomData.miningInfo.mineral.packedFreeSpots)[0]);
+        //Add a path to the controller
+        pathingTargets.push(this.controllerPos);
+        //Add paths to each of the extension pods. We are pathing at range 1, so path to the middle of the pod
+        for (let pod of this.placedExtensionPods) {
+            let offset = Math.floor(pod.group[8].buildings.length / 2);
+            pathingTargets.push(new RoomPosition(pod.dx + offset, pod.dy + offset, this.roomName));
+        }
+
+        let done = true;
+        if (!this.placedRoads) this.placedRoads = [];
+        let callback = (roomName: string) => (this.roomName === roomName ? this.pathMatrix! : false);
+
+        for (let target of pathingTargets) {
+            let path = PathFinder.search(this.storagePos!, { pos: target, range: 1 }, { roomCallback: callback });
+            for (let pos of path.path) {
+                if (this.pathMatrix?.get(pos.x, pos.y) !== 1) {
+                    this.pathMatrix?.set(pos.x, pos.y, 1);
+                    this.placedRoads.push(pos);
+                    done = false;
+                    break;
+                }
+            }
+        }
+
+        if (getFeature(FEATURE_VISUALIZE_PLANNING)) {
+            let visual = new RoomVisual(this.roomName);
+            this.placedExtensionPods!.forEach(p => drawPlacedStructureGroup(visual, p));
+            drawPlacedStructureGroup(visual, this.placedStorageCore);
+            drawPlacedStructureGroup(visual, this.placedFastFiller);
+            for (let roadPos of this.placedRoads) visual.structure(roadPos.x, roadPos.y, STRUCTURE_ROAD, {});
+            visual.connectRoads();
+        }
+
+        return done;
+    }
+
+    private placeWalls(): boolean {
+        if (!this.placedExtensionPods) return this.fail("Cannot place walls without extension pods");
+        if (!this.placedFastFiller) return this.fail("Cannot place walls without fast filler");
+        if (!this.placedStorageCore) return this.fail("Cannot place walls without storage core");
+
+        const rectArray = [];
+
+        rectArray.push(this.rectAround(this.placedFastFiller));
+        rectArray.push(this.rectAround(this.placedStorageCore));
+        this.placedExtensionPods.forEach(pod => rectArray.push(this.rectAround(pod)));
+
+        this.placedWalls = getCutTiles(this.roomName, rectArray, false, Infinity, true);
+
+        return true;
+    }
+
+    private placeTowers(): boolean {
+        if (!this.placedWalls) return this.fail("Cannot place towers without walls");
+
+        //TODO average the ramp position to get a starting point
+        //flood fill from storage using roads
+        //mark every empty spot next to the road as a potential tower spot, ranked by distance to average
+
+        return true;
+    }
+
+    private rectAround(group: PlacedStructureGroup): Rectangle {
+        const width = group.group[8].buildings.length;
+        const padding = 3;
+        return {
+            x1: Math.max(group.dx - padding, 0),
+            y1: Math.max(group.dy - padding, 0),
+            x2: Math.min(group.dx + width + padding, 49),
+            y2: Math.min(group.dy + width + padding, 49)
+        };
+    }
+
+    //Will attempt to center the structure around the given point. On success returns the offset value
+    // that can be subtracted from the center coord to result in the stamp being centered
+    private placeCentered(center: Coord, group: BuildableStructureConstant[][][]): number | false {
+        let offset = Math.floor(group.length / 2); //square matrix remember?
+        let upperLeft: Coord = { x: center.x - offset, y: center.y - offset };
+        if (this.place(upperLeft, group)) return offset;
+        return false;
+    }
+
+    //Places the structure at the given coord.
     private place(upperLeft: Coord, group: BuildableStructureConstant[][][]): boolean {
         group = clone2DArray(group);
+        //We check the middle square, not the upper left one
+        // upperLeft = { x: upperLeft.x - Math.floor(size / 2), y: upperLeft.y - Math.floor(size / 2) };
         let dx = upperLeft.x;
         let dy = upperLeft.y;
 
         for (let y = 0; y < group.length; y++) {
             if (y + dy < 0 || y + dy >= 50) return false;
             for (let x = 0; x < group[y].length; x++) {
+                if (!group[y][x].length) continue; //If we don't have anything to place, then we are good
+
                 if (x + dx < 0 || x + dx >= 50) return false;
                 let blocking = _.any(group[y][x], b => !isWalkableOwnedRoom(b));
+                //Don't place blocking sturctures ontop of forbidden spaces
                 if (blocking && this.forbiddenMatrix?.get(x + dx, y + dy) === 255) return false;
-                if (this.blockingMatrix?.get(x + dx, y + dy) === 255) return false;
+                //Don't place blocking sturctures on roads
+                if (blocking && this.pathMatrix?.get(x, y) === 1) return false;
+                //Also don't place anything on walls obviously
+                if (this.pathMatrix?.get(x + dx, y + dy) === 255) return false;
             }
         }
 
@@ -279,18 +546,19 @@ export class RoomPlanner implements PriorityQueueItem {
         for (let y = 0; y < group.length; y++) {
             for (let x = 0; x < group[y].length; x++) {
                 let blocking = _.any(group[y][x], b => !isWalkableOwnedRoom(b));
-                if (blocking) this.blockingMatrix?.set(x + dx, y + dy, 255);
+                if (blocking) this.pathMatrix?.set(x + dx, y + dy, 255);
                 let hasRoad = _.any(group[y][x], b => b === STRUCTURE_ROAD);
-                if (hasRoad) this.roadMatrix?.set(x + dx, y + dy, 1);
+                if (hasRoad) this.pathMatrix?.set(x + dx, y + dy, 1);
             }
         }
 
         return true;
     }
 
-    private fail(reason: string): void {
+    private fail(reason: string): boolean {
         this.failReason = reason;
         this.planningState = "Failed";
+        return false;
     }
 }
 
@@ -306,7 +574,7 @@ export function drawPlacedStructureGroup(visual: RoomVisual, placed?: PlacedStru
     }
 }
 
-function drawRoadMatrix(visual: RoomVisual, matrix: CostMatrix) {
+function drawPathMatrix(visual: RoomVisual, matrix: CostMatrix) {
     for (let y = 0; y < 50; y++) {
         for (let x = 0; x < 50; x++) {
             let color = "white";
@@ -335,19 +603,6 @@ function drawForbiddenMatrix(visual: RoomVisual, matrix: CostMatrix) {
     }
 }
 
-function drawBlockedMatrix(visual: RoomVisual, matrix: CostMatrix) {
-    for (let y = 0; y < 50; y++) {
-        for (let x = 0; x < 50; x++) {
-            if (matrix.get(x, y) === 255) {
-                visual.rect(x - 0.5, y - 0.5, 1, 1, {
-                    fill: "black",
-                    opacity: 0.4
-                });
-            }
-        }
-    }
-}
-
 function drawLagoonMatrix(visual: RoomVisual, matrix: CostMatrix) {
     for (let y = 0; y <= 49; y++) {
         for (let x = 0; x <= 49; x++) {
@@ -363,6 +618,7 @@ function drawLagoonMatrix(visual: RoomVisual, matrix: CostMatrix) {
 
 function fillCoords(visual: RoomVisual, coords: Coord[]) {
     for (let i = 0; i < coords.length; i++) {
+        if (!coords[i]) continue;
         let x = coords[i].x;
         let y = coords[i].y;
         visual.rect(x - 0.5, y - 0.5, 1, 1, {

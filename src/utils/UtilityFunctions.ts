@@ -189,6 +189,10 @@ export function manhattanDistance(x1: number, y1: number, x2: number, y2: number
     return _.max([Math.abs(x1 - x2), Math.abs(y1 - y2)]);
 }
 
+export function euclidianDistance(x1: number, y1: number, x2: number, y2: number): number {
+    return Math.sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2));
+}
+
 export function roomPos(coord: Coord, roomName: string) {
     return new RoomPosition(coord.x, coord.y, roomName);
 }

@@ -66,8 +66,8 @@ function evaluateSources(sources: [Source, ...Source[]]): [SourceInfo, ...Source
 function evaluateMineral(mineral: Mineral): MineralInfo {
     return {
         id: mineral.id as string,
-        packedPosition: packCoord(mineral.pos.localCoords),
-        packedFreeSpots: packCoordList(getFreeSpacesNextTo(mineral.pos, mineral.room).map(p => p.localCoords)),
+        packedPosition: packPos(mineral.pos),
+        packedFreeSpots: packPosList(getFreeSpacesNextTo(mineral.pos, mineral.room)),
         mineralType: mineral.mineralType
     };
 }

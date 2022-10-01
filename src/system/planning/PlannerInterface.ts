@@ -1,4 +1,4 @@
-import { PriorityQueue, PriorityQueueItem } from "utils/PriorityQueue";
+import { PriorityQueue } from "utils/PriorityQueue";
 import { RoomPlanner } from "./BetterPlanner";
 
 export var _queuedJobs: PriorityQueue<RoomPlanner> = new PriorityQueue(5, (a, b) => a.roomDepth - b.roomDepth);

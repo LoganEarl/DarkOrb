@@ -29,7 +29,7 @@ export class PlannerPRocess extends Process {
         //                 drawPlacedStructureGroup(visual, pod);
         //             }
         //         }
-        //         visual.connectRoads({});
+        //         visual.connectRoads();
         //     }
         // }
     }

@@ -9,6 +9,7 @@ type RoomOwnershipType =
 interface SourceInfo {
     id: string;
     packedPosition: string;
+    //Packed as room positions
     packedFreeSpots: string;
 }
 

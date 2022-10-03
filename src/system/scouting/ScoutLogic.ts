@@ -34,7 +34,7 @@ function evaluateSources(sources: [Source, ...Source[]]): [SourceInfo, ...Source
     let sourceInfos: [SourceInfo, ...SourceInfo[]] = sources.map(s => {
         return {
             id: s.id as string,
-            packedPosition: packPos(sources[0].pos),
+            packedPosition: packPos(s.pos),
             packedFreeSpots: ""
         };
     }) as [SourceInfo, ...SourceInfo[]];

@@ -308,7 +308,9 @@ export function isWalkableOwnedRoom(type: StructureConstant): boolean {
  * Create a shallow copy of a 2D array
  */
 export function clone2DArray<T>(a: T[][]): T[][] {
-    return _.map(a, e => e.slice());
+    let array: T[][] = [];
+    array = a.slice();
+    return array.map(e => e.slice());
 }
 
 /**

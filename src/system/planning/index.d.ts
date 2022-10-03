@@ -18,5 +18,7 @@ interface PlannedRoom {
     storageCore?: PlacedStructureGroup;
     fastFiller?: PlacedStructureGroup;
     extensionPods?: PlacedStructureGroup[];
-    extensions?: PlacedStructureGroup;
+    towerPositions?: Coord[];
+    roadPositions?: Coord[];
+    wallPositions?: Coord[];
 }

@@ -14,7 +14,7 @@ class ShardWorkerSystem {
     private lastControllerLevels: { [roomName: string]: number } = {};
 
     _scanWorkSystems() {
-        Log.d("Rescanning work rooms");
+        // Log.d("Rescanning work rooms");
         //Check for registered rooms that are dead
         for (let system of Object.values(this.roomWorkSystems)) {
             if (!Game.rooms[system.roomName] || !Game.rooms[system.roomName].controller?.my) {

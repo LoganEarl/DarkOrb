@@ -19,7 +19,7 @@ import { WorkerProcess } from "system/working/WorkerProcess";
 
 import "./utils/visual/RoomVisual.js";
 import { LagoonDetector } from "utils/algorithms/LagoonFlow";
-import { PlannerPRocess as PlannerProcess } from "system/planning/PlannerProcess";
+import { PlannerProcess as PlannerProcess } from "system/planning/PlannerProcess";
 
 let deferedInit = false;
 let globalRefresh = true;

@@ -11,7 +11,7 @@ export class ShardMinerSystem {
     //Loop through the spawns, get unique rooms with active spawns, and make sure we have a room miner system for each
     //Remove miner systems we don't have room visibility or spawns in
     public _rescanRooms() {
-        Log.d("Rescanning mining rooms");
+        // Log.d("Rescanning mining rooms");
         let minerRooms = Object.keys(this.roomMinerSystems);
         minerRooms.forEach(roomName => {
             if (!Game.rooms[roomName] || Game.rooms[roomName].find(FIND_MY_SPAWNS).length === 0) {
@@ -89,12 +89,12 @@ export class ShardMinerSystem {
     }
 
     _reloadAllConfigs() {
-        Log.d("Reloading miner configs");
+        // Log.d("Reloading miner configs");
         Object.values(this.roomMinerSystems).forEach(s => s._reloadAllConfigs());
     }
 
     _reloadAllPaths() {
-        Log.d("Reloading paths");
+        // Log.d("Reloading paths");
         Object.values(this.roomMinerSystems).forEach(s => s._reloadAllPathInfo());
     }
 

@@ -1,3 +1,4 @@
+import { clone } from "lodash";
 import { clone2DArray, rotateMatrixTurns } from "utils/UtilityFunctions";
 
 interface RawStructureGroup {
@@ -8,6 +9,25 @@ interface RawStructureGroup {
 }
 
 type Positions = { pos: Coord[] };
+
+export function deepCopyGroups(group: StructureGroup[]): StructureGroup[] {
+    let newGroup: StructureGroup[] = group.slice();
+    for (let rcl = 1; rcl <= 8; rcl++) {
+        newGroup[rcl] = deepCopyGroup(newGroup[rcl]);
+    }
+    return newGroup;
+}
+
+export function deepCopyGroup(group: StructureGroup): StructureGroup {
+    let newGroup = Object.assign({}, group);
+    newGroup.buildings = clone2DArray(newGroup.buildings);
+    for (let y = 0; y < newGroup.buildings.length; y++) {
+        for (let x = 0; x < newGroup.buildings[y].length; x++) {
+            newGroup.buildings[y][x] = newGroup.buildings[y][x].slice();
+        }
+    }
+    return newGroup;
+}
 
 export function rotateGroup(groupByRCL: StructureGroup[], turns: 0 | 1 | 2 | 3): StructureGroup[] {
     let result: StructureGroup[] = [];
@@ -21,7 +41,9 @@ export function rotateGroup(groupByRCL: StructureGroup[], turns: 0 | 1 | 2 | 3):
 }
 
 export function parseStructures(structureJsons: string[]): StructureGroup[] {
-    let groups = structureJsons.map(json => JSON.parse(json) as RawStructureGroup).map(s => compileRawStamp(s));
+    let groups: StructureGroup[] = structureJsons
+        .map(json => JSON.parse(json) as RawStructureGroup)
+        .map(s => compileRawStamp(s));
     let groupsByRcl: StructureGroup[] = [];
     // Log.d(`Parsed raw groups: ${JSON.stringify(rawGroups)}`);
     let lastGroup: StructureGroup = {
@@ -37,18 +59,18 @@ export function parseStructures(structureJsons: string[]): StructureGroup[] {
             //If we have reached the rcl where we should place the building
             if (rcl >= group.rcl) {
                 // Log.d(`Used group ${groupIndex} for rcl ${rcl}`);
-                groupsByRcl[rcl] = Object.assign({}, group);
+                groupsByRcl[rcl] = deepCopyGroup(group);
                 lastGroup = group;
                 groupIndex++;
             }
             //The group starts at a higher rcl. don't increase the group index, but do increase the rcl
             else {
                 // Log.d(`No plans registered for RCL: ${rcl}, going with last group`);
-                groupsByRcl[rcl] = Object.assign({}, lastGroup);
+                groupsByRcl[rcl] = deepCopyGroup(lastGroup);
             }
         } else {
             // Log.d(`No plans registered for RCL: ${rcl} because it is greater than the number of groups.`);
-            groupsByRcl[rcl] = Object.assign({}, lastGroup);
+            groupsByRcl[rcl] = deepCopyGroup(lastGroup);
         }
 
         groupsByRcl[rcl].rcl = rcl;

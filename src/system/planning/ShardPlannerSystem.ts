@@ -1,8 +1,5 @@
 import { getRoomData, saveMapData } from "system/scouting/ScoutInterface";
-import { LagoonDetector } from "utils/algorithms/LagoonFlow";
 import { Log } from "utils/logger/Logger";
-import { MemoryComponent } from "utils/MemoryWriter";
-import { PriorityQueue, PriorityQueueItem } from "utils/PriorityQueue";
 import { registerResetFunction } from "utils/SystemResetter";
 import { _queuedJobs } from "./PlannerInterface";
 
@@ -12,6 +9,12 @@ class ShardPlannerSystem {
         if (job) {
             let result = job.continuePlanning();
             if (result) {
+                if (!job.failReason) {
+                    Log.i(`Successfully planned room ${job.roomName}`);
+                } else {
+                    Log.i(`Failed to plan room ${job.roomName} with status: ${job.failReason}`);
+                }
+
                 let mapData = getRoomData(job.roomName);
                 if (mapData) {
                     mapData.roomPlan = result;

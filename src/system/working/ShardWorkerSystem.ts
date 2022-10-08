@@ -3,6 +3,7 @@ import { getMainStorage } from "system/storage/StorageInterface";
 import { Log } from "utils/logger/Logger";
 import { registerResetFunction } from "utils/SystemResetter";
 import { RoomWorkSystem } from "./RoomWorkerSystem";
+import { getWorkDetailsOfType, registerWorkDetail } from "./WorkInterface";
 
 const SCAN_INTERVAL = 20;
 
@@ -99,7 +100,7 @@ class ShardWorkerSystem {
                 this.updateWallReinforcement(bestRoom, rampartsAndWalls, minBucket ?? 0);
 
                 if (room.controller?.owner?.username === global.PLAYER_USERNAME) {
-                    bestRoom._updateWorkDetail({
+                    registerWorkDetail(bestRoom.roomName, {
                         detailId: room.controller!.id,
                         detailType: "Upgrade",
                         targetStructureType: STRUCTURE_CONTROLLER,
@@ -115,7 +116,7 @@ class ShardWorkerSystem {
 
     private updateCSites(system: RoomWorkSystem, sites: ConstructionSite[]) {
         sites.forEach(site => {
-            system._updateWorkDetail({
+            registerWorkDetail(system.roomName, {
                 detailId: site.id,
                 detailType: "Construction",
                 destPosition: site.pos,
@@ -128,7 +129,7 @@ class ShardWorkerSystem {
 
     private updateStructureRepair(system: RoomWorkSystem, structures: Structure[]) {
         structures.forEach(structure => {
-            system._updateWorkDetail({
+            registerWorkDetail(system.roomName, {
                 detailId: structure.id,
                 detailType: "Repair",
                 destPosition: structure.pos,
@@ -144,7 +145,7 @@ class ShardWorkerSystem {
     ) {
         let targetHits = (bucket + 1) * 10000 + 5000;
         walls.forEach(wall => {
-            system._updateWorkDetail({
+            registerWorkDetail(system.roomName, {
                 detailId: wall.id,
                 detailType: "Reinforce",
                 destPosition: wall.pos,
@@ -162,7 +163,7 @@ class ShardWorkerSystem {
         //What the controller level was last time we checked the focus
         let lastControllerLevel = this.lastControllerLevels[room.name] ?? 0;
         if (room) {
-            let hasConstructionJobs = system._hasWorkDetailsOfType("Construction");
+            let hasConstructionJobs = getWorkDetailsOfType(room.name, "Construction").length > 0;
             //Start off the room by upgrading to rcl 2
             if (room.controller!.level === 1) {
                 system.focus = "Upgrade";

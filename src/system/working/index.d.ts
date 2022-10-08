@@ -29,12 +29,14 @@ interface WorkDetail {
     targetStructureType?: StructureConstant;
 }
 
-interface WorkMemory {
-    details: { [id: string]: WorkDetail };
+interface RoomWorkMemory {
     focus: WorkFocus;
     lastFocusUpdate: number;
 }
 
+type WorkDetailMemory = { [roomName: string]: { [id: string]: WorkDetail } }; 
+
 interface Memory {
-    workMemory?: { [roomName: string]: WorkMemory };
+    roomWorkMemory?: { [roomName: string]: RoomWorkMemory };
+    workDetails?: WorkDetailMemory;
 }

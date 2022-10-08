@@ -24,9 +24,10 @@ import {
     _sortDetails,
     _upgraderPriorities
 } from "./WorkerLogic";
+import { deleteWorkDetail, getWorkDetails } from "./WorkInterface";
 
 export class RoomWorkSystem implements MemoryComponent {
-    private memory?: WorkMemory;
+    private memory?: RoomWorkMemory;
 
     public roomName: string;
     private targetWorkParts: number = 0;
@@ -41,17 +42,9 @@ export class RoomWorkSystem implements MemoryComponent {
         return `Work: ${this.roomName}`;
     }
 
-    _updateWorkDetail(detail: WorkDetail) {
-        this.loadMemory();
-        let details = this.memory!.details;
-        //We store work details in memory, so to avoid mistakes always store a copy not the real thing
-        details[detail.detailId] = Object.assign({}, detail);
-        updateMemory(this);
-    }
-
     _visualize() {
         if (Game.rooms[this.roomName]) {
-            Object.values(this.memory!.details).forEach(detail => {
+            Object.values(getWorkDetails(this.roomName)).forEach(detail => {
                 new RoomVisual(detail.destPosition.roomName).rect(
                     detail.destPosition.x - 0.5,
                     detail.destPosition.y - 0.5,
@@ -77,17 +70,15 @@ export class RoomWorkSystem implements MemoryComponent {
     _runCreeps() {
         this.loadMemory();
         let focus = this.memory!.focus;
-        let details: WorkDetail[] = [];
+        let details: { [id: string]: WorkDetail } = getWorkDetails(this.roomName);
         let creeps = getCreeps(this.handle);
         let first = true;
         for (let creep of creeps) {
             let assignment: WorkDetail | undefined = this.creepAssignments[creep.name]
-                ? this.memory!.details[this.creepAssignments[creep.name]]
+                ? details[this.creepAssignments[creep.name]]
                 : undefined;
             if (!assignment) {
-                if (!details.length) details = Object.values(this.memory!.details);
-
-                let sorted = _sortDetails(creep, details);
+                let sorted = _sortDetails(creep, Object.values(details));
                 //The first creep is in charge of keeping things running smoothly before the focused task
                 if (first) {
                     assignment =
@@ -108,8 +99,7 @@ export class RoomWorkSystem implements MemoryComponent {
                 let results = _runCreep(creep, assignment, this.roomName, this.handle, [this.handle]);
                 if (results) {
                     delete this.creepAssignments[creep.name];
-                    delete this.memory!.details[assignment.detailId];
-                    updateMemory(this);
+                    deleteWorkDetail(this.roomName, assignment.detailId);
                 }
             } else {
                 let rally = getRallyPosition(this.roomName);
@@ -142,14 +132,9 @@ export class RoomWorkSystem implements MemoryComponent {
         return this.memory!.lastFocusUpdate;
     }
 
-    _hasWorkDetailsOfType(type: DetailType): boolean {
-        this.loadMemory();
-        return _.any(Object.values(this.memory!.details), d => d.detailType === type);
-    }
-
     _reloadConfigs() {
         this.loadMemory();
-        let details = Object.values(this.memory!.details);
+        let details = Object.values(getWorkDetails(this.roomName));
         let focus = this.memory!.focus;
 
         if (details.length > 0) {
@@ -227,10 +212,9 @@ export class RoomWorkSystem implements MemoryComponent {
 
     loadMemory(): void {
         if (!this.memory) {
-            if (!Memory.workMemory) Memory.workMemory = {};
+            if (!Memory.roomWorkMemory) Memory.roomWorkMemory = {};
 
-            this.memory = Memory.workMemory[this.roomName] ?? {
-                details: {},
+            this.memory = Memory.roomWorkMemory[this.roomName] ?? {
                 focus: "None",
                 lastFocusUpdate: Game.time
             };
@@ -239,7 +223,7 @@ export class RoomWorkSystem implements MemoryComponent {
 
     saveMemory(): void {
         if (this.memory) {
-            Memory.workMemory![this.roomName] = this.memory;
+            Memory.roomWorkMemory![this.roomName] = this.memory;
         }
     }
 }

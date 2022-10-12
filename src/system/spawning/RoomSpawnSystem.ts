@@ -47,18 +47,19 @@ export class RoomSpawnSystem {
                 .map(s => s as StructureSpawn | StructureExtension);
 
             for (let fillable of fillables) {
-                let node = getNode(this.roomName, fillable.id);
+                let nodeId = "extension:" + fillable.id;
+                let node = getNode(this.roomName, nodeId);
                 if (node) {
                     if (fillable.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
                         node.level = fillable.store.getUsedCapacity(RESOURCE_ENERGY);
                         node.maxLevel = fillable.store.getCapacity(RESOURCE_ENERGY);
                     } else {
-                        unregisterNode(this.roomName, "Spawning", fillable.id);
+                        unregisterNode(this.roomName, "Spawning", nodeId);
                     }
                 } else if (fillable.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
                     let dist = getMultirooomDistance(storage!.pos, fillable.pos);
                     node = {
-                        nodeId: fillable.id,
+                        nodeId: nodeId,
                         targetId: fillable.id,
                         level: fillable.store.getUsedCapacity(RESOURCE_ENERGY),
                         maxLevel: fillable.store.getCapacity(RESOURCE_ENERGY),
@@ -67,7 +68,8 @@ export class RoomSpawnSystem {
                         type: "Sink",
                         analyticsCategories: [],
                         lastKnownPosition: fillable.pos,
-                        priorityScalar: 10,
+                        priorityScalar: 50,
+                        disableLimitedGrab: true,
                         serviceRoute: {
                             pathLength: dist,
                             pathCost: dist * 2

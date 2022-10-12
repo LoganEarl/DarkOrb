@@ -18,7 +18,7 @@ import {
     rotateMatrix
 } from "utils/UtilityFunctions";
 import { EXTENSION_GROUP } from "./stamp/ExtensionPod";
-import { FAST_FILLER_GROUP, FAST_FILLER_SPAWN_COORD } from "./stamp/FastFiller";
+import { FAST_FILLER_GROUP, FAST_FILLER_SPAWN_COORDS } from "./stamp/FastFiller";
 import { deepCopyGroup, deepCopyGroups, rotateGroup } from "./stamp/StampLogic";
 import { STORAGE_CORE_GROUP } from "./stamp/StorageCore";
 
@@ -231,8 +231,8 @@ export class RoomPlanner implements PriorityQueueItem {
         if (this.spawnPos) {
             //We don't rotate the fast filler ever. Makes spawning fillers annoying
             let buildings = FAST_FILLER_GROUP[8].buildings;
-            let stampX = this.spawnPos.x - FAST_FILLER_SPAWN_COORD.x;
-            let stampY = this.spawnPos.y - FAST_FILLER_SPAWN_COORD.y;
+            let stampX = this.spawnPos.x - FAST_FILLER_SPAWN_COORDS[0].x;
+            let stampY = this.spawnPos.y - FAST_FILLER_SPAWN_COORDS[0].y;
             if (!this.place({ x: stampX, y: stampY }, buildings)) this.fail("Bad spawn position");
             else {
                 this.placedFastFiller = {

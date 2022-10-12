@@ -12,7 +12,7 @@ export type Comparator<T> = (a: T, b: T) => number;
  * Item must have writeable property queueIndex: number
  */
 export class PriorityQueue<T extends PriorityQueueItem> {
-    public items: T[];
+    private items: T[];
     private _comparator: Comparator<T>;
     private _length: number;
 

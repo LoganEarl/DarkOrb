@@ -84,11 +84,15 @@ class ShardWorkerSystem {
                     .map(s => s as StructureWall | StructureRampart);
 
                 let lowRamps = rampartsAndWalls.filter(s => s.structureType === STRUCTURE_RAMPART && s.hits < 10000);
-                this.updateStructureRepair(bestRoom, lowRamps);
+                this.updateLowRampRepair(bestRoom, lowRamps);
 
+                let reinforementTargets = rampartsAndWalls.filter(
+                    r => r.structureType !== STRUCTURE_RAMPART || r.hits > 10000
+                );
                 let lowestWallBucket: (StructureWall | StructureRampart)[] = [];
                 let minBucket: number | undefined;
-                rampartsAndWalls.forEach(r => {
+
+                reinforementTargets.forEach(r => {
                     let bucket = Math.floor(r.hits / 10000);
                     if (minBucket === undefined || minBucket > bucket) {
                         minBucket = bucket;
@@ -97,11 +101,11 @@ class ShardWorkerSystem {
                         lowestWallBucket.push(r as StructureWall | StructureRampart);
                     }
                 });
-                this.updateWallReinforcement(bestRoom, rampartsAndWalls, minBucket ?? 0);
+                this.updateWallReinforcement(bestRoom, reinforementTargets, minBucket ?? 0);
 
                 if (room.controller?.owner?.username === global.PLAYER_USERNAME) {
                     registerWorkDetail(bestRoom.roomName, {
-                        detailId: room.controller!.id,
+                        detailId: "Upgrade:" + room.controller!.id,
                         detailType: "Upgrade",
                         targetStructureType: STRUCTURE_CONTROLLER,
                         destPosition: room.controller!.pos,
@@ -117,7 +121,7 @@ class ShardWorkerSystem {
     private updateCSites(system: RoomWorkSystem, sites: ConstructionSite[]) {
         sites.forEach(site => {
             registerWorkDetail(system.roomName, {
-                detailId: site.id,
+                detailId: "Construct:" + site.id,
                 detailType: "Construction",
                 destPosition: site.pos,
                 currentProgress: site.progress,
@@ -130,10 +134,24 @@ class ShardWorkerSystem {
     private updateStructureRepair(system: RoomWorkSystem, structures: Structure[]) {
         structures.forEach(structure => {
             registerWorkDetail(system.roomName, {
-                detailId: structure.id,
+                detailId: "Repair:" + structure.id,
                 detailType: "Repair",
                 destPosition: structure.pos,
                 targetId: structure.id
+            });
+        });
+    }
+
+    private updateLowRampRepair(system: RoomWorkSystem, structures: Structure[]) {
+        structures.forEach(structure => {
+            registerWorkDetail(system.roomName, {
+                detailId: "RepairRamp:" + structure.id,
+                detailType: "Repair",
+                destPosition: structure.pos,
+                targetProgress: 15000,
+                currentProgress: structure.hits,
+                targetId: structure.id,
+                targetStructureType: STRUCTURE_RAMPART
             });
         });
     }
@@ -146,7 +164,7 @@ class ShardWorkerSystem {
         let targetHits = (bucket + 1) * 10000 + 5000;
         walls.forEach(wall => {
             registerWorkDetail(system.roomName, {
-                detailId: wall.id,
+                detailId: "Reinforce:" + wall.id,
                 detailType: "Reinforce",
                 destPosition: wall.pos,
                 currentProgress: wall.hits,

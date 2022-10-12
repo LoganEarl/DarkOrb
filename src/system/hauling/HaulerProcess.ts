@@ -12,7 +12,7 @@ export class HaulerProcess extends Process {
     private configReloader = new ScheduledJob(_shardHaulerSystem._reloadAllConfigs, _shardHaulerSystem, 25);
 
     constructor() {
-        super("HaulerProcess", 1);
+        super("HaulerProcess", 2);
     }
 
     private first = true;

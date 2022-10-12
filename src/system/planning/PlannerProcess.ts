@@ -2,17 +2,23 @@ import { Process } from "core/Process";
 import { getRoomData, getShardData } from "system/scouting/ScoutInterface";
 import { FEATURE_VISUALIZE_PLANNING } from "utils/featureToggles/FeatureToggleConstants";
 import { getFeature } from "utils/featureToggles/FeatureToggles";
+import { ScheduledJob } from "utils/ScheduledJob";
 import { drawPlacedStructureGroup } from "./PlannerLogic";
 import { _shardPlannerSystem } from "./ShardPlannerSystem";
 
 export class PlannerProcess extends Process {
     processType = "PlannerProcess";
 
+    roomScanner: ScheduledJob = new ScheduledJob(_shardPlannerSystem._rescanRooms, _shardPlannerSystem, 30);
+    buildingQueuer: ScheduledJob = new ScheduledJob(_shardPlannerSystem._queueBuildings, _shardPlannerSystem, 10);
+
     constructor() {
         super("PlannerProcess", 3);
     }
 
     run(): void {
+        this.roomScanner.run();
+        this.buildingQueuer.run();
         _shardPlannerSystem._continuePlanning();
 
         if (getFeature(FEATURE_VISUALIZE_PLANNING)) {

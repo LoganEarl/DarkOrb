@@ -4,7 +4,9 @@ import { getFeature } from "utils/featureToggles/FeatureToggles";
 import { Log } from "utils/logger/Logger";
 import { PriorityQueue } from "utils/PriorityQueue";
 import { Traveler } from "utils/traveler/Traveler";
-import { clamp } from "utils/UtilityFunctions";
+import { clamp, findSortedIndex, insertSorted, insertSortedAndTruncate, maxBy } from "utils/UtilityFunctions";
+
+const MAX_ASSIGNMENTS_PER_NODE = 10; //No more than this many creeps assigned to a single node
 
 //Have hauler carry out its assignment. Will return true if done with current assignment
 export function _runHauler(
@@ -111,7 +113,9 @@ export function _runHauler(
                 creep.queueSay("🏧");
             }
         }
-    } else {
+    }
+    //Handle sink requests
+    else {
         let amount = assignment.deltaAtETA;
         if (!canServiceSinkRequests) {
             runResults.done = true;
@@ -137,14 +141,16 @@ export function _runHauler(
                     runResults.usedTransfer = true;
                     creep.queueSay("🔼");
                 } else {
-                    let amount = Math.min(
-                        creep.store.getCapacity(resource),
-                        assignment.deltaAtETA,
-                        storage.store.getUsedCapacity(resource) ?? 0
+                    withdrawFrom(
+                        creep,
+                        resource,
+                        Math.abs(assignment.deltaAtETA),
+                        storage,
+                        runResults,
+                        targetNode,
+                        parentRoomName,
+                        analyticsCategories
                     );
-                    creep.withdraw(storage, resource, amount);
-                    runResults.done = false;
-                    runResults.usedTransfer = true;
                     creep.queueSay("🔽");
                     if (runResults.usedTransfer) {
                         Traveler.travelTo(creep, targetPos);
@@ -167,7 +173,7 @@ export function _runHauler(
 export function _assignJobForHauler(
     creep: Creep,
     haulerAssignments: { [haulerName: string]: LogisticsPairing },
-    nodeAssignments: { [nodeId: string]: PriorityQueue<LogisticsPairing> },
+    nodeAssignments: { [nodeId: string]: LogisticsPairing[] },
     logisticsNodes: { [id: string]: LogisticsNode },
     storage: MainStorage,
     prevResults?: HaulerRunResults
@@ -183,31 +189,38 @@ export function _assignJobForHauler(
     });
     if (servicableNodes.length) {
         const possiblePairings: { [nodeId: string]: LogisticsPairing } = {};
+        // Log.d(
+        //     `Starting node evaluation for ${creep.name}. Existing assignments are ${JSON.stringify(nodeAssignments)}`
+        // );
         servicableNodes.forEach(node => {
-            let pair = generatePair(creep, node, storage!, nodeAssignments, prevResults);
-            if (Math.abs(pair.drdt) > 1 && !node.priorityScalar) possiblePairings[node.nodeId] = pair;
+            let pair = generatePair(creep, node, storage!, nodeAssignments, haulerAssignments, prevResults);
 
-            possiblePairings[node.nodeId] = pair;
+            //Drdt should always be positive
+            if (pair.drdt > 1 || node.priorityScalar) possiblePairings[node.nodeId] = pair;
         });
-        const bestPairing = _.max(possiblePairings, pairing => pairing.drdt);
+        const bestPairing = maxBy(
+            Object.values(possiblePairings),
+            pairing => pairing.drdt * (logisticsNodes[pairing.nodeId].priorityScalar ?? 1)
+        );
 
-        if (bestPairing && nodeAssignments[bestPairing.nodeId]) {
-            // Log.d(`All nodes: ${JSON.stringify(logisticsNodes)}`);
-            // Log.d(`Servicable nodes: ${JSON.stringify(servicableNodes)}`);
-            // Log.d(`Previous assignments: ${JSON.stringify(nodeAssignments)}`);
-            // Log.d("Possible pairings: " + JSON.stringify(possiblePairings));
-            // Log.d("Best pairing: " + JSON.stringify(bestPairing));
-            nodeAssignments[bestPairing.nodeId].enqueue(bestPairing);
-            haulerAssignments[creep.name] = bestPairing;
+        if (bestPairing != null) {
+            if (!nodeAssignments[bestPairing.nodeId]) nodeAssignments[bestPairing.nodeId] = [];
+            let assignments = nodeAssignments[bestPairing.nodeId];
 
-            //If you shortcut another creep's assignment, make sure they pick new jobs
-            let truncated = nodeAssignments[bestPairing.nodeId].truncateAfter(bestPairing);
-            for (let removedPairing of truncated) {
-                delete haulerAssignments[removedPairing.haulerName];
+            let newIndex = findSortedIndex(bestPairing, assignments, _pairingComparitor);
+
+            //We are shortcutting several other haulers, make sure they pick a new job
+            for (let i = newIndex; i < assignments.length; i++) {
+                delete haulerAssignments[assignments[i].haulerName];
             }
+            haulerAssignments[creep.name] = bestPairing;
+            //Add the new best pairing at the sorted index, throwing out everything after
+            nodeAssignments[bestPairing.nodeId].splice(newIndex, Infinity, bestPairing);
+
             return bestPairing;
         }
     }
+    // Log.d(`Failed to find a valid node pairing for ${creep.name}`);
     return null;
 }
 
@@ -226,14 +239,13 @@ function generatePair(
     creep: Creep,
     node: LogisticsNode,
     storage: MainStorage,
-    nodeAssignments: { [nodeId: string]: PriorityQueue<LogisticsPairing> },
+    nodeAssignments: { [nodeId: string]: LogisticsPairing[] },
+    haulerAssignments: { [haulerName: string]: LogisticsPairing },
     prevResults?: HaulerRunResults
 ): LogisticsPairing {
     const nodeResource = node.resource as ResourceConstant;
     let nodeTarget = _lookupNodeTarget(node.targetId);
     let pos = nodeTarget?.pos ?? node.lastKnownPosition;
-
-    //console.log(`Generating pair for ${creep.name} with node ${JSON.stringify(node)} and prev results ${JSON.stringify(prevResults? prevResults : "")}`)
 
     let directDistance = creep.pos.getMultiRoomRangeTo(pos);
     let serviceDistance =
@@ -246,16 +258,24 @@ function generatePair(
     const usedSpace = prevResults?.newUsedCapacity ?? creep.store.getUsedCapacity(nodeResource);
     const freeSpace = prevResults?.newFreeCapacity ?? creep.store.getFreeCapacity(nodeResource);
 
-    //Amount we can free up using storage
-    const storageFreeableCapacity = Math.min(
-        creep.store.getCapacity(nodeResource),
-        storage.store.getFreeCapacity(nodeResource) ?? 0
+    //How much space we would have after freeing up using the storage
+    const storageFreeableCapacity = clamp(
+        freeSpace + (storage.store.getFreeCapacity(nodeResource) ?? 0),
+        0,
+        creep.store.getCapacity(nodeResource)
     );
-    //Amount we can fill up on using storage
-    const storageFillableCapacity = Math.min(
-        creep.store.getCapacity(nodeResource),
-        storage instanceof StructureSpawn ? 0 : storage.store.getUsedCapacity(RESOURCE_ENERGY)
+
+    //Amount we would have if we grabbed more from the storage
+    let storageFillableCapacity = clamp(
+        usedSpace + (storage.store.getUsedCapacity(nodeResource) ?? 0),
+        0,
+        creep.store.getCapacity(nodeResource)
     );
+
+    //If it is still a spawn we won't pull energy from it. The fillable cap is just the amount we already have
+    if (storage instanceof StructureSpawn) {
+        storageFillableCapacity = usedSpace;
+    }
 
     var directDelta = 0;
     var serviceDelta = 0;
@@ -272,16 +292,29 @@ function generatePair(
         serviceDelta = storageFreeableCapacity * -1;
     }
 
-    //The predicted resource level if we were to head directly there
+    // Log.d(`\tCalculating node ${node.nodeId}`);
+
+    //The predicted resource level if we were to head directly there. Init it to the current level, and then add
     let directResourceLevel = node.level;
-    //The predicted resource level if we take the service route
+    //The predicted resource level if we take the service route. Init it to the current level, and then add
     let serviceResourceLevel = node.level;
 
     //Currently, the directDelta and serviceDelta only represent the best the creep can do. They don't factor in
     //the other pairings we already have. We have to factor those in here. Sadly, this is a pain
     let lastDirectUpdate = 0;
     let lastServiceUpdate = 0;
-    let otherNodePairings = nodeAssignments[node.nodeId]?.items ?? [];
+
+    //Sometimes creeps get their job stolen and the reservation sticks around. We prevent that with this
+    if (nodeAssignments[node.nodeId]?.length > 0 && nodeAssignments[node.nodeId][0].eta < Game.time) {
+        nodeAssignments[node.nodeId] = nodeAssignments[node.nodeId].filter(
+            pair => Game.creeps[pair.haulerName] && haulerAssignments[pair.haulerName]?.nodeId === pair.nodeId
+        );
+    }
+
+    let otherNodePairings = nodeAssignments[node.nodeId] ?? [];
+
+    // Log.d(`\t\tStarting levels are direct: ${directResourceLevel} service: ${serviceResourceLevel}`);
+
     for (let pairing of otherNodePairings) {
         //only factor in pairings that happen before us
         if (pairing?.eta > serviceEta) {
@@ -289,28 +322,49 @@ function generatePair(
         }
 
         if (pairing) {
+            //We get there faster by going direct. We keep that in mind with this
             if (pairing.eta < directEta) {
-                directResourceLevel += getResourceDelta(
+                directResourceLevel += getDeltaAppliedAfterTime(
                     directResourceLevel,
                     lastDirectUpdate,
                     pairing.eta,
                     pairing.deltaAtETA,
-                    node
+                    node,
+                    false
                 );
+                // Log.d(
+                //     `\t\tDIRECT: ${pairing.haulerName} arrives after ${pairing.eta - Game.time} ticks. Delta:${
+                //         pairing.deltaAtETA
+                //     } New Level:${directResourceLevel}`
+                // );
                 lastDirectUpdate = pairing.eta;
             }
-            serviceResourceLevel += getResourceDelta(
+
+            // Log.d(
+            //     `\t\tSERVICE: Pairing ${pairing.haulerName} after ${pairing.eta - Game.time} ticks. Delta:${
+            //         pairing.deltaAtETA
+            //     } New Level:${directResourceLevel}`
+            // );
+            serviceResourceLevel += getDeltaAppliedAfterTime(
                 serviceResourceLevel,
                 lastServiceUpdate,
                 pairing.eta,
                 pairing.deltaAtETA,
-                node
+                node,
+                false
             );
             lastServiceUpdate = pairing.eta;
         }
     }
-    directDelta = getResourceDelta(directResourceLevel, lastDirectUpdate, directEta, directDelta, node);
-    serviceDelta = getResourceDelta(serviceResourceLevel, lastServiceUpdate, serviceEta, serviceDelta, node);
+    directDelta = getDeltaAppliedAfterTime(directResourceLevel, lastDirectUpdate, directEta, directDelta, node, true);
+    serviceDelta = getDeltaAppliedAfterTime(
+        serviceResourceLevel,
+        lastServiceUpdate,
+        serviceEta,
+        serviceDelta,
+        node,
+        true
+    );
 
     var directDrdt = directDelta / (directEta - Game.time);
     var serviceDrdt = serviceDelta / (serviceEta - Game.time);
@@ -320,35 +374,48 @@ function generatePair(
         serviceDrdt = serviceDrdt * -1;
     }
 
+    // Log.d(
+    //     `\t\tDIRECT: Finished evaluating. Delta:${directDelta} after ${directEta - Game.time} for DRDT:${directDrdt}`
+    // );
+    // Log.d(
+    //     `\t\tSERVICE: Finished evaluating. Delta:${serviceDelta} after ${
+    //         serviceEta - Game.time
+    //     } for DRDT:${serviceDrdt}`
+    // );
+
     //All that work for this one little flag...
     let useServiceRoute = serviceDrdt > directDrdt;
-
-    // console.log(`Drdt readouts for node:${node.id} direct:${directDrdt} service:${serviceDrdt}`)
 
     return {
         haulerName: creep.name,
         nodeId: node.nodeId,
         eta: useServiceRoute ? serviceEta : directEta,
-        queueIndex: useServiceRoute ? serviceEta : directEta,
         usesServiceRoute: useServiceRoute,
         deltaAtETA: useServiceRoute ? serviceDelta : directDelta,
-        drdt: useServiceRoute ? serviceDrdt : directDrdt
+        drdt: useServiceRoute ? serviceDrdt : directDrdt,
+        queueIndex: 0 //Will get overwritten
     };
 }
 
-function getResourceDelta(
+//This is a complicated one. Factors in passive rate of change and can either return how effective the creep was, or how much the level changed.
+function getDeltaAppliedAfterTime(
     lastLevel: number,
     lastUpdate: number,
     eta: number,
     delta: number,
-    node: LogisticsNode
+    node: LogisticsNode,
+    returnAppliedDelta: boolean
 ): number {
     if (lastUpdate == 0) lastUpdate = eta;
 
-    var level = lastLevel + (eta - lastUpdate) * node.baseDrdt;
-    level += delta;
-    level = clamp(level, 0, node.maxLevel);
-    return level - lastLevel;
+    const passiveLevel = clamp(lastLevel + (eta - lastUpdate) * node.baseDrdt, 0, node.maxLevel);
+    const levelWithDelta = clamp(passiveLevel + delta, 0, node.maxLevel);
+
+    if (returnAppliedDelta) {
+        return levelWithDelta - passiveLevel;
+    } else {
+        return levelWithDelta - lastLevel;
+    }
 }
 
 function depositInto(
@@ -407,7 +474,11 @@ function withdrawFrom(
             `Hauler ${creep.name} tried to withdraw from an object of type ${typeof target}, which is not allowed`
         );
     } else if (target instanceof Resource) {
-        amount = Math.min(target.amount, creep.store.getFreeCapacity(target.resourceType), runResults.newFreeCapacity);
+        amount = Math.min(
+            logisticsNodeToUpdate.disableLimitedGrab ? Infinity : target.amount,
+            creep.store.getFreeCapacity(target.resourceType),
+            runResults.newFreeCapacity
+        );
         creep.pickup(target);
         logisticsNodeToUpdate.level -= amount;
         runResults.newUsedCapacity += amount;
@@ -415,7 +486,7 @@ function withdrawFrom(
         runResults.done = true;
     } else if (target instanceof Creep) {
         amount = Math.min(
-            amount,
+            logisticsNodeToUpdate.disableLimitedGrab ? Infinity : amount,
             target.store.getUsedCapacity(resource),
             creep.store.getFreeCapacity(resource),
             runResults.newFreeCapacity
@@ -427,7 +498,7 @@ function withdrawFrom(
         runResults.done = true;
     } else if (target) {
         amount = Math.min(
-            amount,
+            logisticsNodeToUpdate.disableLimitedGrab ? Infinity : amount,
             (target as any).store.getUsedCapacity(resource) ?? 0,
             creep.store.getFreeCapacity(resource)
         );

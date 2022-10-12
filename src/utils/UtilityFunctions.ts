@@ -337,3 +337,28 @@ export function findPositionsInsideRect(x1: number, y1: number, x2: number, y2: 
 
     return positions;
 }
+
+export function findSortedIndex<T>(search: T, items: T[], compare: (a: T, b: T) => number) {
+    for (let i = 0; i < items.length; i++) {
+        if (compare(search, items[i]) <= 0) {
+            return i;
+        }
+    }
+    return items.length;
+}
+
+export function insertSorted<T>(item: T, items: T[], compare: (a: T, b: T) => number): T[] {
+    if (items.length === 0) return [item];
+
+    let index = findSortedIndex(item, items, compare);
+    items.splice(index, 0, item);
+    return items;
+}
+
+export function insertSortedAndTruncate<T>(item: T, items: T[], compare: (a: T, b: T) => number): T[] {
+    if (items.length === 0) return [item];
+
+    let index = findSortedIndex(item, items, compare);
+    items.splice(index, Infinity, item);
+    return items;
+}

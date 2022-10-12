@@ -22,6 +22,7 @@ declare global {
         type: LogisticsNodeType; //Whether we want delivered or we want it gone
         analyticsCategories: string[]; //What categories we record the analytics data for
         priorityScalar?: number; //A scalar value to multiply the drdt calculation with to incentivize some transfers over others
+        disableLimitedGrab?: boolean; //By default, will only grab enough to service the node on SINKs. true = disabled
         baseDrdt: number; //How quickly the resource level changes over time. Beware, can be +/-. Used in conjunction with service route to determine number of carry parts
         bodyDrdt?: number; //How much resource should be moved per tick. Replaces baseDrdt for the purposes of creep quotas.
         //Use for temporary jobs that are low priority such as scoreing and looting

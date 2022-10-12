@@ -12,15 +12,14 @@ import { _assignJobForHauler, _lookupNodeTarget, _pairingComparitor, _runHauler 
 
 const MAX_HAULERS_PER_ROOM = 25; //Total haulers a single room can have after rcl3
 const MAX_HAULERS_PER_ROOM_LOW_RCL = 60; //Total haulers a single room can have before rcl4
-const MAX_ASSIGNMENTS_PER_NODE = 10; //No more than this many creeps assigned to a single node
-const HAULER_SAFTEY_MARGIN = 1.5; //How many more haulers we will spawn than we think we need
+const HAULER_SAFTEY_MARGIN = 1.2; //How many more haulers we will spawn than we think we need
 
 export class RoomHaulerSystem {
     private roomName: string;
 
     //These both hold the same data, they are just indexed differently. Need to keep them in sync
     private haulerAssignments: { [haulerName: string]: LogisticsPairing } = {};
-    private nodeAssignments: { [nodeId: string]: PriorityQueue<LogisticsPairing> } = {};
+    private nodeAssignments: { [nodeId: string]: LogisticsPairing[] } = {};
 
     private targetCarryParts = 0;
     private buildRoadedCreeps = false;
@@ -39,7 +38,6 @@ export class RoomHaulerSystem {
         let nodes = getNodes(this.roomName);
         //console.log(`Calculating logistics node creeps`)
         for (let node of Object.values(nodes)) {
-            this.nodeAssignments[node.nodeId] = new PriorityQueue(MAX_ASSIGNMENTS_PER_NODE, _pairingComparitor);
             const carryParts = Math.ceil(
                 ((node.serviceRoute.pathLength * 2 * Math.abs(node.bodyDrdt ?? node.baseDrdt)) / 50) *
                     HAULER_SAFTEY_MARGIN
@@ -181,7 +179,8 @@ export class RoomHaulerSystem {
         let pairing = this.haulerAssignments[hauler.name];
         if (pairing) {
             delete this.haulerAssignments[hauler.name];
-            this.nodeAssignments[pairing.nodeId]?.remove(pairing);
+            let index = this.nodeAssignments[pairing.nodeId]?.indexOf(pairing);
+            if (index != undefined && index != -1) this.nodeAssignments[pairing.nodeId].splice(index, 1);
         }
     }
 }

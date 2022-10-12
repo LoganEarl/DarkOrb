@@ -122,7 +122,7 @@ export function _runCreep(
         Traveler.reservePosition(creep.pos);
 
         target = target as Structure;
-        if (target.hits < target.hitsMax || (target.structureType === STRUCTURE_RAMPART && target.hits < 20000)) {
+        if (target.hits < (assignment.targetProgress ?? target.hitsMax)) {
             if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
                 creep.queueSay("🔧");
                 creep.repair(target);
@@ -217,13 +217,7 @@ export function _sortDetails(creep: Creep, details: WorkDetail[]): SortedDetails
 
         //repair ramparts that are low.
         else if (detail.targetStructureType === STRUCTURE_RAMPART && detail.detailType === "Repair") {
-            if (
-                detail.currentProgress != undefined &&
-                detail.targetProgress != undefined &&
-                detail.currentProgress < (results.rampartRepair?.currentProgress ?? Infinity)
-            ) {
-                results.rampartRepair = detail;
-            }
+            results.rampartRepair = detail;
         }
 
         //repair roads that are low.
@@ -254,8 +248,15 @@ export function _sortDetails(creep: Creep, details: WorkDetail[]): SortedDetails
                 );
 
                 //Take the higher progress in the event of a tie
-                if (comparison === 0)
-                    comparison = (detail.currentProgress ?? 0) > (results.build.currentProgress ?? 0) ? -1 : 1;
+                if (comparison === 0) comparison = (detail.currentProgress ?? 0) - (results.build.currentProgress ?? 0);
+                //Still tied? Go with the closer option
+                if (comparison === 0) {
+                    comparison =
+                        getMultirooomDistance(creep.pos, detail.destPosition) <
+                        getMultirooomDistance(creep.pos, results.build.destPosition)
+                            ? -1
+                            : 1;
+                }
                 if (comparison < 0) results.build = detail;
             } else results.build = detail;
         }

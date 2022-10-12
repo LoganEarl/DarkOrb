@@ -11,6 +11,14 @@ export const FAST_FILLER_JSON: string[] = [
 ];
 
 //relative to the upper left
-export const FAST_FILLER_SPAWN_COORD: Coord = { x: 1, y: 3 };
+export const FAST_FILLER_SPAWN_COORDS: [Coord, Coord] = [
+    { x: 1, y: 3 },
+    { x: 5, y: 3 }
+];
+
+export const FAST_FILLER_CONTAINER_COORDS: [Coord, Coord] = [
+    { x: 3, y: 1 },
+    { x: 3, y: 5 }
+];
 
 export const FAST_FILLER_GROUP = parseStructures(FAST_FILLER_JSON);

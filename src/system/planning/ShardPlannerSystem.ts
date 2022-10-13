@@ -1,9 +1,11 @@
 import { getRoomData, saveMapData } from "system/scouting/ScoutInterface";
 import { Log } from "utils/logger/Logger";
+import { profile } from "utils/profiler/Profiler";
 import { registerResetFunction } from "utils/SystemResetter";
 import { _queuedJobs } from "./PlannerInterface";
 import { RoomPlannerSystem } from "./RoomPlannerSystem";
 
+@profile
 class ShardPlannerSystem {
     private roomPlannerSystems: { [roomName: string]: RoomPlannerSystem } = {};
     private lastSystemIndex = 0;
@@ -53,7 +55,7 @@ class ShardPlannerSystem {
     }
 
     public _continuePlanning(): void {
-        let job = _queuedJobs.peek();
+        let job = _queuedJobs[0];
         if (job) {
             let result = job.continuePlanning();
             if (result) {
@@ -68,7 +70,7 @@ class ShardPlannerSystem {
                     mapData.roomPlan = result;
                     saveMapData(mapData);
                 }
-                _queuedJobs.dequeue();
+                _queuedJobs.shift();
             }
         }
     }

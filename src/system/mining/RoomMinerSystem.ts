@@ -1,11 +1,13 @@
 import { getMainStorage } from "system/storage/StorageInterface";
 import { unpackCoordList, unpackPosList } from "utils/Packrat";
+import { profile } from "utils/profiler/Profiler";
 import { drawBar } from "utils/UtilityFunctions";
 import { _calcualteMiningPath } from "./MinerLogic";
 import { SourceMinerSystem } from "./SourceMinerSystem";
 
 //TODO Hardcoded for now. Replace when I have spawn loading controls
 const MAX_MINING_OPERATIONS = 5;
+@profile
 export class RoomMinerSystem {
     private sourceMinerSystems: { [sourceId: string]: SourceMinerSystem } = {};
     private roomName: string;

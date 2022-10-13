@@ -1,9 +1,11 @@
 import { Process } from "core/Process";
 import { FEATURE_VISUALIZE_MINING } from "utils/featureToggles/FeatureToggleConstants";
 import { getFeature } from "utils/featureToggles/FeatureToggles";
+import { profile } from "utils/profiler/Profiler";
 import { ScheduledJob } from "utils/ScheduledJob";
 import { _shardMinerSystem } from "./ShardMinerSystem";
 
+@profile
 export class MinerProcess extends Process {
     processType = "MinerProcess";
 

@@ -5,6 +5,7 @@ import { getMainStorage } from "system/storage/StorageInterface";
 import { Log } from "utils/logger/Logger";
 import { MemoryComponent, updateMemory } from "utils/MemoryWriter";
 import { packPos, unpackPos, unpackPosList } from "utils/Packrat";
+import { profile } from "utils/profiler/Profiler";
 import { Traveler } from "utils/traveler/Traveler";
 import { getMultirooomDistance, samePos } from "utils/UtilityFunctions";
 import {
@@ -18,6 +19,8 @@ import {
 /*
     We don't want to do too much here. Calcuate the mining path, figure out our creep configs, and know how to run the logic
 */
+
+@profile
 export class SourceMinerSystem implements MemoryComponent {
     roomName: string;
 

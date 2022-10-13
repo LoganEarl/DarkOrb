@@ -3377,7 +3377,7 @@ interface PowerCreepMemory {}
 interface RoomMemory {}
 interface SpawnMemory {}
 
-declare const Memory: Memory;
+declare let Memory: Memory;
 /**
  * A mineral deposit object. Can be harvested by creeps with a WORK body part using the extractor structure.
  * @see http://docs.screeps.com/api/#Mineral
@@ -3845,6 +3845,8 @@ interface RawMemory {
      * Use RawMemory.setActiveSegments to fetch segments on the next tick. Segments data is saved automatically in the end of the tick.
      */
     segments: { [segmentId: number]: string };
+
+    _parsed?: Memory;
 
     /**
      * An object with a memory segment of another player available on this tick. Use `setActiveForeignSegment` to fetch segments on the next tick.

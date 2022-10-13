@@ -13,6 +13,7 @@ import {
     clone2DArray,
     euclidianDistance,
     findPositionsInsideRect,
+    insertSorted,
     isWalkableOwnedRoom,
     manhattanDistance,
     rotateMatrix
@@ -62,7 +63,8 @@ export class RoomPlanner implements PriorityQueueItem {
 
     //Temporary variables used for calculations extending over multiple ticks
     private lastScannedY: number = 1;
-    private scoredCoords: PriorityQueue<ScoredCoord> = new PriorityQueue(49 * 49, (a, b) => a.score - b.score);
+    private scoredCoords: ScoredCoord[] = [];
+    private scoredCoordComparator = (a: ScoredCoord, b: ScoredCoord) => a.score - b.score;
 
     //Stores all tiles that we forbid building blocking structures on (not ramps)
     private forbiddenMatrix: CostMatrix | undefined;
@@ -369,7 +371,7 @@ export class RoomPlanner implements PriorityQueueItem {
 
                     if (!path.incomplete) {
                         let coord: ScoredCoord = { x: x, y: y, score: score, queueIndex: 0 };
-                        this.scoredCoords.enqueue(coord);
+                        insertSorted(coord, this.scoredCoords, this.scoredCoordComparator);
                     }
                 }
             }
@@ -378,13 +380,13 @@ export class RoomPlanner implements PriorityQueueItem {
         //If we have filled every spot
         if (target === 49) {
             let results: Coord[] = [];
-            while (this.scoredCoords.length > 0) results.push(this.scoredCoords.dequeue()!);
+            while (this.scoredCoords.length > 0) results.push(this.scoredCoords.shift()!);
             this.storageGradient = results;
         }
 
         if (getFeature(FEATURE_VISUALIZE_PLANNING)) {
             let visual = new RoomVisual(this.roomName);
-            fillCoords(visual, this.storageGradient ?? this.scoredCoords.items);
+            fillCoords(visual, this.storageGradient ?? this.scoredCoords);
             drawPlacedStructureGroup(visual, this.placedStorageCore);
             drawPlacedStructureGroup(visual, this.placedFastFiller);
             visual.connectRoads();

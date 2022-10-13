@@ -17,8 +17,10 @@ declare global {
             PLAYER_USERNAME: string;
             INVADER_USERNAME: string;
             KEEPER_USERNAME: string;
+            __PROFILER_ENABLED__: boolean;
             Profiler: Profiler;
             runner: ProcessRunner;
+            Memory?: Memory;
             processes: () => void;
             setFeature: (feature: string, enabled: boolean) => void;
             toggleFeature: (feature: string) => boolean;

@@ -5,15 +5,17 @@ import { FEATURE_VISUALIZE_HAULING } from "utils/featureToggles/FeatureToggleCon
 import { getFeature } from "utils/featureToggles/FeatureToggles";
 import { Log } from "utils/logger/Logger";
 import { PriorityQueue } from "utils/PriorityQueue";
+import { profile } from "utils/profiler/Profiler";
 import { Traveler } from "utils/traveler/Traveler";
 import { clamp, drawBar, drawCircledItem } from "utils/UtilityFunctions";
 import { getNode, getNodes, unregisterNode } from "./HaulerInterface";
-import { _assignJobForHauler, _lookupNodeTarget, _pairingComparitor, _runHauler } from "./HaulerLogic";
+import { haulerLogic } from "./HaulerLogic";
 
 const MAX_HAULERS_PER_ROOM = 25; //Total haulers a single room can have after rcl3
 const MAX_HAULERS_PER_ROOM_LOW_RCL = 60; //Total haulers a single room can have before rcl4
 const HAULER_SAFTEY_MARGIN = 1.2; //How many more haulers we will spawn than we think we need
 
+@profile
 export class RoomHaulerSystem {
     private roomName: string;
 
@@ -99,7 +101,13 @@ export class RoomHaulerSystem {
             //If we don't have a job for the creep get it one
             if (!pairing || !nodes[pairing.nodeId]) {
                 //Assign the job
-                pairing = _assignJobForHauler(creep, this.haulerAssignments, this.nodeAssignments, nodes, storage);
+                pairing = haulerLogic.assignJobForHauler(
+                    creep,
+                    this.haulerAssignments,
+                    this.nodeAssignments,
+                    nodes,
+                    storage
+                );
             }
 
             // Log.d(`Assigned pairing for ${creep}, ${JSON.stringify(pairing)}`);
@@ -107,7 +115,10 @@ export class RoomHaulerSystem {
             if (pairing) {
                 this.haulerAssignments[creep.name] = pairing;
                 let node = getNode(this.roomName, pairing.nodeId);
-                let results = _runHauler(creep, pairing, node!, storage!, this.roomName, [this.handle, "Drudge"]);
+                let results = haulerLogic.runHauler(creep, pairing, node!, storage!, this.roomName, [
+                    this.handle,
+                    "Drudge"
+                ]);
                 if (results.done) {
                     this.completeAssignment(creep);
                     toRunAgain[creep.name] = results;
@@ -129,17 +140,28 @@ export class RoomHaulerSystem {
         for (let haulerName in toRunAgain) {
             const hauler = Game.creeps[haulerName];
             const lastResults = toRunAgain[haulerName];
-            let pairing = _assignJobForHauler(
-                hauler,
-                this.haulerAssignments,
-                this.nodeAssignments,
-                nodes,
-                storage,
-                lastResults
-            );
+            let pairing: LogisticsPairing | null = this.haulerAssignments[haulerName];
+            if (!pairing) {
+                pairing = haulerLogic.assignJobForHauler(
+                    hauler,
+                    this.haulerAssignments,
+                    this.nodeAssignments,
+                    nodes,
+                    storage,
+                    lastResults
+                );
+            }
             if (pairing) {
                 let node = getNode(this.roomName, pairing.nodeId);
-                _runHauler(hauler, pairing, node!, storage!, this.roomName, [this.handle, "Drudge"], lastResults);
+                haulerLogic.runHauler(
+                    hauler,
+                    pairing,
+                    node!,
+                    storage!,
+                    this.roomName,
+                    [this.handle, "Drudge"],
+                    lastResults
+                );
             }
         }
     }

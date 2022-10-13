@@ -2,9 +2,11 @@ import { Process } from "core/Process";
 import { _shardMinerSystem } from "system/mining/ShardMinerSystem";
 import { FEATURE_VISUALIZE_HAULING } from "utils/featureToggles/FeatureToggleConstants";
 import { getFeature } from "utils/featureToggles/FeatureToggles";
+import { profile } from "utils/profiler/Profiler";
 import { ScheduledJob } from "utils/ScheduledJob";
 import { _shardHaulerSystem } from "./ShardHaulerSystem";
 
+@profile
 export class HaulerProcess extends Process {
     processType = "HaulerProcess";
 
@@ -16,7 +18,7 @@ export class HaulerProcess extends Process {
     }
 
     private first = true;
-    run(): void {
+    public run(): void {
         if (this.first) {
             _shardHaulerSystem._rescanRooms();
             _shardHaulerSystem._reloadAllConfigs();

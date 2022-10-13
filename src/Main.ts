@@ -18,8 +18,8 @@ import { printSpawnQueues } from "system/spawning/SpawnInterface";
 import { WorkerProcess } from "system/working/WorkerProcess";
 
 import "./utils/visual/RoomVisual.js";
-import { LagoonDetector } from "utils/algorithms/LagoonFlow";
 import { PlannerProcess as PlannerProcess } from "system/planning/PlannerProcess";
+import { memhack } from "utils/memHack/Memhack";
 
 let deferedInit = false;
 let globalRefresh = true;
@@ -28,6 +28,7 @@ Log.i(`Global refresh detected, recreating process table`);
 global.PLAYER_USERNAME = Game.spawns[Object.keys(Game.spawns)[0]].owner.username;
 global.INVADER_USERNAME = "Invader";
 global.KEEPER_USERNAME = "Source Keeper";
+global.__PROFILER_ENABLED__ = true;
 
 function resetForRespawn() {
     //Clear out memory from old spawn
@@ -72,7 +73,7 @@ function init() {
 }
 
 //===================================================================Main Loop
-export const loop = () => {
+export const loop = memhack(() => {
     try {
         let detectedRespawn = hasRespawned();
         //If we have respawned make sure to reinit all our processes
@@ -119,4 +120,4 @@ export const loop = () => {
     } catch (e) {
         Log.e("Uncaught error detected", e);
     }
-};
+});

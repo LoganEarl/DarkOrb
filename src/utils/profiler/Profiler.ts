@@ -113,7 +113,6 @@ export function profile(
     _descriptor?: TypedPropertyDescriptor<Function>
 ): void {
     if (Game.shard.name === "sim") return;
-    if (!Memory.noSeason) return;
 
     if (key) {
         // case of method decorator

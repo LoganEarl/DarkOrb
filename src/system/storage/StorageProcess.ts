@@ -1,9 +1,11 @@
 import { Process } from "core/Process";
 import { FEATURE_VISUALIZE_STORAGE } from "utils/featureToggles/FeatureToggleConstants";
 import { getFeature } from "utils/featureToggles/FeatureToggles";
+import { profile } from "utils/profiler/Profiler";
 import { ScheduledJob } from "utils/ScheduledJob";
 import { _shardStorageSystem } from "./ShardStorageSystem";
 
+@profile
 export class StorageProcess extends Process {
     processType = "StorageProcess";
     //Check for new spawning rooms and trim the old ones once every 10 ticks or so

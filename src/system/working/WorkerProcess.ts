@@ -1,9 +1,11 @@
 import { Process } from "core/Process";
 import { FEATURE_VISUALIZE_WORK } from "utils/featureToggles/FeatureToggleConstants";
 import { getFeature } from "utils/featureToggles/FeatureToggles";
+import { profile } from "utils/profiler/Profiler";
 import { ScheduledJob } from "utils/ScheduledJob";
 import { _shardWorkerSystem } from "./ShardWorkerSystem";
 
+@profile
 export class WorkerProcess extends Process {
     processType = "WorkProcess";
     //Check for new rooms and trim the old ones once every 10 ticks or so

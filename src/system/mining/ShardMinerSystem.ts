@@ -1,10 +1,12 @@
 import { getRoomData } from "system/scouting/ScoutInterface";
 import { Log } from "utils/logger/Logger";
 import { unpackPos } from "utils/Packrat";
+import { profile } from "utils/profiler/Profiler";
 import { registerResetFunction } from "utils/SystemResetter";
 import { _findAllSourcesInRange } from "./MinerLogic";
 import { RoomMinerSystem } from "./RoomMinerSystem";
 
+@profile
 export class ShardMinerSystem {
     private roomMinerSystems: { [spawnRoomName: string]: RoomMinerSystem } = {};
 

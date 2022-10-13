@@ -1,16 +1,17 @@
 import { PriorityQueue } from "utils/PriorityQueue";
+import { insertSorted } from "utils/UtilityFunctions";
 import { RoomPlanner } from "./PlannerLogic";
 
-export var _queuedJobs: PriorityQueue<RoomPlanner> = new PriorityQueue(5, (a, b) => a.roomDepth - b.roomDepth);
+export var _queuedJobs: RoomPlanner[] = [];
 
 export function planRoom(room: Room, roomData: RoomScoutingInfo): void {
     if (
         !_.any(
-            _queuedJobs.items.filter(i => i),
+            _queuedJobs.filter(i => i),
             j => j.roomName === room.name
         )
     ) {
         //Try to prioritize planning rooms that are closer to home
-        _queuedJobs.enqueue(new RoomPlanner(room, roomData));
+        insertSorted(new RoomPlanner(room, roomData), _queuedJobs, (a, b) => a.roomDepth - b.roomDepth);
     }
 }

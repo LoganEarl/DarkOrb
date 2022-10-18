@@ -1,5 +1,5 @@
 import { getNode, registerNode, unregisterNode, unregisterNodes } from "system/hauling/HaulerInterface";
-import { getRoomData } from "system/scouting/ScoutInterface";
+import { getRoomData, scoutRoom } from "system/scouting/ScoutInterface";
 import { getCreeps, registerCreepConfig, unregisterHandle } from "system/spawning/SpawnInterface";
 import { getMainStorage } from "system/storage/StorageInterface";
 import { Log } from "utils/logger/Logger";
@@ -125,7 +125,11 @@ export class SourceMinerSystem implements MemoryComponent {
 
         //Determine if we own the room
         let mapData: RoomScoutingInfo | undefined = getRoomData(this.roomName);
-        if (mapData?.ownership && mapData.ownership.username !== global.PLAYER_USERNAME) {
+        if (
+            mapData?.ownership &&
+            mapData.ownership.ownershipType !== "Unclaimed" &&
+            mapData.ownership.username !== global.PLAYER_USERNAME
+        ) {
             if (mapData.ownership.ownershipType === "Claimed") this.addStopReason("ForeignOwnership");
             else this.clearStopReason("ForeignOwnership");
 
@@ -199,6 +203,7 @@ export class SourceMinerSystem implements MemoryComponent {
                 });
 
                 for (let creep of creeps) {
+                    scoutRoom(creep.room);
                     if (this.freeSpaces.length < creeps.length && creep.memory.jobName === "Primordial") {
                         creep.suicide();
                         delete this.creepAssignments[creep.name];

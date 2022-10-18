@@ -24,7 +24,7 @@ class ShardPlannerSystem {
             }
         });
 
-        //Make sure we have a room miner system per spawn room
+        //Make sure we have a planning job in rooms with a completed room plan
         let plannable = _.unique(
             Object.values(Game.spawns)
                 .filter(spawn => spawn.isActive() && Game.rooms[spawn.pos.roomName])

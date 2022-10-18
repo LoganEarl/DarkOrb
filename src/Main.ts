@@ -50,7 +50,6 @@ function init() {
     if (!Memory.rooms) Memory.rooms = {};
 
     //===================================================================Initialize Processes
-    Log.i("Recreating process table");
 
     global.runner = new ProcessRunner();
     global.runner.addProcess(new SpawnProcess());

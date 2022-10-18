@@ -88,7 +88,7 @@ export class RoomPlanner implements PriorityQueueItem {
         this.exitCoords = room.find(FIND_EXIT).map(e => e.localCoords);
         this.controllerPos = room.controller!.pos;
         this.roomData = roomData;
-        this.roomDepth = roomData.territoryInfo[0].range;
+        this.roomDepth = roomData.territoryInfo.claims[0].range;
         this.laggonDetector = new LagoonDetector(room, 100);
 
         let spawns = room.find(FIND_MY_SPAWNS);
@@ -371,7 +371,7 @@ export class RoomPlanner implements PriorityQueueItem {
 
                     if (!path.incomplete) {
                         let coord: ScoredCoord = { x: x, y: y, score: score, queueIndex: 0 };
-                        insertSorted(coord, this.scoredCoords, this.scoredCoordComparator);
+                        this.scoredCoords = insertSorted(coord, this.scoredCoords, this.scoredCoordComparator);
                     }
                 }
             }

@@ -62,7 +62,7 @@ class ShardWorkerSystem {
                 (!lastScan || lastScan > Game.time - SCAN_INTERVAL)
             ) {
                 //Send the job to whichever room is closest
-                let closest = mapData.territoryInfo[0].roomName;
+                let closest = mapData.territoryInfo.claims[0].roomName;
                 let bestRoom = this.roomWorkSystems[closest];
 
                 let structures = room.find(FIND_STRUCTURES);

@@ -1,6 +1,6 @@
 import { MemoryComponent, updateMemory } from "utils/MemoryWriter";
 import { Log } from "utils/logger/Logger";
-import { assignRoomToScout, getRoomsToExplore, runScout, scoutRoom } from "./ScoutLogic";
+import { assignRoomToScout, getRoomsToExplore, runScout } from "./ScoutLogic";
 import { registerResetFunction } from "utils/SystemResetter";
 import { getCreeps, registerCreepConfig, unregisterHandle } from "system/spawning/SpawnInterface";
 import { unpackCoord, unpackPos } from "utils/Packrat";
@@ -15,6 +15,7 @@ class ShardScoutSystem implements MemoryComponent {
     constructor() {
         this.loadMemory();
 
+        Log.i("Creating shard scouting system");
         //TODO Remove this later
         this.memory!.clusters = _.unique(this.memory!.clusters);
         updateMemory(this);

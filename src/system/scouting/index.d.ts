@@ -4,8 +4,14 @@ type RoomOwnershipType =
     | "Claimed" //They own the controller. Superceeds other forms
     | "Reserved" //They reserved the controller. Superceeds military and economic
     | "Military" //They have combat creeps present. Superceeds economic
-    | "Economic"; //They have economic creeps present. Likely remotes.
+    | "Economic" //They have economic creeps present. Likely remotes.
+    | "Unclaimed"; //Nobody here
 
+interface TTLData {
+    lastUpdate: number; //The last game tick this info was refreshed
+    minNextUpdate: number; //The minimum tick number before we will allow rechecking the data
+    maxNextUpdate: number; //After this game tick, we will decide to send a scout
+}
 interface SourceInfo {
     id: string;
     packedPosition: string;
@@ -20,16 +26,15 @@ interface MineralInfo {
     mineralType: MineralConstant;
 }
 
-interface RoomMiningInfo {
+interface RoomMiningInfo extends TTLData {
     sources: [SourceInfo, ...SourceInfo[]]; //At least 1 source
     mineral: MineralInfo;
 }
 
-interface RoomOwnershipInfo {
-    lastUpdated: number;
-    username: string;
-    rcl: number;
-    ownershipType: RoomOwnershipType;
+interface RoomOwnershipInfo extends TTLData {
+    username?: string;
+    rcl?: number;
+    ownershipType?: RoomOwnershipType;
 }
 
 interface ThreatInfo {
@@ -40,20 +45,21 @@ interface ThreatInfo {
     healPt: number;
 }
 
-type RoomTerritoryInfo = [TerritoryInfo, ...TerritoryInfo[]];
+interface RoomTerritoryInfo extends TTLData {
+    claims: [TerritoryInfo, ...TerritoryInfo[]];
+}
 interface TerritoryInfo {
     roomName: string;
     range: number;
 }
 
-interface RoomThreatInfo {
-    lastUpdated: number;
+interface RoomThreatInfo extends TTLData {
     threatsByPlayer: { [playerName: string]: ThreatInfo };
     numCombatants: number; //How many enemies that can hurt us
     numNonhostile: number; //How many enemies without hurty/worky/claimy parts
 }
 
-interface RoomPathingInfo {
+interface RoomPathingInfo extends TTLData {
     //(if present. If not present it is just the largest open area)
     pathableExits: string[]; //Exits reachable from the rally position
     packedRallyPos: string; //The position of the largest open area reachable from the controller

@@ -1,6 +1,6 @@
 import { Process } from "core/Process";
 import { getRoomData, getShardData } from "system/scouting/ScoutInterface";
-import { FEATURE_VISUALIZE_PLANNING } from "utils/featureToggles/FeatureToggleConstants";
+import { FEATURE_VISUALIZE_PLANS } from "utils/featureToggles/FeatureToggleConstants";
 import { getFeature } from "utils/featureToggles/FeatureToggles";
 import { profile } from "utils/profiler/Profiler";
 import { ScheduledJob } from "utils/ScheduledJob";
@@ -23,7 +23,7 @@ export class PlannerProcess extends Process {
         this.buildingQueuer.run();
         _shardPlannerSystem._continuePlanning();
 
-        if (getFeature(FEATURE_VISUALIZE_PLANNING)) {
+        if (getFeature(FEATURE_VISUALIZE_PLANS)) {
             let plannedRooms = Object.values(getShardData())
                 .filter(d => d.roomPlan)
                 .map(p => p.roomName);

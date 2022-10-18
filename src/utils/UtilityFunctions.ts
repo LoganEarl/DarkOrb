@@ -348,7 +348,10 @@ export function findSortedIndex<T>(search: T, items: T[], compare: (a: T, b: T) 
 }
 
 export function insertSorted<T>(item: T, items: T[], compare: (a: T, b: T) => number): T[] {
-    if (items.length === 0) return [item];
+    if (items.length === 0) {
+        items.push(item);
+        return items;
+    }
 
     let index = findSortedIndex(item, items, compare);
     items.splice(index, 0, item);

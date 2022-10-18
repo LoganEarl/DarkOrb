@@ -1,7 +1,8 @@
+import { Log } from "utils/logger/Logger";
 import { MemoryComponent, updateMemory } from "utils/MemoryWriter";
 import { unpackPos } from "utils/Packrat";
 import { registerResetFunction } from "utils/SystemResetter";
-import { scoutRoom } from "./ScoutLogic";
+import { _canBeUpdated, _scoutRoom } from "./ScoutLogic";
 import { _shardScoutSystem } from "./ShardScoutSystem";
 
 export const MAX_SCOUT_DEPTH = 6;
@@ -15,7 +16,7 @@ class MapMemory implements MemoryComponent {
                 Memory.mapData ??
                 _.mapKeys(
                     _.unique(Object.values(Game.spawns).map(s => s.room)).map(room =>
-                        scoutRoom(room, {}, MAX_SCOUT_DEPTH)
+                        _scoutRoom(room, {}, MAX_SCOUT_DEPTH)
                     ),
                     s => s.roomName
                 );
@@ -32,8 +33,18 @@ class MapMemory implements MemoryComponent {
 let memory: MapMemory = new MapMemory();
 registerResetFunction(() => (memory = new MapMemory()));
 
+export function scoutRoom(room: Room): void {
+    memory.loadMemory();
+    if (_canBeUpdated(memory.shardMap[room.name])) {
+        let data = _scoutRoom(room, memory.shardMap, MAX_SCOUT_DEPTH, memory.shardMap[room.name]);
+        memory.shardMap[room.name] = data;
+        updateMemory(memory);
+    }
+}
+
 export function getRoomData(roomName: string): RoomScoutingInfo | undefined {
     memory.loadMemory();
+    // Log.d(`Returning room data ${JSON.stringify(memory.shardMap![roomName])}`);
     return memory.shardMap![roomName];
 }
 

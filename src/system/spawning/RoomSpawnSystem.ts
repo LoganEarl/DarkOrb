@@ -30,7 +30,7 @@ export class RoomSpawnSystem {
                 let nodeId = "extension:" + fillable.id;
                 let node = getNode(this.roomName, nodeId);
                 if (node) {
-                    if (fillable.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                    if (fillable.isActive() && fillable.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
                         node.level = fillable.store.getUsedCapacity(RESOURCE_ENERGY);
                         node.maxLevel = fillable.store.getCapacity(RESOURCE_ENERGY);
                     } else {

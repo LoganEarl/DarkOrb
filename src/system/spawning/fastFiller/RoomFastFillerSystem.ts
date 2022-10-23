@@ -193,7 +193,7 @@ export class RoomFastFillerSystem {
         if (!container) return undefined;
 
         //Needs to be at least one extension as well
-        let extensions = structures.filter(s => s.structureType === STRUCTURE_EXTENSION);
+        let extensions = structures.filter(s => s.structureType === STRUCTURE_EXTENSION && s.isActive());
         if (!extensions.length) return undefined;
 
         let spawn = structures.filter(s => s.structureType === STRUCTURE_SPAWN)[0] as StructureSpawn | undefined;

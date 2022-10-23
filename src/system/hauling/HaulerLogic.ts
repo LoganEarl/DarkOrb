@@ -74,7 +74,12 @@ class HaulerLogic {
         const canServiceSourceRequests =
             (storage.store.getFreeCapacity(nodeResource) ?? 0) > 0 || runResults.newFreeCapacity > 0;
         const canServiceSinkRequests =
-            (storage.store.getUsedCapacity(nodeResource) ?? 0) > 0 || runResults.newUsedCapacity > 0;
+            ((storage.store.getUsedCapacity(nodeResource) ?? 0) > 0 &&
+                storage.structureType !== STRUCTURE_SPAWN &&
+                storage.structureType !== STRUCTURE_CONTAINER) ||
+            runResults.newUsedCapacity > 0;
+
+        Log.d(`${creep.name} canServiceSource:${canServiceSourceRequests} canServiceSink:${canServiceSinkRequests}`);
 
         if (targetNode.type === "Source") {
             if (!canServiceSourceRequests) {
@@ -403,8 +408,19 @@ class HaulerLogic {
         //     } for DRDT:${serviceDrdt}`
         // );
 
+        //Used to disable the service route when it doesn't make sense to use it
+        let canUseServiceRoute = true;
+        if (node.type === "Source" && storage.store.getFreeCapacity(nodeResource) === 0) canUseServiceRoute = false;
+        if (
+            node.type === "Sink" &&
+            (storage.store.getUsedCapacity(nodeResource) === 0 ||
+                storage.structureType === STRUCTURE_SPAWN ||
+                storage.structureType === STRUCTURE_CONTAINER)
+        )
+            canUseServiceRoute = false;
+
         //All that work for this one little flag...
-        let useServiceRoute = serviceDrdt > directDrdt;
+        let useServiceRoute = canUseServiceRoute && serviceDrdt > directDrdt;
 
         return {
             haulerName: creep.name,

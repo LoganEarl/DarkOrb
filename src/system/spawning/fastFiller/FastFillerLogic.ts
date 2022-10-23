@@ -155,7 +155,8 @@ function fillRecordFor(id?: string, oldRecord?: FillRecord): FillRecord {
     if (!id) return { structure: undefined, newCapacity: 0, maxCapacity: 0 };
 
     if (oldRecord) return oldRecord;
-    let structure = Game.getObjectById(id) as AnyStoreStructure;
+    let structure = Game.getObjectById(id) as AnyStoreStructure | undefined;
+    if (structure && !structure.isActive()) structure = undefined;
 
     return {
         structure: structure,

@@ -12,7 +12,7 @@ import {
     ANALYTICS_GOSS_INCOME,
     ANALYTICS_SPAWNING
 } from "system/storage/AnalyticsConstants";
-import { getEnergyPerTick } from "system/storage/StorageInterface";
+import { getEnergyPerTick, getMainStorage } from "system/storage/StorageInterface";
 import { Log } from "utils/logger/Logger";
 import { MemoryComponent, updateMemory } from "utils/MemoryWriter";
 import { Traveler } from "utils/traveler/Traveler";
@@ -145,7 +145,15 @@ export class RoomWorkSystem implements MemoryComponent {
                 getEnergyPerTick(this.roomName, ANALYTICS_GOSS_INCOME) +
                 getEnergyPerTick(this.roomName, ANALYTICS_SPAWNING) -
                 getEnergyPerTick(this.roomName, ANALYTICS_ARTIFICER);
-            availableEnergy *= 0.9;
+
+            let storage = getMainStorage(this.roomName);
+            if (
+                storage &&
+                storage instanceof StructureStorage &&
+                storage.store.getUsedCapacity(RESOURCE_ENERGY) > 50000
+            ) {
+                availableEnergy *= 2;
+            }
 
             // Log.d(`Available energy: ${availableEnergy}`);
             //If we are netting low, only make a single dude to maintain things

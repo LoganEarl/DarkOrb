@@ -118,6 +118,8 @@ class ShardScoutSystem implements MemoryComponent {
                         MAX_SCOUT_DEPTH
                     );
 
+                    Log.d(`Assigned ${assignment} to ${scout.name}`);
+
                     if (assignment) {
                         this.scoutAssignments[scout.name] = assignment;
                     }

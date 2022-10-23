@@ -17,7 +17,7 @@ export function hasRespawned() {
 
     // check for controller, progress and safe mode
     var room = Game.rooms[rNames[0]];
-    Log.d(room?.controller?.safeMode + "");
+    // Log.d(room?.controller?.safeMode + "");
     if (
         !room.controller ||
         !room.controller.my ||

@@ -5,6 +5,36 @@ const DEFAULT_SORTER: BodySorter = function (a: BodyPartConstant, b: BodyPartCon
     return PART_ORDER.indexOf(a) - PART_ORDER.indexOf(b);
 };
 
+const defaultPriorities = [
+    "Primordial", //Initial fast startup creeps
+    "Aspect", //Scout
+    "Priest", //Fast filler
+    "Drudge", //Hauler
+    "Exhumer", //Miner
+    "Artificer", //Worker
+    "Sludger" //Mineral miner
+];
+
+export const _priorityComparator = (a: CreepConfig, b: CreepConfig) => {
+    let aPriority = defaultPriorities.indexOf(a.jobName) ?? 9999999;
+    let bPriority = defaultPriorities.indexOf(b.jobName) ?? 9999999;
+    if (aPriority === bPriority) {
+        aPriority = a.subPriority ?? 9999999;
+        bPriority = b.subPriority ?? 9999999;
+    }
+    return aPriority - bPriority;
+};
+
+export function _shouldAssignConfigToRoom(roomName: string, config: CreepConfig): boolean {
+    let room = Game.rooms[roomName];
+    //Can't spawn the creep if we don't have room vision
+    if (!room) return false;
+
+    let cost = _bodyCost(config.body);
+    if (room.energyCapacityAvailable >= cost) return true;
+    return false;
+}
+
 export function _maximizeBodyForTargetParts(
     baseBody: BodyPartConstant[],
     repeatingBody: BodyPartConstant[],

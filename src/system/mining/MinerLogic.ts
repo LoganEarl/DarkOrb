@@ -127,7 +127,10 @@ export function _findAllSourcesInRange(
 ): SourceInfo[] {
     if (!sourceRoom || range <= -1) return [];
 
-    let ownedByEnemy = sourceRoom.ownership && sourceRoom.ownership.username !== global.PLAYER_USERNAME;
+    let ownedByEnemy =
+        sourceRoom.ownership &&
+        sourceRoom.ownership.ownershipType !== "Unclaimed" &&
+        sourceRoom.ownership.username !== global.PLAYER_USERNAME;
 
     //Dont traverse if we don't own the room
     if (ownedByEnemy) return [];

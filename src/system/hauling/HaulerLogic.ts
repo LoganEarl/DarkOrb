@@ -286,7 +286,7 @@ class HaulerLogic {
         );
 
         //If it is still a spawn we won't pull energy from it. The fillable cap is just the amount we already have
-        if (storage instanceof StructureSpawn) {
+        if (storage instanceof StructureSpawn || storage instanceof StructureContainer) {
             storageFillableCapacity = usedSpace;
         }
 

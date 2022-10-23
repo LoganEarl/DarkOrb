@@ -193,6 +193,9 @@ export class SourceMinerSystem implements MemoryComponent {
     }
 
     _runCreeps() {
+        if ((getRoomData(this.roomName)?.hazardInfo?.numCombatants ?? 0) > 0) this.addStopReason("Attacked");
+        else this.clearStopReason("Attacked");
+
         this.loadMemory();
         let creeps = getCreeps(this.handle);
         if (creeps.length) {
@@ -204,6 +207,10 @@ export class SourceMinerSystem implements MemoryComponent {
 
                 for (let creep of creeps) {
                     scoutRoom(creep.room);
+
+                    let threats = (getRoomData(creep.room.name)?.hazardInfo?.numCombatants ?? 0) > 0;
+                    if (threats) this.addStopReason("Attacked");
+
                     if (this.freeSpaces.length < creeps.length && creep.memory.jobName === "Primordial") {
                         creep.suicide();
                         delete this.creepAssignments[creep.name];
@@ -274,6 +281,7 @@ export class SourceMinerSystem implements MemoryComponent {
         }
         if (this.memory!.state !== "Stopped" && !this.memory!.stopReasons.includes(reason)) {
             this.memory!.stopReasons.push(reason);
+            this.memory!.state = "Stopped";
             updateMemory(this);
             Log.w(
                 `Stopping mining operation ${this.parentRoomName}->${this.roomName}:${this.sourceId} because of reason:${reason}`

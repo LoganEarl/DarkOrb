@@ -8,31 +8,11 @@ import { Log } from "utils/logger/Logger";
 import { findStructure } from "utils/StructureFindCache";
 import { getMultirooomDistance } from "utils/UtilityFunctions";
 import { _creepManifest } from "./CreepManifest";
-import { _bodyCost, _configShouldBeSpawned, _haveSufficientCapacity } from "./SpawnLogic";
+import { _getConfigs } from "./SpawnInterface";
+import { _bodyCost, _configShouldBeSpawned, _haveSufficientCapacity, _priorityComparator } from "./SpawnLogic";
 
 export class RoomSpawnSystem {
     public roomName: string;
-
-    private creepConfigs: { [handle: string]: CreepConfig[] } = {};
-
-    private defaultPriorities = [
-        "Primordial", //Initial fast startup creeps
-        "Aspect", //Scout
-        "Drudge", //Hauler
-        "Exhumer", //Miner
-        "Artificer", //Worker
-        "Sludger" //Mineral miner
-    ];
-
-    private priorityComparator = (a: CreepConfig, b: CreepConfig) => {
-        let aPriority = this.defaultPriorities.indexOf(a.jobName) ?? 9999999;
-        let bPriority = this.defaultPriorities.indexOf(b.jobName) ?? 9999999;
-        if (aPriority === bPriority) {
-            aPriority = a.subPriority ?? 9999999;
-            bPriority = b.subPriority ?? 9999999;
-        }
-        return aPriority - bPriority;
-    };
 
     constructor(room: Room) {
         this.roomName = room.name;
@@ -81,21 +61,13 @@ export class RoomSpawnSystem {
         }
     }
 
-    _registerCreepConfig(handle: string, configs: CreepConfig[]) {
-        this.creepConfigs[handle] = configs;
-    }
-
-    _unregisterHandle(handle: string) {
-        delete this.creepConfigs[handle];
-    }
-
     _spawnCreeps() {
         let room = Game.rooms[this.roomName];
         if (room) {
             let readySpawns: StructureSpawn[] = findStructure(room, FIND_MY_SPAWNS)
                 .map(s => s as StructureSpawn)
                 .filter(s => !s.spawning);
-            let readyToSpawn: CreepConfig[] = Object.values(this.creepConfigs)
+            let readyToSpawn: CreepConfig[] = Object.values(_getConfigs(this.roomName))
                 .reduce((acc, val) => acc.concat(val), [])
                 .filter(c => _configShouldBeSpawned(c) && _haveSufficientCapacity(room, c));
 
@@ -103,7 +75,7 @@ export class RoomSpawnSystem {
                 if (room.energyAvailable < 300) postAnalyticsEvent(room.name, 1, ANALYTICS_SPAWN_GENERATION);
 
                 for (let spawn of readySpawns) {
-                    readyToSpawn.sort(this.priorityComparator);
+                    readyToSpawn.sort(_priorityComparator);
                     let next = readyToSpawn[0];
                     let result = spawn.spawnCreep(next.body, "SPAWN_TEST:" + Math.random(), { dryRun: true });
                     if (result == OK) {
@@ -144,16 +116,5 @@ export class RoomSpawnSystem {
                 }
             }
         }
-    }
-
-    _printSpawnQueues() {
-        let configs = Object.values(this.creepConfigs)
-            .reduce((acc, val) => acc.concat(val), [])
-            .filter(c => _configShouldBeSpawned(c) && _haveSufficientCapacity(Game.rooms[this.roomName], c));
-        configs.sort(this.priorityComparator);
-        Log.i(`${this.roomName} 
-            Spawn Queue: ${JSON.stringify(configs)}
-            All Configs: ${JSON.stringify(this.creepConfigs)}
-            `);
     }
 }

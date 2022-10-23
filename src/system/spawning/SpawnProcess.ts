@@ -1,4 +1,5 @@
 import { Process } from "core/Process";
+import { Log } from "utils/logger/Logger";
 import { profile } from "utils/profiler/Profiler";
 import { ScheduledJob } from "utils/ScheduledJob";
 import { _shardSpawnSystem } from "./ShardSpawnSystem";
@@ -9,15 +10,29 @@ export class SpawnProcess extends Process {
     processType = "SpawnProcess";
     //Check for new spawning rooms and trim the old ones once every 10 ticks or so
     periodicRoomScanner: ScheduledJob = new ScheduledJob(_shardSpawnSystem._scanSpawnSystems, _shardSpawnSystem, 10);
+    periodicConfigLoader: ScheduledJob = new ScheduledJob(
+        _shardSpawnSystem._reloadFillerConfigs,
+        _shardSpawnSystem,
+        10
+    );
 
     constructor() {
         super("SpawnProcess", 0);
         _shardSpawnSystem._scanSpawnSystems();
     }
 
+    private first = true;
     run(): void {
         this.periodicRoomScanner.run();
         _shardSpawnSystem._updateLogisticsNodes();
         _shardSpawnSystem._spawnCreeps();
+
+        if (this.first) {
+            _shardSpawnSystem._reloadFillerConfigs();
+        } else {
+            this.periodicConfigLoader.run();
+        }
+
+        _shardSpawnSystem._runFillers();
     }
 }

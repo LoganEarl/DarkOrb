@@ -6,7 +6,7 @@ import { _calcualteMiningPath } from "./MinerLogic";
 import { SourceMinerSystem } from "./SourceMinerSystem";
 
 //TODO Hardcoded for now. Replace when I have spawn loading controls
-const MAX_MINING_OPERATIONS = 5;
+const MAX_MINING_OPERATIONS = 6;
 @profile
 export class RoomMinerSystem {
     private sourceMinerSystems: { [sourceId: string]: SourceMinerSystem } = {};

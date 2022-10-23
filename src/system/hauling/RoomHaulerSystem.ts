@@ -1,10 +1,8 @@
-import { getRallyPosition } from "system/scouting/ScoutInterface";
+import { getRallyPosition, scoutRoom } from "system/scouting/ScoutInterface";
 import { getCreeps, maximizeBody, registerCreepConfig, unregisterHandle } from "system/spawning/SpawnInterface";
 import { getMainStorage } from "system/storage/StorageInterface";
 import { FEATURE_VISUALIZE_HAULING } from "utils/featureToggles/FeatureToggleConstants";
 import { getFeature } from "utils/featureToggles/FeatureToggles";
-import { Log } from "utils/logger/Logger";
-import { PriorityQueue } from "utils/PriorityQueue";
 import { profile } from "utils/profiler/Profiler";
 import { Traveler } from "utils/traveler/Traveler";
 import { clamp, drawBar, drawCircledItem } from "utils/UtilityFunctions";
@@ -96,6 +94,7 @@ export class RoomHaulerSystem {
         let creeps = getCreeps(this.handle);
         let toRunAgain: { [creepName: string]: HaulerRunResults } = {};
         for (let creep of creeps) {
+            scoutRoom(creep.room);
             let pairing: LogisticsPairing | null = this.haulerAssignments[creep.name];
             // Log.d(`Current pairing for ${creep}, ${JSON.stringify(pairing)}`);
             //If we don't have a job for the creep get it one

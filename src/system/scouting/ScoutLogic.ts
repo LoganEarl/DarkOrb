@@ -152,13 +152,14 @@ function evaluateOwnership(room: Room): [RoomThreatInfo | undefined, RoomOwnersh
         let allDangerous = allEnemies.filter(c => !c.my && _.any(c.body, p => dangerousParts.includes(p.type)));
         let dangerousByPlayer: { [playerName: string]: Creep[] } = {};
         allDangerous.forEach(c => {
+            // Log.d(`Owner info: ${JSON.stringify(c.owner)}`);
             if (!dangerousByPlayer[c.owner.username]) dangerousByPlayer[c.owner.username] = [];
             dangerousByPlayer[c.owner.username].push(c);
         });
         let threatsByPlayer: { [playerName: string]: ThreatInfo } = {};
-        Object.keys(allDangerous).forEach(
-            player => (threatsByPlayer[player] = sumThreat(dangerousByPlayer[player] ?? [], hostileTowers, player))
-        );
+        for (let player in dangerousByPlayer) {
+            threatsByPlayer[player] = sumThreat(dangerousByPlayer[player] ?? [], hostileTowers, player);
+        }
 
         let allPeaceful = allEnemies.filter(c => !c.my && !_.any(c.body, p => dangerousParts.includes(p.type)));
         let peacefullByPlayer: { [playerName: string]: number } = {};
@@ -505,7 +506,7 @@ export function getRoomsToExplore(
         }
     }
 
-    // Log.d(`Rooms to explore ${JSON.stringify(roomsToExplore)}`);
+    Log.d(`Rooms to explore ${JSON.stringify(roomsToExplore)}`);
     return roomsToExplore;
 }
 
@@ -523,6 +524,7 @@ export function runScout(scout: Creep, roomToExplore: string, shardMap: ShardMap
 
     let positionLock = controllerTargetLocks[scout.name];
     let done = false;
+    let roomNeedsScouting = !shardMap[roomToExplore] || _canBeUpdated(shardMap[roomToExplore]);
 
     //Clear the lock after TTL is up. For saftey...
     if (positionLock && positionLock[1] < Game.time) {
@@ -531,7 +533,7 @@ export function runScout(scout: Creep, roomToExplore: string, shardMap: ShardMap
         scout.queueSay("🎯🤔");
     }
 
-    //Sign the controller if we locked onto it ans are near
+    //Sign the controller if we locked onto it and are near
     if (positionLock && scout.pos.isNearTo(positionLock[0].x, positionLock[0].y)) {
         scout.queueSay("🖊️✅");
         scout.signController(scout.room.controller!, getAppropriateControllerSignature(shardMap[scout.pos.roomName]));
@@ -543,7 +545,7 @@ export function runScout(scout: Creep, roomToExplore: string, shardMap: ShardMap
         Traveler.travelTo(scout, positionLock[0], { offRoad: true });
     }
     //If we are in the room we need to explore
-    else if (scout.pos.roomName === roomToExplore && !shardMap[roomToExplore]) {
+    else if (scout.pos.roomName === roomToExplore && roomNeedsScouting) {
         let roomData = _scoutRoom(scout.room, shardMap, maxTerritoryRange);
         //If it is a controller room, work on signing the controller if it isn't already done
         scout.queueSay("👁️✅");
@@ -551,7 +553,7 @@ export function runScout(scout: Creep, roomToExplore: string, shardMap: ShardMap
         shardMap[roomToExplore] = roomData;
     }
     //We aren't in the room yet. Go to it
-    else if (scout.pos.roomName !== roomToExplore && !shardMap[roomToExplore]) {
+    else if (scout.pos.roomName !== roomToExplore && roomNeedsScouting) {
         Traveler.travelTo(scout, new RoomPosition(25, 25, roomToExplore), {
             range: 21,
             offRoad: true,
@@ -560,9 +562,12 @@ export function runScout(scout: Creep, roomToExplore: string, shardMap: ShardMap
         scout.queueSay("👁️");
     }
     //It was scouted before we could get there. Done!
-    else if (!shouldSendScout(roomToExplore, shardMap[roomToExplore], [])) {
+    else if (!roomNeedsScouting) {
         done = true;
         scout.queueSay("👁️✅");
+    } else {
+        scout.queueSay("❓");
+        Log.e(`Scout ${scout.name} is assigned ${roomToExplore} but cannot resolve it's state`);
     }
 
     return done;

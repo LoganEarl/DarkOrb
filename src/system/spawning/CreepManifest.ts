@@ -24,7 +24,7 @@ class CreepManifest implements MemoryComponent {
             //Detect any that died during the query phase=
             let deadCreepNames = (byHandle[subHandle] ?? []).filter(name => !Game.creeps[name]);
             if (deadCreepNames.length > 0) {
-                Log.d("Clearing memory for creeps with names: " + JSON.stringify(deadCreepNames));
+                // Log.d("Clearing memory for creeps with names: " + JSON.stringify(deadCreepNames));
                 byHandle[subHandle] = byHandle[subHandle].filter(name => Game.creeps[name]);
                 updateMemory(this);
             }
@@ -36,7 +36,7 @@ class CreepManifest implements MemoryComponent {
                 .reduce((acc, val) => acc.concat(val), [])
                 .filter(name => !Game.creeps[name]);
             if (deadCreepNames.length > 0) {
-                Log.d("Clearing memory for creeps with names: " + JSON.stringify(deadCreepNames));
+                // Log.d("Clearing memory for creeps with names: " + JSON.stringify(deadCreepNames));
                 for (let subHandle of Object.keys(byHandle))
                     byHandle[subHandle] = byHandle[subHandle].filter(name => Game.creeps[name]);
                 updateMemory(this);
@@ -66,7 +66,7 @@ class CreepManifest implements MemoryComponent {
             let lastNameIndex = Math.floor(nextIndex % LAST_NAMES.length);
 
             let name = `${FIRST_NAMES[firstNameIndex]} ${LAST_NAMES[lastNameIndex]} <${jobName}>`;
-            Log.d(`Chose name with fIndex:${firstNameIndex} and lIndex:${lastNameIndex}`);
+            // Log.d(`Chose name with fIndex:${firstNameIndex} and lIndex:${lastNameIndex}`);
 
             if (!Game.creeps[name]) {
                 this.memory.previousNameIndex = nextIndex;

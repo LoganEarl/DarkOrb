@@ -1,5 +1,11 @@
 type BodySorter = (a: BodyPartConstant, b: BodyPartConstant) => number;
 
+interface SpawnRoom {
+    roomName: string;
+    tickCapacity: number; //Ticks of spawn time per 1500 ticks. (can be greater with powers or additional spawns)
+    energyCapacity: number;
+}
+
 interface CreepConfig {
     body: BodyPartConstant[];
     handle: string; //Id used to look up the creeps
@@ -26,7 +32,7 @@ interface CreepMemory {
 }
 
 interface SpawnPosition {
-    spawnId: Id<StructureSpawn>;
+    spawnName: string;
     directions: DirectionConstant[];
 }
 

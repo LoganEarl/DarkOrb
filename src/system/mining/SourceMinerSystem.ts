@@ -216,7 +216,11 @@ export class SourceMinerSystem implements MemoryComponent {
                         delete this.creepAssignments[creep.name];
                     } else {
                         if (!this.creepAssignments[creep.name]) {
-                            let populationSize = _.sum(this.configs, c => c.quantity);
+                            let populationSize = Math.max(
+                                _.sum(this.configs, c => c.quantity),
+                                creeps.length
+                            );
+
                             this.creepAssignments[creep.name] = _assignMiningSpace(
                                 creep,
                                 this.freeSpaces,

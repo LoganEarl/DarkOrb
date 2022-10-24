@@ -79,7 +79,7 @@ export class RoomHaulerSystem {
                     subPriority: 1
                 });
             }
-            registerCreepConfig(this.handle, configs);
+            registerCreepConfig(this.handle, configs, this.roomName);
         } else {
             unregisterHandle(this.handle);
         }

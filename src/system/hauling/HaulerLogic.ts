@@ -79,7 +79,7 @@ class HaulerLogic {
                 storage.structureType !== STRUCTURE_CONTAINER) ||
             runResults.newUsedCapacity > 0;
 
-        Log.d(`${creep.name} canServiceSource:${canServiceSourceRequests} canServiceSink:${canServiceSinkRequests}`);
+        // Log.d(`${creep.name} canServiceSource:${canServiceSourceRequests} canServiceSink:${canServiceSinkRequests}`);
 
         if (targetNode.type === "Source") {
             if (!canServiceSourceRequests) {

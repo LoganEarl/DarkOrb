@@ -11,6 +11,7 @@ import {
 } from "./SpawnLogic";
 
 let creepConfigs: { [roomName: string]: { [handle: string]: CreepConfig[] } } = {};
+//Denotes where we decided to put the given room-agnostic creep config via handle
 let roomAgnosticConfigRooms: { [handle: string]: string } = {};
 let spawnRooms: { [roomName: string]: SpawnRoom } = {};
 
@@ -20,6 +21,7 @@ export function registerCreepConfig(
     roomName?: string,
     territoryInfo?: RoomTerritoryInfo
 ) {
+    // Log.d(`Registering creep config with info roomName:${roomName} handle:${handle}`);
     if (roomName) {
         if (!creepConfigs[roomName]) creepConfigs[roomName] = {};
         creepConfigs[roomName][handle] = configs;
@@ -28,8 +30,8 @@ export function registerCreepConfig(
         // the new system should use spawn loading and the registered spawn rooms better
         for (let spawnRoom in spawnRooms) {
             //Remove old room assignment
-            if (roomAgnosticConfigRooms[handle] && creepConfigs[roomAgnosticConfigRooms[handle]]) {
-                delete creepConfigs[roomAgnosticConfigRooms[handle]];
+            if (roomAgnosticConfigRooms[handle] && creepConfigs[roomAgnosticConfigRooms[handle]]?.[handle]) {
+                delete creepConfigs[roomAgnosticConfigRooms[handle]][handle];
             }
             if (!creepConfigs[spawnRoom]) creepConfigs[spawnRoom] = {};
 
@@ -38,6 +40,7 @@ export function registerCreepConfig(
             break;
         }
     }
+    // printSpawnQueues();
 }
 
 export function _setSpawnRooms(newSpawnRooms: { [roomName: string]: SpawnRoom }) {
@@ -45,12 +48,14 @@ export function _setSpawnRooms(newSpawnRooms: { [roomName: string]: SpawnRoom })
 }
 
 export function unregisterHandle(handle: string, roomName?: string) {
+    // Log.d(`Unregistering creep config with info roomName:${roomName} handle:${handle}`);
     if (roomAgnosticConfigRooms[handle] && creepConfigs[roomAgnosticConfigRooms[handle]]) {
         delete creepConfigs[roomAgnosticConfigRooms[handle]];
         delete roomAgnosticConfigRooms[handle];
     } else if (roomName && creepConfigs[roomName]) {
         delete creepConfigs[roomName][handle];
     }
+    // printSpawnQueues();
 }
 
 export function _getConfigs(roomName: string) {
@@ -96,13 +101,27 @@ export function maximizeBody(
 
 export function printSpawnQueues() {
     for (let roomName in creepConfigs) {
-        let active = Object.values(creepConfigs[roomName])
-            .reduce((acc, val) => acc.concat(val), [])
-            .filter(c => _configShouldBeSpawned(c) && _haveSufficientCapacity(Game.rooms[roomName], c));
+        let all = Object.values(creepConfigs[roomName]).reduce((acc, val) => acc.concat(val), []);
+        let active = all.filter(c => _configShouldBeSpawned(c) && _haveSufficientCapacity(Game.rooms[roomName], c));
         active.sort(_priorityComparator);
         Log.i(`${roomName} 
-            Spawn Queue: ${JSON.stringify(active)}
-            All Configs: ${JSON.stringify(creepConfigs[roomName])}
+            Spawn Queue:\n ${active.map(c => displayCreepConfig(c))}
+            All Configs:\n ${all.map(c => displayCreepConfig(c))}
             `);
     }
+}
+
+function displayCreepConfig(config: CreepConfig) {
+    let partCount: { [part: string]: number } = {};
+    config.body.forEach(p => {
+        if (!partCount[p as string]) partCount[p as string] = 1;
+        else partCount[p as string]++;
+    });
+
+    let keys = Object.keys(partCount);
+    keys.sort();
+    let bodyDescriptor = "";
+    keys.forEach(key => (bodyDescriptor += key[0].toUpperCase() + partCount[key]));
+
+    return `\t\tJob:${config.jobName} Body:${bodyDescriptor} Handle:${config.handle} SubHandle:${config.subHandle}\n`;
 }

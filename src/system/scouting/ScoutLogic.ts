@@ -506,7 +506,7 @@ export function getRoomsToExplore(
         }
     }
 
-    Log.d(`Rooms to explore ${JSON.stringify(roomsToExplore)}`);
+    // Log.d(`Rooms to explore ${JSON.stringify(roomsToExplore)}`);
     return roomsToExplore;
 }
 

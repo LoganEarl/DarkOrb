@@ -104,7 +104,7 @@ export class RoomPlannerSystem {
                             placed++;
                             remainingBuildings[buildable]--;
                             break;
-                        } else {
+                        } else if (result !== ERR_INVALID_TARGET) {
                             Log.w(
                                 `Failed to place a construction site for ${buildable} at x:${xPos} y:${yPos} r:${room.name} with code ${result}`
                             );

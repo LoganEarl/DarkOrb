@@ -1,0 +1,75 @@
+version: '3.2'
+services:
+  screeps:
+    image: screepers/screeps-launcher
+    volumes:
+      - ./config.yml:/screeps/config.yml
+      - screeps-data:/screeps
+    ports:
+      - 21025:21025/tcp
+    environment:
+      MONGO_HOST: mongo
+      REDIS_HOST: redis
+    restart: unless-stopped
+
+  mongo:
+    image: mongo
+    volumes:
+      - mongo-data:/data/db
+    restart: unless-stopped
+
+  redis:
+    image: redis
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+  graphite:
+    image: graphiteapp/graphite-statsd
+    volumes:
+      - graphite_data:/opt/graphite/storage/whisper
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./cfg/grafana.ini:/etc/grafana/grafana.ini
+      - ./cfg/grafana.prov.yaml:/etc/grafana/provisioning/datasources/default.yaml
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+  stats-agent:
+    image: ags131/hosted-agent
+    environment:
+      GRAPHITE_HOST: "graphite"
+    volumes:
+      - stats-agent:/app
+    restart: unless-stopped
+
+  setup-stats-agent:
+    build: cfg/.
+    volumes:
+      - .cfg//setup.json:/setup.json
+    restart: "no"
+
+  client:
+    image: node:16
+    command: sh -c 'npx screeps-steamless-client --package /screeps.nw --host 0.0.0.0 --internal_backend http://screeps:21025 --backend http://localhost:21025'
+    environment:
+      SCREEPS_NW_PATH: ${SCREEPS_NW_PATH:?"Missing screeps nw file"}
+    volumes:
+      - ./package.nw:/screeps.nw
+    ports:
+      - 8080:8080/tcp
+    restart: unless-stopped
+
+
+volumes:
+  redis-data:
+  mongo-data:
+  screeps-data:
+  graphite_data:
+  grafana_data:
+  stats-agent:

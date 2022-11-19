@@ -18,9 +18,6 @@
 # Screeps Config
 screeps.json
 
-# ScreepsServer data from integration tests
-/server
-
 # Numerous always-ignore extensions
 *.diff
 *.err

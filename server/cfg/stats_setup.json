@@ -1,0 +1,17 @@
+{
+    "method": "memory",
+    "methodConfig": {
+        "shard": 1,
+        "path": "stats",
+        "interval": 15
+    },
+    "screepsAPIConfig": {
+        "privateServer": true,
+        "username": "DarkOrb",
+        "password": "abcd1234",
+        "hostname": "localhost",
+        "protocol": "http",
+        "port": 21025,
+        "path": "/"
+    }
+}

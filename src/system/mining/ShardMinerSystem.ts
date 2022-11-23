@@ -43,7 +43,7 @@ export class ShardMinerSystem {
         //Get the sources in range to each spawn room
         let sourceInfosPerSpawnRoom: { [spawnRoomName: string]: SourceInfo[] } = {};
         Object.keys(this.roomMinerSystems).forEach(spawnRoom => {
-            sourceInfosPerSpawnRoom[spawnRoom] = _findAllSourcesInRange(getRoomData(spawnRoom), 2, true);
+            sourceInfosPerSpawnRoom[spawnRoom] = _findAllSourcesInRange(getRoomData(spawnRoom), 3, true);
         });
 
         //Find the optimal spawn room for each source

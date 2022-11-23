@@ -11,8 +11,6 @@ export class WorkerProcess extends Process {
     //Check for new rooms and trim the old ones once every 10 ticks or so
     periodicRoomScanner: ScheduledJob = new ScheduledJob(_shardWorkerSystem._scanWorkSystems, _shardWorkerSystem, 10);
     configReloader: ScheduledJob = new ScheduledJob(_shardWorkerSystem._reloadConfigs, _shardWorkerSystem, 10);
-    focusReloader: ScheduledJob = new ScheduledJob(_shardWorkerSystem._reloadFocus, _shardWorkerSystem, 20);
-
     constructor() {
         super("WorkProcess", 10);
         _shardWorkerSystem._scanWorkSystems();
@@ -28,7 +26,6 @@ export class WorkerProcess extends Process {
         }
 
         this.periodicRoomScanner.run();
-        this.focusReloader.run();
         _shardWorkerSystem._runCreeps();
         _shardWorkerSystem._scanForWork();
 

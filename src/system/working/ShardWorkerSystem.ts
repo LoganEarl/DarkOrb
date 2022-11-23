@@ -46,10 +46,6 @@ class ShardWorkerSystem {
         Object.values(this.roomWorkSystems).forEach(s => s._visualize());
     }
 
-    _reloadFocus() {
-        Object.values(this.roomWorkSystems).forEach(s => this.determineFocus(s));
-    }
-
     _scanForWork() {
         for (let roomName in Game.rooms) {
             let room = Game.rooms[roomName];
@@ -119,11 +115,10 @@ class ShardWorkerSystem {
     }
 
     private updateCSites(system: RoomWorkSystem, sites: ConstructionSite[]) {
-        sites.forEach(site => {
+        if(sites.length)
             registerWorkDetail(system.roomName, {
-                detailId: "Construct:" + site.id,
+                detailId: "Construct:" + system.roomName,
                 detailType: "Construction",
-                destPosition: site.pos,
                 currentProgress: site.progress,
                 targetProgress: site.progressTotal,
                 targetId: site.id
@@ -172,40 +167,6 @@ class ShardWorkerSystem {
                 targetId: wall.id
             });
         });
-    }
-    //After each new RCL build for 1000 ticks and until we run out of construction projects
-    private determineFocus(system: RoomWorkSystem) {
-        let room = Game.rooms[system.roomName];
-        //The min time before we can toggle from construction to upgrading
-        let minUpdateTime = system.lastFocusUpdate + 1000;
-        //What the controller level was last time we checked the focus
-        let lastControllerLevel = this.lastControllerLevels[room.name] ?? 0;
-        if (room) {
-            let hasConstructionJobs = getWorkDetailsOfType(room.name, "Construction").length > 0;
-            //Start off the room by upgrading to rcl 2
-            if (room.controller!.level === 1) {
-                system.focus = "Upgrade";
-            } else if (hasConstructionJobs) {
-                system.focus = "Construction";
-            }
-            //If we just now upgraded switch over to building new buildings
-            else if (lastControllerLevel != room.controller!.level) {
-                system.focus = "Construction";
-                this.lastControllerLevels[room.name] = room.controller!.level;
-            }
-            //Check if we finished the construction period and need to move onto pushing for the next upgrade
-            else if (Game.time > minUpdateTime) {
-                let doneBuilding = !hasConstructionJobs;
-                if (room.controller!.level < 8 && doneBuilding) {
-                    system.focus = "Upgrade";
-                }
-
-                //No point in focusing once we hit max
-                else if (room.controller!.level === 8 && doneBuilding) {
-                    system.focus = "None";
-                }
-            }
-        }
     }
 }
 

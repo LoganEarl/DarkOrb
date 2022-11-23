@@ -38,14 +38,41 @@ const PRIORITY_COMPARITOR = (a: BuildableStructureConstant, b: BuildableStructur
     return aIndex - bIndex;
 };
 
-interface SortedDetails {
-    controllerDetail?: WorkDetail;
-    lowControllerDetail?: WorkDetail;
-    rampartRepair?: WorkDetail;
-    rampartReinforcement?: WorkDetail;
-    roadRepair?: WorkDetail;
-    miscRepair?: WorkDetail;
-    build?: WorkDetail;
+export interface UpgradeAssignment {
+    placeToStand: RoomPosition;
+}
+
+export function _assignUpgradeJob(creep: string, assignmnets: UpgradeAssignment[], upgradePlaces: RoomPosition[]) {
+    //TODO we have the data in the room plan for all the positions upgraders stand. Use that to assign a spot
+    //TODO splice out dead assignments
+}
+
+export function _runUpgrader(
+    creep: Creep,
+    assignment: WorkDetail,
+    parentRoomName: string,
+    upgradeContainer: StructureContainer | undefined,
+    //TODO upgrader assignment has to have a spot to stand
+    handle: string,
+    analyticsCategories: string[]
+): boolean {
+    //go to the controller upgrade point. Need to pick one for scouting...
+    //Basically, it needs to be the point with the most free spaces next to it within range 3 of the controller
+
+    return false;
+}
+
+export function _runWorker(
+    creep: Creep,
+    assignment: WorkDetail,
+    parentRoomName: string,
+    handle: string,
+    analyticsCategories: string[]
+): boolean {
+    //TODO We have a general work detail. This needs to be smart enough to target lock and complete tasks in the room
+    //TODO should we use creep memory for the target lock or just go with heap? probably just heap. We can scrub it for bad targets periodically.
+
+    return false;
 }
 
 //returns true when it completes the assignment
@@ -180,96 +207,6 @@ export function _runCreep(
     }
 
     return done;
-}
-
-export function _constructionPriorities(sortedDetails: SortedDetails): WorkDetail | undefined {
-    return sortedDetails.rampartRepair ?? sortedDetails.build ?? sortedDetails.rampartReinforcement;
-}
-
-export function _upgraderPriorities(sortedDetails: SortedDetails): WorkDetail | undefined {
-    return sortedDetails.controllerDetail;
-}
-
-export function _maintainencePriorities(sortedDetails: SortedDetails): WorkDetail | undefined {
-    return (
-        sortedDetails.lowControllerDetail ??
-        sortedDetails.rampartRepair ??
-        sortedDetails.roadRepair ??
-        sortedDetails.miscRepair ??
-        sortedDetails.build
-    );
-}
-
-export function _sortDetails(creep: Creep, details: WorkDetail[]): SortedDetails {
-    let results: SortedDetails = {};
-
-    for (let detail of details) {
-        //upgrade controller if it is about to downgrade
-        if (detail.detailType === "Upgrade" && detail.targetStructureType === STRUCTURE_CONTROLLER) {
-            //In maintainence mode, only upgrade the controller if it is close to downgrading
-            let downgradeTicks = Game.rooms[detail.destPosition.roomName]?.controller?.ticksToDowngrade;
-            if (downgradeTicks && downgradeTicks < 20000) {
-                results.lowControllerDetail = detail;
-            }
-
-            results.controllerDetail = detail;
-        }
-
-        //repair ramparts that are low.
-        else if (detail.targetStructureType === STRUCTURE_RAMPART && detail.detailType === "Repair") {
-            results.rampartRepair = detail;
-        }
-
-        //repair roads that are low.
-        else if (detail.detailType === "Repair") {
-            //Just go with the closest one. Treat roads seperatly
-            if (
-                detail.targetStructureType === STRUCTURE_ROAD &&
-                (!results.roadRepair ||
-                    getMultirooomDistance(creep.pos, detail.destPosition) <
-                        getMultirooomDistance(creep.pos, results.roadRepair.destPosition))
-            ) {
-                results.roadRepair = detail;
-            } else if (
-                !results.miscRepair ||
-                getMultirooomDistance(creep.pos, detail.destPosition) <
-                    getMultirooomDistance(creep.pos, results.miscRepair.destPosition)
-            ) {
-                results.miscRepair = detail;
-            }
-        }
-
-        //build new structures
-        else if (detail.detailType === "Construction") {
-            if (results.build) {
-                let comparison = PRIORITY_COMPARITOR(
-                    detail.targetStructureType! as BuildableStructureConstant,
-                    results.build.targetStructureType as BuildableStructureConstant
-                );
-
-                //Take the higher progress in the event of a tie
-                if (comparison === 0) comparison = (detail.currentProgress ?? 0) - (results.build.currentProgress ?? 0);
-                //Still tied? Go with the closer option
-                if (comparison === 0) {
-                    comparison =
-                        getMultirooomDistance(creep.pos, detail.destPosition) <
-                        getMultirooomDistance(creep.pos, results.build.destPosition)
-                            ? -1
-                            : 1;
-                }
-                if (comparison < 0) results.build = detail;
-            } else results.build = detail;
-        }
-
-        //Make the walls higher. Go with the one with the lowest current progress
-        else if (detail.detailType === "Reinforce") {
-            if (results.rampartReinforcement) {
-                if ((results.rampartReinforcement.currentProgress ?? Infinity) < (detail.currentProgress ?? 0))
-                    results.rampartReinforcement = detail;
-            } else results.rampartReinforcement = detail;
-        }
-    }
-    return results;
 }
 
 function updateNode(creep: Creep, drdt: number, parentRoomName: string, handle: string, analyticsCategories: string[]) {

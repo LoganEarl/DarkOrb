@@ -1,24 +1,18 @@
-type WorkFocus =
-    | "None" //Spend as little as possible to build up a reserve
-    | "Upgrade" //Focus on increasing RCL. Will devote only 1 creep to building/maintenence
-    | "Construction"; //Focus on building new buildings. Workers will mostly build cosntruction sites
-// | "Expansion"; //Focus most creeps on buildings in other rooms.
-
 type DetailType =
     | "Upgrade" //Standard type for upgrading room RCL
     | "Construction" //Build buildings
-    | "Reinforce" //Build ramparts/walls higher.
-    | "Repair"; //Repair buildings in the room. Used to repair low ramparts too
+    | "Reinforce" //Build ramparts/walls higher. Used when all ramparts are around the same hits
+    | "Repair" //Repair buildings in the room
+    | "RampartRepair"; //Repair ramparts that are very low and rampars that are significantly lower than their neighboors
 
 interface WorkDetail {
     //Id used for deduplication
     detailId: string;
 
-    destPosition: RoomPosition;
+    roomName: string;
 
     detailType: DetailType;
 
-    //Required for repair or reinforce jobs
     currentProgress?: number;
     targetProgress?: number;
 
@@ -29,14 +23,8 @@ interface WorkDetail {
     targetStructureType?: StructureConstant;
 }
 
-interface RoomWorkMemory {
-    focus: WorkFocus;
-    lastFocusUpdate: number;
-}
-
-type WorkDetailMemory = { [roomName: string]: { [id: string]: WorkDetail } }; 
+type WorkDetailMemory = { [roomName: string]: { [id: string]: WorkDetail } };
 
 interface Memory {
-    roomWorkMemory?: { [roomName: string]: RoomWorkMemory };
     workDetails?: WorkDetailMemory;
 }

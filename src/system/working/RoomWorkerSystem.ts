@@ -14,7 +14,6 @@ import {
 } from "system/storage/AnalyticsConstants";
 import { getEnergyPerTick, getMainStorage } from "system/storage/StorageInterface";
 import { Log } from "utils/logger/Logger";
-import { MemoryComponent, updateMemory } from "utils/MemoryWriter";
 import { Traveler } from "utils/traveler/Traveler";
 import { drawBar } from "utils/UtilityFunctions";
 import {
@@ -26,11 +25,10 @@ import {
 } from "./WorkerLogic";
 import { deleteWorkDetail, getWorkDetails } from "./WorkInterface";
 
-export class RoomWorkSystem implements MemoryComponent {
-    private memory?: RoomWorkMemory;
-
+export class RoomWorkSystem {
     public roomName: string;
     private targetWorkParts: number = 0;
+    private targetUpgradeParts: number = 0;
 
     private creepAssignments: { [creepName: string]: string } = {};
 
@@ -68,8 +66,6 @@ export class RoomWorkSystem implements MemoryComponent {
     }
 
     _runCreeps() {
-        this.loadMemory();
-        let focus = this.memory!.focus;
         let details: { [id: string]: WorkDetail } = getWorkDetails(this.roomName);
         let creeps = getCreeps(this.handle);
         let first = true;
@@ -78,21 +74,7 @@ export class RoomWorkSystem implements MemoryComponent {
                 ? details[this.creepAssignments[creep.name]]
                 : undefined;
             if (!assignment) {
-                let sorted = _sortDetails(creep, Object.values(details));
-                //The first creep is in charge of keeping things running smoothly before the focused task
-                if (first) {
-                    assignment =
-                        _maintainencePriorities(sorted) ??
-                        (focus === "Construction" ? _constructionPriorities(sorted) : undefined) ??
-                        (focus === "Upgrade" ? _upgraderPriorities(sorted) : undefined);
-                } else {
-                    assignment =
-                        (focus === "Construction" ? _constructionPriorities(sorted) : undefined) ??
-                        (focus === "Upgrade" ? _upgraderPriorities(sorted) : undefined) ??
-                        _maintainencePriorities(sorted);
-                }
-
-                if (assignment) this.creepAssignments[creep.name] = assignment.detailId;
+                //TODO give them an assignment
             }
 
             if (assignment) {
@@ -111,31 +93,16 @@ export class RoomWorkSystem implements MemoryComponent {
         }
     }
 
-    set focus(focus: WorkFocus) {
-        this.loadMemory();
-        if (this.memory!.focus !== focus) {
-            //Remove prev assignemnts when we change focus
-            this.creepAssignments = {};
-            this.memory!.focus = focus;
-            this.memory!.lastFocusUpdate = Game.time;
-            updateMemory(this);
-        }
-    }
-
-    get focus(): WorkFocus {
-        this.loadMemory();
-        return this.memory!.focus;
-    }
-
-    get lastFocusUpdate() {
-        this.loadMemory();
-        return this.memory!.lastFocusUpdate;
-    }
-
     _reloadConfigs() {
-        this.loadMemory();
         let details = Object.values(getWorkDetails(this.roomName));
-        let focus = this.memory!.focus;
+
+        let hasBuild: boolean = false;
+        let hasUpgrade: boolean = false;
+        for (let d of details) {
+            if (d.detailType === "Upgrade") hasUpgrade = true;
+            else hasBuild = true;
+            if (hasBuild && hasUpgrade) break;
+        }
 
         if (details.length > 0) {
             let configs: CreepConfig[] = [];
@@ -155,83 +122,95 @@ export class RoomWorkSystem implements MemoryComponent {
                 availableEnergy *= 2;
             }
 
+            //TODO We have to allocate our energy amongst the different creep configs we register.
+            //TODO We will have build/repairers which are optimized for moving at decent speed and have high energy cap
+            //TODO We will also have builders which won't care much for moving or storage, optimizing for work parts
+
             // Log.d(`Available energy: ${availableEnergy}`);
             //If we are netting low, only make a single dude to maintain things
-            if (availableEnergy < 0 || focus === "None") {
-                this.targetWorkParts = 1;
-                configs = [
-                    {
-                        handle: this.handle,
-                        subHandle: "Artificer",
-                        body: [WORK, CARRY, CARRY, CARRY, MOVE],
-                        jobName: "Artificer",
-                        quantity: 1
-                    }
-                ];
-            } else {
-                let bodies: BodyPartConstant[][] = [];
-                //These creeps are easier on the hauling system. Build them instead for RCL1
-                if (Game.rooms[this.roomName].controller!.level === 1) {
-                    this.targetWorkParts = Math.ceil(availableEnergy / UPGRADE_CONTROLLER_POWER);
-                    bodies = maximizeBodyForTargetParts(
-                        [WORK, CARRY, CARRY, CARRY, MOVE],
-                        [WORK, CARRY, MOVE],
-                        WORK,
-                        this.targetWorkParts,
-                        Game.rooms[this.roomName]!.energyCapacityAvailable
-                    );
-                } else if (focus === "Construction") {
-                    //Each part is 5 e/t.
-                    this.targetWorkParts = Math.ceil(availableEnergy / BUILD_POWER);
-                    bodies = maximizeBodyForTargetParts(
-                        [WORK, CARRY, CARRY, CARRY, MOVE],
-                        [WORK, CARRY, MOVE],
-                        WORK,
-                        this.targetWorkParts,
-                        Game.rooms[this.roomName]!.energyCapacityAvailable
-                    );
-                } else if (focus === "Upgrade") {
-                    this.targetWorkParts = Math.ceil(availableEnergy / UPGRADE_CONTROLLER_POWER);
-                    bodies = maximizeBodyForTargetParts(
-                        [WORK, WORK, CARRY, MOVE],
-                        [WORK, WORK, CARRY, MOVE],
-                        WORK,
-                        this.targetWorkParts,
-                        Game.rooms[this.roomName]!.energyCapacityAvailable
-                    );
-                }
-
-                configs = [];
-                for (let i = 0; i < bodies.length; i++) {
+            if (availableEnergy < 0) {
+                if (hasBuild) {
                     configs.push({
                         handle: this.handle,
-                        subHandle: "Artificer:" + i,
-                        body: bodies[i],
+                        subHandle: "Artificer",
+                        body: [WORK, CARRY, CARRY, MOVE, MOVE],
                         jobName: "Artificer",
                         quantity: 1
                     });
+                    this.targetWorkParts = 1;
+                }
+
+                if (hasUpgrade) {
+                    configs.push({
+                        handle: this.handle,
+                        subHandle: "Priest",
+                        body: [WORK, CARRY, CARRY, CARRY, MOVE],
+                        jobName: "Priest",
+                        quantity: 1
+                    });
+                    this.targetUpgradeParts = 1;
+                }
+            } else {
+                let configs: CreepConfig[] = [];
+                let buildEnergy = 0;
+                let upgradeEnergy = 0;
+
+                //Split the energy across the two
+                if (hasBuild && hasUpgrade) {
+                    buildEnergy = availableEnergy / 2;
+                    upgradeEnergy = availableEnergy - buildEnergy;
+                }
+                //Otherwise focus on one or the other
+                else if (hasBuild) {
+                    buildEnergy = availableEnergy;
+                } else {
+                    upgradeEnergy = availableEnergy;
+                }
+
+                this.targetWorkParts = Math.ceil(buildEnergy / UPGRADE_CONTROLLER_POWER);
+                this.targetUpgradeParts = Math.ceil(availableEnergy / UPGRADE_CONTROLLER_POWER);
+
+                if (this.targetWorkParts > 0) {
+                    let bodies = maximizeBodyForTargetParts(
+                        [WORK, CARRY, CARRY, CARRY, MOVE],
+                        [WORK, CARRY, MOVE],
+                        WORK,
+                        this.targetWorkParts,
+                        Game.rooms[this.roomName]!.energyCapacityAvailable
+                    );
+                    for (let i = 0; i < bodies.length; i++) {
+                        configs.push({
+                            handle: this.handle,
+                            subHandle: "Artificer:" + i,
+                            body: bodies[i],
+                            jobName: "Artificer",
+                            quantity: 1
+                        });
+                    }
+                }
+
+                if (this.targetUpgradeParts > 0) {
+                    let bodies = maximizeBodyForTargetParts(
+                        [WORK, WORK, CARRY, MOVE],
+                        [WORK, WORK, CARRY, MOVE],
+                        WORK,
+                        this.targetWorkParts,
+                        Game.rooms[this.roomName]!.energyCapacityAvailable
+                    );
+                    for (let i = 0; i < bodies.length; i++) {
+                        configs.push({
+                            handle: this.handle,
+                            subHandle: "Priest:" + i,
+                            body: bodies[i],
+                            jobName: "Priest",
+                            quantity: 1
+                        });
+                    }
                 }
             }
             registerCreepConfig(this.handle, configs, this.roomName);
         } else {
             unregisterHandle(this.handle);
-        }
-    }
-
-    loadMemory(): void {
-        if (!this.memory) {
-            if (!Memory.roomWorkMemory) Memory.roomWorkMemory = {};
-
-            this.memory = Memory.roomWorkMemory[this.roomName] ?? {
-                focus: "None",
-                lastFocusUpdate: Game.time
-            };
-        }
-    }
-
-    saveMemory(): void {
-        if (this.memory) {
-            Memory.roomWorkMemory![this.roomName] = this.memory;
         }
     }
 }

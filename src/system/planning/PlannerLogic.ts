@@ -16,6 +16,7 @@ import {
     insertSorted,
     isWalkableOwnedRoom,
     manhattanDistance,
+    roomPos,
     rotateMatrix
 } from "utils/UtilityFunctions";
 import { EXTENSION_GROUP } from "./stamp/ExtensionPod";
@@ -81,6 +82,8 @@ export class RoomPlanner implements PriorityQueueItem {
     private placedRoads: Coord[] | undefined;
     private placedWalls: Coord[] | undefined;
     private placedTowers: Coord[] | undefined;
+    private placedUpgradeContainer: Coord | undefined;
+    private upgraderPositions: Coord[] | undefined;
 
     constructor(room: Room, roomData: RoomScoutingInfo) {
         this.roomName = room.name;
@@ -209,16 +212,38 @@ export class RoomPlanner implements PriorityQueueItem {
         spots.forEach(p => forbiddenMatrix.set(p.x, p.y, 255));
 
         //Block off spaces inside range 2 of the controller
-        findPositionsInsideRect(
+        let cPoses = findPositionsInsideRect(
             this.controllerPos.x - 2,
             this.controllerPos.y - 2,
             this.controllerPos.x + 2,
             this.controllerPos.y + 2
-        ).forEach(p => {
-            if (this.terrain.get(p.x, p.y) !== TERRAIN_MASK_WALL) {
-                forbiddenMatrix.set(p.x, p.y, 255);
+        );
+
+        //For each position in range 3 of the controller, which has the most unoccupied neighboors within range 3.
+
+        let maxIndex = -1;
+        let maxNeighboors: Coord[] = [];
+        for (let i = 0; i < cPoses.length; i++) {
+            let pos = cPoses[i];
+            if (this.terrain.get(pos.x, pos.y) !== TERRAIN_MASK_WALL) {
+                let neighboors = findPositionsInsideRect(pos.x - 1, pos.y - 1, pos.x + 1, pos.y + 1).filter(
+                    p => this.terrain.get(p.x, p.y) !== TERRAIN_MASK_WALL
+                );
+                if (neighboors.length > maxNeighboors.length) {
+                    maxIndex = i;
+                    maxNeighboors = neighboors;
+                }
             }
-        });
+        }
+
+        if (maxIndex != -1) {
+            this.placedUpgradeContainer = cPoses[maxIndex];
+            this.upgraderPositions = maxNeighboors;
+        }
+
+        for (let p of maxNeighboors) {
+            forbiddenMatrix.set(p.x, p.y, 255);
+        }
 
         if (getFeature(FEATURE_VISUALIZE_PLANNING)) {
             drawForbiddenMatrix(new RoomVisual(this.roomName), forbiddenMatrix);
@@ -489,6 +514,7 @@ export class RoomPlanner implements PriorityQueueItem {
         if (!this.placedFastFiller) return this.fail("Cannot load mining paths placed fast filler pods");
         if (!this.roomData.miningInfo || !this.roomData.pathingInfo)
             return this.fail("Cannot load mining paths without a storage position");
+        if (!this.placedUpgradeContainer) return this.fail("Cannot place roads without an upgrader position");
 
         let pathingTargets: RoomPosition[] = [];
         //Add the fast filler station
@@ -505,7 +531,7 @@ export class RoomPlanner implements PriorityQueueItem {
         //Add a path to the mineral
         pathingTargets.push(unpackPos(this.roomData.miningInfo.mineral.packedPosition));
         //Add a path to the controller
-        pathingTargets.push(this.controllerPos);
+        pathingTargets.push(roomPos(this.placedUpgradeContainer, this.roomName));
         //Add paths to each of the extension pods. We are pathing at range 1, so path to the middle of the pod
         for (let pod of this.placedExtensionPods) {
             let offset = Math.floor(pod.group[8].buildings.length / 2);
@@ -528,12 +554,20 @@ export class RoomPlanner implements PriorityQueueItem {
             }
         }
 
+        if (done) {
+            //We placed roads ontop of our upgrade container.
+            this.upgraderPositions = this.upgraderPositions!.filter(p => this.pathMatrix?.get(p.x, p.y) !== 1);
+        }
+
         if (getFeature(FEATURE_VISUALIZE_PLANNING)) {
             let visual = new RoomVisual(this.roomName);
             this.placedExtensionPods!.forEach(p => drawPlacedStructureGroup(visual, p));
             drawPlacedStructureGroup(visual, this.placedStorageCore);
             drawPlacedStructureGroup(visual, this.placedFastFiller);
             for (let roadPos of this.placedRoads) visual.structure(roadPos.x, roadPos.y, STRUCTURE_ROAD, {});
+            visual.structure(this.placedUpgradeContainer!.x, this.placedUpgradeContainer!.y, STRUCTURE_CONTAINER, {});
+            for (let upgradePos of this.upgraderPositions!)
+                visual.circle(upgradePos.x, upgradePos.y, { radius: 0.5, fill: "blue" });
             visual.connectRoads();
         }
 

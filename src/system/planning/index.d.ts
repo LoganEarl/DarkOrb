@@ -21,4 +21,6 @@ interface PlannedRoom {
     towerPositions?: Coord[];
     roadPositions?: Coord[];
     wallPositions?: Coord[];
+    upgradeContainerPos?: Coord;
+    upgraderPositions?: Coord[];
 }

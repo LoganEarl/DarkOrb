@@ -49,6 +49,17 @@ export class RoomPlannerSystem {
                 remainingBuildings
             );
 
+            if (controller.level >= 2) {
+                remainingSites -= this.planStructuresByCoord(
+                    room,
+                    [plan.upgradeContainerPos!],
+                    STRUCTURE_CONTAINER,
+                    structures,
+                    remainingSites,
+                    remainingBuildings
+                );
+            }
+
             if (controller.level >= 3) {
                 //Check the road paths
                 remainingSites -= this.planStructuresByCoord(

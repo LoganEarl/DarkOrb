@@ -125,7 +125,7 @@ export class RoomFastFillerSystem {
                     body: [CARRY, CARRY, CARRY, CARRY, CARRY, MOVE],
                     handle: this.handle,
                     subHandle: `Filler #${i}`,
-                    jobName: "Priest",
+                    jobName: "Summoner",
                     quantity: 1
                 };
                 if (this.fillerPositions[i].spawnId && this.fillerPositions[i].direction) {

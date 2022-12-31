@@ -16,201 +16,182 @@ import { getEnergyPerTick, getMainStorage } from "system/storage/StorageInterfac
 import { Log } from "utils/logger/Logger";
 import { Traveler } from "utils/traveler/Traveler";
 import { drawBar } from "utils/UtilityFunctions";
-import {
-    _constructionPriorities,
-    _maintainencePriorities,
-    _runCreep,
-    _sortDetails,
-    _upgraderPriorities
-} from "./WorkerLogic";
 import { deleteWorkDetail, getWorkDetails } from "./WorkInterface";
+import { _assignWorkDetail } from "./WorkerLogic";
 
 export class RoomWorkSystem {
     public roomName: string;
-    private targetWorkParts: number = 0;
-    private targetUpgradeParts: number = 0;
-
-    private creepAssignments: { [creepName: string]: string } = {};
+    //Creep name to work detail id
+    private creepAssignments: Map<string, string> = new Map();
 
     constructor(roomName: string) {
         this.roomName = roomName;
     }
 
-    private get handle() {
+    private get upgradeHandle() {
+        return `Upgrade: ${this.roomName}`;
+    }
+
+    private get workHandle() {
         return `Work: ${this.roomName}`;
     }
 
-    _visualize() {
-        if (Game.rooms[this.roomName]) {
-            Object.values(getWorkDetails(this.roomName)).forEach(detail => {
-                new RoomVisual(detail.destPosition.roomName).rect(
-                    detail.destPosition.x - 0.5,
-                    detail.destPosition.y - 0.5,
-                    1,
-                    1,
-                    {
-                        fill: "transparent",
-                        stroke: "yellow"
-                    }
-                );
-            });
+    private get eRepairHandle() {
+        return `ERepair: ${this.roomName}`;
+    }
 
-            let numWork = _.sum(getCreeps(this.handle), c => _.sum(c.body, p => (p.type === WORK ? 1 : 0)));
-            drawBar(
-                `WorkerParts: ${numWork}/${this.targetWorkParts}`,
-                2,
-                numWork / this.targetWorkParts,
-                Game.rooms[this.roomName].visual
-            );
-        }
+    _visualize() {
+        // if (Game.rooms[this.roomName]) {
+        //     Object.values(getWorkDetails(this.roomName)).forEach(detail => {
+        //         new RoomVisual(detail.destPosition.roomName).rect(
+        //             detail.destPosition.x - 0.5,
+        //             detail.destPosition.y - 0.5,
+        //             1,
+        //             1,
+        //             {
+        //                 fill: "transparent",
+        //                 stroke: "yellow"
+        //             }
+        //         );
+        //     });
+        //     let numWork = _.sum(getCreeps(this.handle), c => _.sum(c.body, p => (p.type === WORK ? 1 : 0)));
+        //     drawBar(
+        //         `WorkerParts: ${numWork}/${this.targetWorkParts}`,
+        //         2,
+        //         numWork / this.targetWorkParts,
+        //         Game.rooms[this.roomName].visual
+        //     );
+        // }
     }
 
     _runCreeps() {
         let details: { [id: string]: WorkDetail } = getWorkDetails(this.roomName);
-        let creeps = getCreeps(this.handle);
-        let first = true;
-        for (let creep of creeps) {
-            let assignment: WorkDetail | undefined = this.creepAssignments[creep.name]
-                ? details[this.creepAssignments[creep.name]]
+
+        this.runCreepPool("Upgraders", this.upgradeHandle, details);
+        this.runCreepPool("Workers", this.workHandle, details);
+        this.runCreepPool("EmergencyRepairers", this.eRepairHandle, details);
+    }
+
+    private runCreepPool(pool: WorkerPool, handle: string, workDetails: { [id: string]: WorkDetail }) {
+        let workers = getCreeps(handle);
+        for (let creep of workers) {
+            let assignment: WorkDetail | undefined = this.creepAssignments.get(creep.name)
+                ? workDetails[this.creepAssignments.get(creep.name)!]
                 : undefined;
-            if (!assignment) {
-                //TODO give them an assignment
-            }
-
+            if (!assignment) assignment = _assignWorkDetail(creep, pool, Object.values(workDetails));
             if (assignment) {
-                let results = _runCreep(creep, assignment, this.roomName, this.handle, [this.handle]);
-                if (results) {
-                    delete this.creepAssignments[creep.name];
-                    deleteWorkDetail(this.roomName, assignment.detailId);
-                }
-            } else {
-                let rally = getRallyPosition(this.roomName);
-                if (rally) Traveler.travelTo(creep, rally);
-                creep.sayWaiting();
+                this.creepAssignments.set(creep.name, assignment.detailId);
+                //TODO do the thing
             }
-
-            first = false;
         }
     }
 
     _reloadConfigs() {
         let details = Object.values(getWorkDetails(this.roomName));
+        //There are several types of worker pool. We need to figure out how much
+        // e/t to devote to each
 
-        let hasBuild: boolean = false;
-        let hasUpgrade: boolean = false;
-        for (let d of details) {
-            if (d.detailType === "Upgrade") hasUpgrade = true;
-            else hasBuild = true;
-            if (hasBuild && hasUpgrade) break;
-        }
-
-        if (details.length > 0) {
-            let configs: CreepConfig[] = [];
-
-            //Net energy not counting workers
-            let availableEnergy =
-                getEnergyPerTick(this.roomName, ANALYTICS_GOSS_INCOME) +
-                getEnergyPerTick(this.roomName, ANALYTICS_SPAWNING) -
-                getEnergyPerTick(this.roomName, ANALYTICS_ARTIFICER);
-
-            let storage = getMainStorage(this.roomName);
-            if (
-                storage &&
-                storage instanceof StructureStorage &&
-                storage.store.getUsedCapacity(RESOURCE_ENERGY) > 50000
-            ) {
-                availableEnergy *= 2;
-            }
-
-            //TODO We have to allocate our energy amongst the different creep configs we register.
-            //TODO We will have build/repairers which are optimized for moving at decent speed and have high energy cap
-            //TODO We will also have builders which won't care much for moving or storage, optimizing for work parts
-
-            // Log.d(`Available energy: ${availableEnergy}`);
-            //If we are netting low, only make a single dude to maintain things
-            if (availableEnergy < 0) {
-                if (hasBuild) {
-                    configs.push({
-                        handle: this.handle,
-                        subHandle: "Artificer",
-                        body: [WORK, CARRY, CARRY, MOVE, MOVE],
-                        jobName: "Artificer",
-                        quantity: 1
-                    });
-                    this.targetWorkParts = 1;
-                }
-
-                if (hasUpgrade) {
-                    configs.push({
-                        handle: this.handle,
+        if (details.length === 0) {
+            //If there aren't any details just keep a single upgrader around
+            registerCreepConfig(
+                this.upgradeHandle,
+                [
+                    {
+                        handle: this.upgradeHandle,
                         subHandle: "Priest",
                         body: [WORK, CARRY, CARRY, CARRY, MOVE],
                         jobName: "Priest",
                         quantity: 1
-                    });
-                    this.targetUpgradeParts = 1;
-                }
-            } else {
-                let configs: CreepConfig[] = [];
-                let buildEnergy = 0;
-                let upgradeEnergy = 0;
-
-                //Split the energy across the two
-                if (hasBuild && hasUpgrade) {
-                    buildEnergy = availableEnergy / 2;
-                    upgradeEnergy = availableEnergy - buildEnergy;
-                }
-                //Otherwise focus on one or the other
-                else if (hasBuild) {
-                    buildEnergy = availableEnergy;
-                } else {
-                    upgradeEnergy = availableEnergy;
-                }
-
-                this.targetWorkParts = Math.ceil(buildEnergy / UPGRADE_CONTROLLER_POWER);
-                this.targetUpgradeParts = Math.ceil(availableEnergy / UPGRADE_CONTROLLER_POWER);
-
-                if (this.targetWorkParts > 0) {
-                    let bodies = maximizeBodyForTargetParts(
-                        [WORK, CARRY, CARRY, CARRY, MOVE],
-                        [WORK, CARRY, MOVE],
-                        WORK,
-                        this.targetWorkParts,
-                        Game.rooms[this.roomName]!.energyCapacityAvailable
-                    );
-                    for (let i = 0; i < bodies.length; i++) {
-                        configs.push({
-                            handle: this.handle,
-                            subHandle: "Artificer:" + i,
-                            body: bodies[i],
-                            jobName: "Artificer",
-                            quantity: 1
-                        });
                     }
-                }
-
-                if (this.targetUpgradeParts > 0) {
-                    let bodies = maximizeBodyForTargetParts(
-                        [WORK, WORK, CARRY, MOVE],
-                        [WORK, WORK, CARRY, MOVE],
-                        WORK,
-                        this.targetWorkParts,
-                        Game.rooms[this.roomName]!.energyCapacityAvailable
-                    );
-                    for (let i = 0; i < bodies.length; i++) {
-                        configs.push({
-                            handle: this.handle,
-                            subHandle: "Priest:" + i,
-                            body: bodies[i],
-                            jobName: "Priest",
-                            quantity: 1
-                        });
-                    }
-                }
-            }
-            registerCreepConfig(this.handle, configs, this.roomName);
-        } else {
-            unregisterHandle(this.handle);
+                ],
+                this.roomName
+            );
+            return;
         }
+
+        let availableEnergy =
+            getEnergyPerTick(this.roomName, ANALYTICS_GOSS_INCOME) +
+            getEnergyPerTick(this.roomName, ANALYTICS_SPAWNING) -
+            getEnergyPerTick(this.roomName, ANALYTICS_ARTIFICER);
+
+        //TODO temporary measure to burn off excesses
+        let storage = getMainStorage(this.roomName);
+        let highCapacity = (storage?.store.getUsedCapacity(RESOURCE_ENERGY) ?? 0) > 50000;
+        if (highCapacity) {
+            availableEnergy *= 2;
+        }
+
+        let energyBudgetPerWorkerPool: Map<WorkerPool, number> = new Map();
+        for (let detail of details) {
+            //First just signal that this pool is needed
+            energyBudgetPerWorkerPool.set(detail.primaryPool, 1);
+        }
+        //TODO this is super crude. Eventually we will want more granular control over energy distribution per rcl
+        //Next scale each pool to match the desired ratio (for now, just even distribution)
+        let numActivePools = energyBudgetPerWorkerPool.size;
+        if (energyBudgetPerWorkerPool.get("EmergencyRepairers")) {
+            //0 out the other categories
+            for (let pool of energyBudgetPerWorkerPool.keys()) energyBudgetPerWorkerPool.set(pool, 0);
+            //Give repair all we got
+            let eRepairEnergy = availableEnergy * 2; //For a total of x4 in emergencies
+            energyBudgetPerWorkerPool.set("EmergencyRepairers", eRepairEnergy);
+        } else {
+            //Split the energy amongst the pools
+            for (let pool of energyBudgetPerWorkerPool.keys()) {
+                //Minimum of 1e/t
+                energyBudgetPerWorkerPool.set(pool, Math.min(Math.floor(availableEnergy / numActivePools), 1));
+            }
+        }
+
+        //If we need workers, queue them up
+        let workEnergy = energyBudgetPerWorkerPool.get("Workers");
+        if (workEnergy) {
+            let targetWorkParts = Math.ceil(workEnergy / BUILD_POWER);
+            //TODO make a new version of this that makes all the creeps the same size
+            let bodies = maximizeBodyForTargetParts(
+                [WORK, CARRY, CARRY, MOVE, MOVE],
+                [WORK, CARRY, CARRY, MOVE, MOVE],
+                WORK,
+                targetWorkParts,
+                Game.rooms[this.roomName]!.energyCapacityAvailable
+            );
+            let configs: CreepConfig[] = [];
+            for (let i = 0; i < bodies.length; i++) {
+                configs.push({
+                    handle: this.workHandle,
+                    subHandle: "Artificer:" + i,
+                    body: bodies[i],
+                    jobName: "Artificer",
+                    quantity: 1
+                });
+            }
+            registerCreepConfig(this.workHandle, configs, this.roomName);
+        } else {
+            unregisterHandle(this.workHandle);
+        }
+
+        let upgradeEnergy = energyBudgetPerWorkerPool.get("Upgraders");
+        if (upgradeEnergy) {
+            let targetWorkParts = Math.ceil(upgradeEnergy / UPGRADE_CONTROLLER_POWER);
+            let bodies = maximizeBodyForTargetParts(
+                [WORK, WORK, CARRY, MOVE],
+                [WORK, WORK, MOVE],
+                WORK,
+                targetWorkParts,
+                Game.rooms[this.roomName].energyAvailable
+            );
+            let configs: CreepConfig[] = [];
+            for (let i = 0; i < bodies.length; i++) {
+                configs.push({
+                    handle: this.upgradeHandle,
+                    subHandle: "Priest:" + 1,
+                    body: bodies[i],
+                    jobName: "Priest",
+                    quantity: 1
+                });
+            }
+        }
+
+        //TODO emergency builders would go here. Need to figure out boosts before I mess with that...
     }
 }

@@ -40,6 +40,7 @@ type WorkDetailPriority =
     | "Critical";
 
 interface WorkTarget {
+    packedPosition: string;
     currentProgress: number;
     targetProgress: number;
     targetId: Id<Structure | ConstructionSite | StructureController>;

@@ -293,7 +293,7 @@ export class SourceMinerSystem implements MemoryComponent {
         }
     }
 
-    private loadMemory() {
+    private loadMemory(): SourceMinerMemory {
         if (!this.memory) {
             if (!Memory.sourceMinerMemory) Memory.sourceMinerMemory = {};
             this.memory = Memory.sourceMinerMemory[this.sourceId as string];
@@ -316,6 +316,7 @@ export class SourceMinerSystem implements MemoryComponent {
                 updateMemory(this);
             }
         }
+        return this.memory;
     }
 
     saveMemory(): void {

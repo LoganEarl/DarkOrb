@@ -8,6 +8,7 @@ import {
     ANALYTICS_UPGRADE
 } from "system/storage/AnalyticsConstants";
 import { getMainStorage, postAnalyticsEvent } from "system/storage/StorageInterface";
+import { unpackPos } from "utils/Packrat";
 import { Log } from "utils/logger/Logger";
 import { Traveler } from "utils/traveler/Traveler";
 import { getMultirooomDistance, insertSorted } from "utils/UtilityFunctions";
@@ -30,6 +31,13 @@ const CONSTRUCTION_PRIORITIES = [
     STRUCTURE_WALL,
     STRUCTURE_ROAD
 ];
+
+//How ramparts are grouped
+const RAMPART_HP_BUCKET = 20000;
+//How many buckets apart a rampart has to be before we prioritize it regardless of distance
+const PRIORITY_RAMPART_BUCKET_DIFFERENCE = 3;
+//If two similar ramparts are within this difference, we just switch to going with the lowest one
+const RAMPART_PRIORITIZE_HP_DISTANCE = 5;
 
 const BUILD_PRIORITY_COMPARATOR = (a: BuildableStructureConstant, b: BuildableStructureConstant) => {
     let aIndex = CONSTRUCTION_PRIORITIES.indexOf(a);
@@ -159,16 +167,51 @@ function compareWorkTargets(
         //No empty spots? Assign to the oldest creep's spot
     } else if (detail.detailType == "Construction" || detail.detailType === "Repair") {
         //First prioritize with the building priority
+        let comparison = BUILD_PRIORITY_COMPARATOR(
+            target1.targetType as BuildableStructureConstant,
+            target2.targetType as BuildableStructureConstant
+        );
+
         //If there is a tie here and we are talking about roads, go with distance to the road instead of what comes next
+        if (comparison === 0 && target1.targetType === STRUCTURE_ROAD) {
+            const dist1 = workerPos.getRangeTo(unpackPos(target1.packedPosition));
+            const dist2 = workerPos.getRangeTo(unpackPos(target2.packedPosition));
+            comparison = dist1 - dist2;
+        }
+
         //Next, prioritize with the progress of the buildings
+        if (comparison === 0) {
+            const completion1 = target1.currentProgress / target1.targetProgress;
+            const completion2 = target2.currentProgress / target2.targetProgress;
+            comparison = completion1 - completion2;
+        }
+
         //Finally prioritize with the id of the structures. This makes sure that creeps target the same buildings
+        if (comparison === 0) {
+            comparison = target1.targetId.localeCompare(target2.targetId);
+        }
+
+        return comparison <= 0 ? target1 : target2;
     } else if (detail.detailType === "RampartRepair") {
         //Prioritize the lowest targets, easy. This will only happen during attacks, so don't worry too much about travel time
+        return target1.currentProgress < target2.currentProgress ? target1 : target2;
     } else if (detail.detailType === "Reinforce") {
         //First, bucket by current progress an target progress. Also grab the linear distance for each.
+        const hpBucket1 = Math.floor(target1.currentProgress / RAMPART_HP_BUCKET);
+        const hpBucket2 = Math.floor(target2.currentProgress / RAMPART_HP_BUCKET);
+        const distance1 = workerPos.getRangeTo(unpackPos(target1.packedPosition));
+        const distance2 = workerPos.getRangeTo(unpackPos(target2.packedPosition));
+
         //If one is more than a bucket or two of progress, go with the lower one
+        if (hpBucket1 - hpBucket2 >= PRIORITY_RAMPART_BUCKET_DIFFERENCE) return target1;
+        if (hpBucket2 - hpBucket1 >= PRIORITY_RAMPART_BUCKET_DIFFERENCE) return target2;
+
         //If they are both in range 5, go with the lowest progress bucket one
+        if (distance1 < RAMPART_PRIORITIZE_HP_DISTANCE && distance2 < RAMPART_PRIORITIZE_HP_DISTANCE)
+            return hpBucket1 < hpBucket2 ? target1 : target2;
+
         //If we have gotten this far with a tie, go with the closest one, as they are both about the same.
+        return distance1 < distance2 ? target1 : target2;
     }
     Log.e("You must have added an extra work detail type... go update `compareWorkTargets()`");
     return target1;
@@ -180,19 +223,49 @@ export function _runCreep(
     workDetail: WorkDetail,
     parentRoomName: string,
     handle: string,
-    analyticsCategories: string[]
+    baseAnalyticsCategories: string[],
+    roomData: RoomScoutingInfo
 ): boolean {
     let targetLock = getTargetLock(creep, workDetail);
+    if (!targetLock) return true;
 
-    //If we don't have any energy, decide to either wait or go grab more
-    //If we are in a remote mining room or an owned room, just wait for haulers
-    //Otherwise, toggle our target lock's mining or restocking field to true
+    let workTarget = workDetail.targets[targetLock.targetId];
+    if (!workTarget) {
+        Log.e(
+            `Failed to look up a work target used in a target lock. This should not happen. detail type:${workDetail.detailType} detail id:${workDetail.detailId} target id:${targetLock.targetId}`
+        );
+    }
 
-    //If our target lock says we are mining or restocking, go do that
+    let useHaulers =
+        roomData.ownership?.username === global.PLAYER_USERNAME &&
+        ["Claimed", "Reserved", "Economic"].includes(roomData.ownership.ownershipType ?? "Unclaimed");
+    let canMine = roomData.miningInfo?.sources?.length ?? 0 > 0;
+    let storage = getMainStorage(parentRoomName);
+
+    let drdt = 0;
+    let analyticsCategories = baseAnalyticsCategories.slice();
+    let done = false;
 
     //If we are supposed to be building, go build
-    //If we do not see our target and are working on a ramp cSite, look for a new ramp on the square and target it
-    //If we see our target, do the thing. Build until we finish it or run out of energy.
+    if (workDetail.detailType === "Construction") {
+        let targetPos = unpackPos(workTarget.packedPosition);
+        if (Game.rooms[targetPos.roomName]) {
+            let target: ConstructionSite | Structure<BuildableStructureConstant> | null = Game.getObjectById(
+                targetLock.targetId
+            );
+            //If we do not see our target and are working on a ramp cSite, look for a new ramp on the square and target it
+            if (!target && workTarget.targetType === STRUCTURE_RAMPART) {
+                let builtRampart = targetPos.lookForStructure(STRUCTURE_RAMPART) as StructureRampart | undefined;
+                if (builtRampart && builtRampart.hits < RAMPART_HP_BUCKET) target = builtRampart;
+                else if (!builtRampart) done = true;
+            }
+            //If we see our target, do the thing. Build until we finish it or run out of energy.
+            if (target) {
+                //If we are close to the target, go ahead and work on it
+                //If we are not close to the target or standing in a bad place, move
+            }
+        }
+    }
 
     //If we are supposed to be upgrading, go do that too
     //If we are low energy and their is a container with E nearby, take from it.
@@ -203,6 +276,26 @@ export function _runCreep(
 
     //If we should be doing rampart repair, go do that
 
+    //If we don't have any energy, decide to either wait or go grab more
+    if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+        //If we are in a remote mining room or an owned room, just wait for haulers
+        if (useHaulers) {
+            //Just sit there and wait for a hauler
+            updateNode(creep, drdt, parentRoomName, handle, analyticsCategories);
+        } else if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
+            if (canMine) {
+                //We won't get serviced where we are. Just get the energy ourselves
+                targetLock.mining = true;
+                unregisterNode(parentRoomName, handle, creep.name);
+            } else if (storage) {
+                //We move toward the storage to go get more energy, but also register a node so that we might get topped off before we go the whole way
+                targetLock.restocking = true;
+                updateNode(creep, drdt, parentRoomName, handle, analyticsCategories);
+            }
+        }
+    }
+
+    //If our target lock says we are mining or restocking, go do that
     // let done = false;
     // if (creep.pos.roomName !== assignment.destPosition.roomName || creep.pos.getRangeTo(assignment.destPosition) > 3) {
     //     Traveler.travelTo(creep, assignment.destPosition, { range: 3 });

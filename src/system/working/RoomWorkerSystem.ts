@@ -78,7 +78,7 @@ export class RoomWorkSystem {
             let assignment: WorkDetail | undefined = this.creepAssignments.get(creep.name)
                 ? workDetails[this.creepAssignments.get(creep.name)!]
                 : undefined;
-            if (!assignment) assignment = _assignWorkDetail(creep, pool, Object.values(workDetails));
+            if (!assignment) assignment = _assignWorkDetail(creep, pool, workDetails, this.creepAssignments);
             if (assignment) {
                 this.creepAssignments.set(creep.name, assignment.detailId);
                 //TODO do the thing

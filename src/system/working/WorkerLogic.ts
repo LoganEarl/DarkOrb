@@ -4,6 +4,8 @@ import { getRallyPosition } from "system/scouting/ScoutInterface";
 import {
     ANALYTICS_ARTIFICER,
     ANALYTICS_CONSTRUCTION,
+    ANALYTICS_PRIEST,
+    ANALYTICS_REINFORCE,
     ANALYTICS_REPAIR,
     ANALYTICS_UPGRADE
 } from "system/storage/AnalyticsConstants";
@@ -12,6 +14,7 @@ import { unpackPos } from "utils/Packrat";
 import { Log } from "utils/logger/Logger";
 import { Traveler } from "utils/traveler/Traveler";
 import { getMultirooomDistance, insertSorted } from "utils/UtilityFunctions";
+import { networkInterfaces } from "os";
 
 const CONSTRUCTION_PRIORITIES = [
     STRUCTURE_SPAWN,
@@ -242,46 +245,120 @@ export function _runCreep(
     let canMine = roomData.miningInfo?.sources?.length ?? 0 > 0;
     let storage = getMainStorage(parentRoomName);
 
-    let drdt = 0;
+    let estimatedDrdt = 0;
     let analyticsCategories = baseAnalyticsCategories.slice();
     let done = false;
+    let energySpent = 0;
 
-    //If we are supposed to be building, go build
-    if (workDetail.detailType === "Construction") {
+    //Build and repair have an almost identical control loop. We do them the same way
+    if (workDetail.detailType === "Construction" || workDetail.detailType === "Repair") {
+        //If we are not close to the target or standing in a bad place, move
         let targetPos = unpackPos(workTarget.packedPosition);
+        navigateToTarget(creep, targetPos, 3);
+
         if (Game.rooms[targetPos.roomName]) {
             let target: ConstructionSite | Structure<BuildableStructureConstant> | null = Game.getObjectById(
                 targetLock.targetId
             );
+
             //If we do not see our target and are working on a ramp cSite, look for a new ramp on the square and target it
             if (!target && workTarget.targetType === STRUCTURE_RAMPART) {
                 let builtRampart = targetPos.lookForStructure(STRUCTURE_RAMPART) as StructureRampart | undefined;
                 if (builtRampart && builtRampart.hits < RAMPART_HP_BUCKET) target = builtRampart;
                 else if (!builtRampart) done = true;
             }
+
             //If we see our target, do the thing. Build until we finish it or run out of energy.
             if (target) {
                 //If we are close to the target, go ahead and work on it
-                //If we are not close to the target or standing in a bad place, move
+                if (creep.pos.getRangeTo(targetPos) <= 3 && creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                    analyticsCategories.push(ANALYTICS_CONSTRUCTION, ANALYTICS_ARTIFICER);
+                    if (target instanceof ConstructionSite) {
+                        estimatedDrdt = creep.getActiveBodyparts(WORK) * BUILD_POWER;
+                        if (creep.build(target) === OK) energySpent = estimatedDrdt;
+                        workTarget.currentProgress = target.progress;
+                    } else {
+                        estimatedDrdt = creep.getActiveBodyparts(WORK) * REPAIR_COST * REPAIR_POWER;
+                        if (creep.repair(target) === OK) energySpent = estimatedDrdt;
+                        workTarget.currentProgress = target.hits;
+                    }
+                }
+            } else {
+                done = true;
             }
         }
     }
 
     //If we are supposed to be upgrading, go do that too
-    //If we are low energy and their is a container with E nearby, take from it.
+    if (workDetail.detailType === "Upgrade") {
+        let standPos = unpackPos(workTarget.packedPosition);
+        navigateToTarget(creep, standPos, 0);
+
+        if (Game.rooms[standPos.roomName]) {
+            let target: StructureController | null = Game.getObjectById(targetLock.targetId);
+
+            if (target) {
+                estimatedDrdt = creep.getActiveBodyparts(WORK) * UPGRADE_CONTROLLER_POWER;
+                if (creep.pos.getRangeTo(target.pos) <= 3 && creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                    analyticsCategories.push(ANALYTICS_PRIEST, ANALYTICS_UPGRADE);
+                    if (creep.upgradeController(target) === OK) energySpent = estimatedDrdt;
+                    workTarget.currentProgress = target.progress;
+                }
+
+                //TODO do this in such a way that we never drop energy on the ground during death
+                if (creep.store.getFreeCapacity(RESOURCE_ENERGY) < estimatedDrdt * 2) {
+                    //If we are low energy and their is a container with E nearby, take from it.
+                    let refillContainer: StructureContainer | null = creep.pos
+                        .findInRange(FIND_STRUCTURES, 1)
+                        .filter(s => s.structureType === STRUCTURE_CONTAINER)
+                        .map(s => s as StructureContainer)?.[0];
+
+                    if (refillContainer && refillContainer.store.getUsedCapacity(RESOURCE_ENERGY) > 3)
+                        creep.withdraw(refillContainer, RESOURCE_ENERGY);
+                }
+            }
+        }
+    }
 
     //If we are supposed to be reinforcing, go do that
+    if (workDetail.detailType === "Reinforce") {
+        let targetPos = unpackPos(workTarget.packedPosition);
+        navigateToTarget(creep, targetPos, 0);
+
+        if (Game.rooms[targetPos.roomName]) {
+            let target: Structure<BuildableStructureConstant> | null = Game.getObjectById(
+                workTarget.targetId
+            ) as Structure<BuildableStructureConstant> | null;
+
+            if (target) {
+                estimatedDrdt = creep.getActiveBodyparts(WORK) * REPAIR_COST * REPAIR_POWER;
+                if (creep.pos.getRangeTo(targetPos) <= 3 && creep.store.getUsedCapacity(RESOURCE_ENERGY)) {
+                    analyticsCategories.push(ANALYTICS_REINFORCE, ANALYTICS_ARTIFICER);
+                    if (creep.repair(target) === OK) energySpent = estimatedDrdt;
+                    workTarget.currentProgress = target.hits;
+                }
+            }
+        }
+    }
 
     //If we should be repairing, go do that
 
     //If we should be doing rampart repair, go do that
+
+    //If we spent energy this tick, post an analytics event
+    if (energySpent > 0) {
+        postAnalyticsEvent(parentRoomName, energySpent * -1, ...analyticsCategories);
+    }
+
+    //If our current work target is finished up, find a new target/work detail
+    if (workTarget.currentProgress >= workTarget.targetProgress) done = true;
 
     //If we don't have any energy, decide to either wait or go grab more
     if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
         //If we are in a remote mining room or an owned room, just wait for haulers
         if (useHaulers) {
             //Just sit there and wait for a hauler
-            updateNode(creep, drdt, parentRoomName, handle, analyticsCategories);
+            updateNode(creep, estimatedDrdt, parentRoomName, handle, analyticsCategories);
         } else if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
             if (canMine) {
                 //We won't get serviced where we are. Just get the energy ourselves
@@ -290,7 +367,7 @@ export function _runCreep(
             } else if (storage) {
                 //We move toward the storage to go get more energy, but also register a node so that we might get topped off before we go the whole way
                 targetLock.restocking = true;
-                updateNode(creep, drdt, parentRoomName, handle, analyticsCategories);
+                updateNode(creep, estimatedDrdt, parentRoomName, handle, analyticsCategories);
             }
         }
     }
@@ -411,6 +488,15 @@ export function _runCreep(
     // }
 
     return done;
+}
+
+function navigateToTarget(creep: Creep, targetPos: RoomPosition, desiredRange: number) {
+    //If we are outside the desired range, go there
+    if (creep.pos.roomName !== targetPos.roomName || creep.pos.getRangeTo(targetPos) > desiredRange) {
+        Traveler.travelTo(creep, targetPos);
+    }
+
+    // TODO If we are standing on an edge tile or a road, and we are inside the desired range, path to it a bit more
 }
 
 function updateNode(creep: Creep, drdt: number, parentRoomName: string, handle: string, analyticsCategories: string[]) {

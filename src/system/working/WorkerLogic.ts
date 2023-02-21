@@ -13,7 +13,7 @@ import { getMainStorage, postAnalyticsEvent } from "system/storage/StorageInterf
 import { unpackPos } from "utils/Packrat";
 import { Log } from "utils/logger/Logger";
 import { Traveler } from "utils/traveler/Traveler";
-import { getMultirooomDistance, insertSorted } from "utils/UtilityFunctions";
+import { getMultirooomDistance, insertSorted, minBy } from "utils/UtilityFunctions";
 import { networkInterfaces } from "os";
 
 const CONSTRUCTION_PRIORITIES = [
@@ -55,6 +55,7 @@ interface TargetLockData {
     detailId: string;
     mining: boolean;
     restocking: boolean;
+    sourcePos?: RoomPosition;
 }
 const TARGET_LOCK_PRUNE_DELAY = 5;
 let lastTargetLockPrune = 0;
@@ -341,9 +342,8 @@ export function _runCreep(
         }
     }
 
-    //If we should be repairing, go do that
-
     //If we should be doing rampart repair, go do that
+    //TODO actuall do this part... probably when we need to defend or something
 
     //If we spent energy this tick, post an analytics event
     if (energySpent > 0) {
@@ -373,6 +373,31 @@ export function _runCreep(
     }
 
     //If our target lock says we are mining or restocking, go do that
+    if (targetLock.mining && canMine) {
+        if (creep.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+            targetLock.mining = false;
+        } else {
+            //Pick a source to harvest from
+            if (!targetLock.sourcePos && creep.pos.roomName === roomData.roomName) {
+                let sourcePositions = roomData.miningInfo?.sources.map(s => unpackPos(s.packedPosition)) ?? [];
+                let closest = minBy(sourcePositions, p => creep.pos.getRangeTo(p));
+                if (closest) targetLock.sourcePos = closest;
+            }
+
+            //Harvest the source
+            if (targetLock.sourcePos) {
+                if (creep.pos.isNearTo(targetLock.sourcePos)) {
+                    let source = creep.room.lookForAt(LOOK_SOURCES, targetLock.sourcePos);
+                    if (source?.length) creep.harvest(source[0]);
+                } else {
+                    Traveler.travelTo(creep, targetLock.sourcePos);
+                }
+            } else {
+                Log.e(`Creep ${creep.name} in room ${creep.room.name} is set to mine but could not find a source`);
+            }
+        }
+    }
+
     // let done = false;
     // if (creep.pos.roomName !== assignment.destPosition.roomName || creep.pos.getRangeTo(assignment.destPosition) > 3) {
     //     Traveler.travelTo(creep, assignment.destPosition, { range: 3 });

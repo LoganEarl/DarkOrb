@@ -1,11 +1,10 @@
-import { getRoomData } from "system/scouting/ScoutInterface";
-import { bodyCost, maximizeBody, maximizeBodyForTargetParts } from "system/spawning/SpawnInterface";
-import { ANALYTICS_CONSTRUCTION } from "system/storage/AnalyticsConstants";
-import { postAnalyticsEvent } from "system/storage/StorageInterface";
-import { Log } from "utils/logger/Logger";
-import { packPos } from "utils/Packrat";
-import { ROOMTYPE_CORE, ROOMTYPE_SOURCEKEEPER, Traveler } from "utils/traveler/Traveler";
-import { samePos } from "utils/UtilityFunctions";
+import {getRoomData} from "system/scouting/ScoutInterface";
+import {bodyCost, maximizeBody, maximizeBodyForTargetParts} from "system/spawning/SpawnInterface";
+import {ANALYTICS_CONSTRUCTION} from "system/storage/AnalyticsConstants";
+import {postAnalyticsEvent} from "system/storage/StorageInterface";
+import {packPos} from "utils/Packrat";
+import {ROOMTYPE_CORE, ROOMTYPE_SOURCEKEEPER, Traveler} from "utils/traveler/Traveler";
+import {samePos} from "utils/UtilityFunctions";
 
 export function _calcualteMiningPath(start: RoomPosition, end: RoomPosition): PathFinderPath {
     //Remember, this is for determining how hard the path is curently. This is NOT for plotting a road

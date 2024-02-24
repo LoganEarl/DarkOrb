@@ -1,18 +1,16 @@
-import { fill } from "lodash";
-import { getNode, registerNode, unregisterNode } from "system/hauling/HaulerInterface";
+import {getNode, registerNode, unregisterNode} from "system/hauling/HaulerInterface";
 import {
     FAST_FILLER_CONTAINER_COORDS,
     FAST_FILLER_SPAWN_COORDS,
     FAST_FILLER_STANDING_POSITIONS
 } from "system/planning/stamp/FastFiller";
-import { getRoomData } from "system/scouting/ScoutInterface";
-import { getMainStorage } from "system/storage/StorageInterface";
-import { FEATURE_VISUALIZE_FAST_FILLER } from "utils/featureToggles/FeatureToggleConstants";
+import {getRoomData} from "system/scouting/ScoutInterface";
+import {getMainStorage} from "system/storage/StorageInterface";
+import {FEATURE_VISUALIZE_FAST_FILLER} from "utils/featureToggles/FeatureToggleConstants";
 import {shouldVisualize} from "utils/featureToggles/FeatureToggles";
-import { Log } from "utils/logger/Logger";
-import { findPositionsInsideRect, getFreeSpacesNextTo, getMultirooomDistance, roomPos } from "utils/UtilityFunctions";
-import { getCreeps, registerCreepConfig, unregisterHandle } from "../SpawnInterface";
-import { FillerPosition, FillRecords, runFillersForPosition } from "./FastFillerLogic";
+import {findPositionsInsideRect, getMultirooomDistance, roomPos} from "utils/UtilityFunctions";
+import {getCreeps, registerCreepConfig, unregisterHandle} from "../SpawnInterface";
+import {FillerPosition, FillRecords, runFillersForPosition} from "./FastFillerLogic";
 
 export class RoomFastFillerSystem {
     public roomName: string;
@@ -58,11 +56,17 @@ export class RoomFastFillerSystem {
             if (fillersForPosition.length) {
                 runFillersForPosition(fillersForPosition, this.fillerPositions[i], fillRecords);
                 if (shouldVisualize(FEATURE_VISUALIZE_FAST_FILLER)) {
-                    visual.circle(this.fillerPositions[i].standingPosition, { radius: 0.5, fill: "blue" });
+                    visual.circle(this.fillerPositions[i].standingPosition, {
+                        radius: 0.5,
+                        fill: "blue"
+                    });
                 }
             } else {
                 if (shouldVisualize(FEATURE_VISUALIZE_FAST_FILLER)) {
-                    visual.circle(this.fillerPositions[i].standingPosition, { radius: 0.5, fill: "red" });
+                    visual.circle(this.fillerPositions[i].standingPosition, {
+                        radius: 0.5,
+                        fill: "red"
+                    });
                 }
             }
         }

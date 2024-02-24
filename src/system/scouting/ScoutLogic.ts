@@ -1,10 +1,9 @@
-import { object } from "lodash";
-import { planRoom } from "system/planning/PlannerInterface";
-import { distanceTransformDiag } from "utils/algorithms/DistanceTransform";
-import { floodFill } from "utils/algorithms/FloodFill";
-import { Log } from "utils/logger/Logger";
-import { packCoord, packCoordList, unpackCoord, packPos, packPosList } from "utils/Packrat";
-import { ROOMTYPE_CONTROLLER, Traveler } from "utils/traveler/Traveler";
+import {planRoom} from "system/planning/PlannerInterface";
+import {distanceTransformDiag} from "utils/algorithms/DistanceTransform";
+import {floodFill} from "utils/algorithms/FloodFill";
+import {Log} from "utils/logger/Logger";
+import {packPos, packPosList} from "utils/Packrat";
+import {ROOMTYPE_CONTROLLER, Traveler} from "utils/traveler/Traveler";
 import {
     getFreeSpacesNextTo,
     getMultirooomDistance,
@@ -142,9 +141,9 @@ function evaluateOwnership(room: Room): [RoomThreatInfo | undefined, RoomOwnersh
 
     let hostileTowers = !isMyOwnedRoom
         ? room
-              .find(FIND_HOSTILE_STRUCTURES)
-              .filter(s => s.structureType === STRUCTURE_TOWER)
-              .map(t => t as StructureTower)
+            .find(FIND_HOSTILE_STRUCTURES)
+            .filter(s => s.structureType === STRUCTURE_TOWER)
+            .map(t => t as StructureTower)
         : [];
 
     let allEnemies = room.find(FIND_HOSTILE_CREEPS);
@@ -242,7 +241,10 @@ function sumThreat(creeps: Creep[], allTowers: StructureTower[], owner: string):
 
 function roomNameAt(room: Room, roomCoordMod: Coord) {
     let baseRoomCoord = new RoomPosition(0, 0, room.name).roomCoords;
-    return roomNameFromCoord({ x: baseRoomCoord.x + roomCoordMod.x, y: baseRoomCoord.y + roomCoordMod.y });
+    return roomNameFromCoord({
+        x: baseRoomCoord.x + roomCoordMod.x,
+        y: baseRoomCoord.y + roomCoordMod.y
+    });
 }
 
 function findRallyPoint(room: Room): RoomPosition | undefined {
@@ -269,7 +271,7 @@ function findRallyPoint(room: Room): RoomPosition | undefined {
     //Find the max value in the resulting matrix, it is now the rally point! Tiebreak with favoring
     // distance to the center of the room
     let highest: number = -1;
-    let highestCoord: Coord = { x: 0, y: 0 };
+    let highestCoord: Coord = {x: 0, y: 0};
     for (let y = 0; y <= 49; y++) {
         for (let x = 0; x <= 49; x++) {
             if (matrix.get(x, y) > 0 && matrix.get(x, y) >= highest) {
@@ -332,7 +334,7 @@ function evaluateRoomDepth(
 ): RoomTerritoryInfo {
     if (ownership?.username === global.PLAYER_USERNAME && ownership?.ownershipType === "Claimed") {
         return {
-            claims: [{ roomName: searchRoomName, range: 0 }],
+            claims: [{roomName: searchRoomName, range: 0}],
             lastUpdate: Game.time,
             minNextUpdate: Game.time + TERRITORY_DATA_MIN_TTL,
             maxNextUpdate: Game.time + TERRITORY_DATA_MAX_TTL
@@ -512,6 +514,7 @@ export function getRoomsToExplore(
 
 //room position target locks with a TTL
 let controllerTargetLocks: { [creepName: string]: [RoomPosition, number] | undefined } = {};
+
 export function runScout(scout: Creep, roomToExplore: string, shardMap: ShardMap, maxTerritoryRange: number): boolean {
     //If the room we are in is on our map but isn't signed by us
     if (scout.pos.room?.controller && shardMap[scout.pos.roomName] && !controllerTargetLocks[scout.name]) {
@@ -542,7 +545,7 @@ export function runScout(scout: Creep, roomToExplore: string, shardMap: ShardMap
     //Head to the targeted controller
     else if (positionLock) {
         scout.queueSay("🖊️🎯");
-        Traveler.travelTo(scout, positionLock[0], { offRoad: true });
+        Traveler.travelTo(scout, positionLock[0], {offRoad: true});
     }
     //If we are in the room we need to explore
     else if (scout.pos.roomName === roomToExplore && roomNeedsScouting) {

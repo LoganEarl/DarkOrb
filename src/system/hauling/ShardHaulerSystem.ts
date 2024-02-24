@@ -1,7 +1,7 @@
-import { Log } from "utils/logger/Logger";
-import { profile } from "utils/profiler/Profiler";
-import { registerResetFunction } from "utils/SystemResetter";
-import { RoomHaulerSystem } from "./RoomHaulerSystem";
+import {Log} from "utils/logger/Logger";
+import {profile} from "utils/profiler/Profiler";
+import {registerResetFunction} from "utils/SystemResetter";
+import {RoomHaulerSystem} from "./RoomHaulerSystem";
 
 @profile
 class ShardHaulerSystem {

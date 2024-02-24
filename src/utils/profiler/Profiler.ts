@@ -1,4 +1,4 @@
-import { Log } from "utils/logger/Logger";
+import {Log} from "utils/logger/Logger";
 
 /* tslint:disable:ban-types */
 export function init(): Profiler {

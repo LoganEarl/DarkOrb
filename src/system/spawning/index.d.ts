@@ -24,6 +24,7 @@ interface CreepConfig {
     memory?: CreepMemory; //Memory to give the new creep
     boosts?: BoostDefinition[]; //What boosts to give the creep
 }
+
 interface CreepMemory {
     handle: string;
     subHandle?: string;

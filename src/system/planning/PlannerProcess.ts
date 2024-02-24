@@ -1,11 +1,11 @@
-import { Process } from "core/Process";
-import { getRoomData, getShardData } from "system/scouting/ScoutInterface";
-import { FEATURE_VISUALIZE_PLANS } from "utils/featureToggles/FeatureToggleConstants";
-import { getFeature } from "utils/featureToggles/FeatureToggles";
-import { profile } from "utils/profiler/Profiler";
-import { ScheduledJob } from "utils/ScheduledJob";
-import { drawPlacedStructureGroup } from "./PlannerLogic";
-import { _shardPlannerSystem } from "./ShardPlannerSystem";
+import {Process} from "core/Process";
+import {getRoomData, getShardData} from "system/scouting/ScoutInterface";
+import {FEATURE_VISUALIZE_PLANS} from "utils/featureToggles/FeatureToggleConstants";
+import {getFeature} from "utils/featureToggles/FeatureToggles";
+import {profile} from "utils/profiler/Profiler";
+import {ScheduledJob} from "utils/ScheduledJob";
+import {drawPlacedStructureGroup} from "./PlannerLogic";
+import {_shardPlannerSystem} from "./ShardPlannerSystem";
 
 @profile
 export class PlannerProcess extends Process {

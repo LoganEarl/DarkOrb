@@ -1,5 +1,4 @@
-import { Log } from "./logger/Logger";
-import { findStructure } from "./StructureFindCache";
+import {findStructure} from "./StructureFindCache";
 
 export function hasRespawned() {
     // server reset or sim
@@ -99,6 +98,7 @@ export function orderOf(item: any, array: any[]): number {
 
 let lastDrawTick = 0;
 let drawCounts: { [posTag: string]: number } = {};
+
 export function drawCircledItem(
     pos: RoomPosition,
     color: string,
@@ -223,7 +223,9 @@ export function clamp(value: number, min: number, max: number): number {
 /**
  * Merges a list of store-like objects, summing overlapping keys. Useful for calculating assets from multiple sources
  */
-export function mergeSum(objects: { [key: string]: number | undefined }[]): { [key: string]: number } {
+export function mergeSum(objects: { [key: string]: number | undefined }[]): {
+    [key: string]: number
+} {
     const ret: { [key: string]: number } = {};
     for (const object of objects) {
         for (const key in object) {
@@ -331,7 +333,7 @@ export function findPositionsInsideRect(x1: number, y1: number, x2: number, y2: 
             if (x < 0 || x >= 50 || y < 0 || y >= 50) continue;
 
             // Otherwise pass the x and y to positions
-            positions.push({ x, y });
+            positions.push({x, y});
         }
     }
 

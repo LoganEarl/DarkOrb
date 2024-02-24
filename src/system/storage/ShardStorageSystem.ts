@@ -1,6 +1,6 @@
-import { Log } from "utils/logger/Logger";
-import { registerResetFunction } from "utils/SystemResetter";
-import { RoomStorageSystem } from "./RoomStorageSystem";
+import {Log} from "utils/logger/Logger";
+import {registerResetFunction} from "utils/SystemResetter";
+import {RoomStorageSystem} from "./RoomStorageSystem";
 
 class ShardStorageSystem {
     private roomStorageSystems: { [roomName: string]: RoomStorageSystem } = {};

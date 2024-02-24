@@ -1,5 +1,3 @@
-import { Log } from "utils/logger/Logger";
-
 export function memhack(fn: () => void) {
     let memory: Memory;
     let tick: number;

@@ -1,4 +1,5 @@
 var nextSeed = 0;
+
 export class ScheduledJob {
     private job: () => void;
     private seed: number;

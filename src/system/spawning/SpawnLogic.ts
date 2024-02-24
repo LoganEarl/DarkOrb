@@ -1,4 +1,4 @@
-import { _creepManifest } from "./CreepManifest";
+import {_creepManifest} from "./CreepManifest";
 
 const PART_ORDER: BodyPartConstant[] = [TOUGH, WORK, CARRY, ATTACK, RANGED_ATTACK, CLAIM, HEAL, MOVE];
 const DEFAULT_SORTER: BodySorter = function (a: BodyPartConstant, b: BodyPartConstant): number {
@@ -63,7 +63,7 @@ export function _maximizeBodyForTargetParts(
             bodyEnergyCost + repeatingCost <= maxCapacity &&
             currentBody.length + repeatingBody.length <= 50 &&
             usedParts < targetNumber
-        ) {
+            ) {
             currentBody = currentBody.concat(repeatingBody);
             bodyEnergyCost += repeatingCost;
             usedParts += repeatingBodyPartUsage;

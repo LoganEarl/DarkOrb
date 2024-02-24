@@ -1,13 +1,14 @@
-import { MemoryComponent, updateMemory } from "utils/MemoryWriter";
-import { Log } from "utils/logger/Logger";
-import { assignRoomToScout, getRoomsToExplore, runScout } from "./ScoutLogic";
-import { registerResetFunction } from "utils/SystemResetter";
-import { getCreeps, registerCreepConfig, unregisterHandle } from "system/spawning/SpawnInterface";
-import { unpackCoord, unpackPos } from "utils/Packrat";
-import { hslToHex } from "utils/UtilityFunctions";
-import { getRoomData, getShardData, MAX_SCOUT_DEPTH, saveMapData } from "./ScoutInterface";
+import {MemoryComponent, updateMemory} from "utils/MemoryWriter";
+import {Log} from "utils/logger/Logger";
+import {assignRoomToScout, getRoomsToExplore, runScout} from "./ScoutLogic";
+import {registerResetFunction} from "utils/SystemResetter";
+import {getCreeps, registerCreepConfig, unregisterHandle} from "system/spawning/SpawnInterface";
+import {unpackPos} from "utils/Packrat";
+import {hslToHex} from "utils/UtilityFunctions";
+import {getRoomData, getShardData, MAX_SCOUT_DEPTH, saveMapData} from "./ScoutInterface";
 
 const SCOUTS_PER_CLUSTER = 1;
+
 class ShardScoutSystem implements MemoryComponent {
     private memory?: ScoutMemory;
     private scoutAssignments: { [creepName: string]: string } = {};
@@ -91,12 +92,16 @@ class ShardScoutSystem implements MemoryComponent {
                 let pathingInfo = getRoomData(roomName)?.pathingInfo;
                 if (pathingInfo?.packedRallyPos) {
                     let pos = unpackPos(pathingInfo.packedRallyPos);
-                    Game.map.visual.circle(pos, { radius: 1.5, stroke: clusterColor, fill: clusterColor });
+                    Game.map.visual.circle(pos, {
+                        radius: 1.5,
+                        stroke: clusterColor,
+                        fill: clusterColor
+                    });
                     pathingInfo.pathableExits
                         .map(roomName => getRoomData(roomName)?.pathingInfo?.packedRallyPos)
                         .filter(p => p)
                         .map(p => unpackPos(p!))
-                        .forEach(p => Game.map.visual.line(pos, p, { color: clusterColor }));
+                        .forEach(p => Game.map.visual.line(pos, p, {color: clusterColor}));
                 }
             }
         }

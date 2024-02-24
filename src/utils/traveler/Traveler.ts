@@ -3,9 +3,8 @@
  * Example: var Traveler = require('Traveler.js');
  */
 
-import { Log } from "utils/logger/Logger";
-import { drawCircledItem } from "utils/UtilityFunctions";
-import { isMainThread } from "worker_threads";
+import {Log} from "utils/logger/Logger";
+import {drawCircledItem} from "utils/UtilityFunctions";
 
 declare global {
     interface CreepMemory {
@@ -22,10 +21,12 @@ const MAX_IMAPSSIBLE_STRUCTURE_COST = 127;
 
 const RESERVE_TTL = 5;
 const RESERVE_COST = 20;
+
 interface Reservation {
     position: RoomPosition;
     ttl: number;
 }
+
 export class Traveler {
     private static structureMatrixCache: { [roomName: string]: CostMatrix } = {};
     private static creepMatrixCache: { [roomName: string]: CostMatrix } = {};
@@ -295,6 +296,7 @@ export class Traveler {
     }
 
     private static reservations: { [roomName: string]: Reservation[] } = {};
+
     public static reservePosition(position: RoomPosition) {
         if (!this.reservations[position.roomName]) this.reservations[position.roomName] = [];
 
@@ -429,7 +431,7 @@ export class Traveler {
 
         let ret = PathFinder.search(
             origin,
-            { pos: destination, range: options.range! },
+            {pos: destination, range: options.range!},
             {
                 maxOps: options.maxOps,
                 maxRooms: options.maxRooms,
@@ -437,18 +439,18 @@ export class Traveler {
                     (options.plainCost ?? 0) > 0
                         ? options.plainCost
                         : options.offRoad
-                        ? 1
-                        : options.ignoreRoads
-                        ? 1
-                        : 2,
+                            ? 1
+                            : options.ignoreRoads
+                                ? 1
+                                : 2,
                 swampCost:
                     (options.swampCost ?? 0) > 0
                         ? options.swampCost
                         : options.offRoad
-                        ? 1
-                        : options.ignoreRoads
-                        ? 5
-                        : 10,
+                            ? 1
+                            : options.ignoreRoads
+                                ? 5
+                                : 10,
                 roomCallback: callback
             }
         );
@@ -506,7 +508,7 @@ export class Traveler {
         options: TravelToOptions = {}
     ): { [roomName: string]: boolean } | void {
         let restrictDistance = options.restrictDistance || Game.map.getRoomLinearDistance(origin, destination) + 10;
-        let allowedRooms = { [origin]: true, [destination]: true };
+        let allowedRooms = {[origin]: true, [destination]: true};
 
         let highwayBias = 1;
         if (options.preferHighway) {
@@ -698,7 +700,7 @@ export class Traveler {
                 if (durabilityVarience !== 0)
                     calculatedCost =
                         (Math.round(structure.hits - minDurability) / durabilityVarience) *
-                            (MAX_IMAPSSIBLE_STRUCTURE_COST - MIN_IMPASSIBLE_STRUCTURE_COST) +
+                        (MAX_IMAPSSIBLE_STRUCTURE_COST - MIN_IMPASSIBLE_STRUCTURE_COST) +
                         MIN_IMPASSIBLE_STRUCTURE_COST;
                 matrix.set(structure.pos.x, structure.pos.y, calculatedCost);
             } else {
@@ -735,7 +737,10 @@ export class Traveler {
         this.circle(startPos, color);
         for (let position of path) {
             if (position.roomName === lastPosition.roomName) {
-                new RoomVisual(position.roomName).line(position, lastPosition, { color: color, lineStyle: "dashed" });
+                new RoomVisual(position.roomName).line(position, lastPosition, {
+                    color: color,
+                    lineStyle: "dashed"
+                });
                 serializedPath += lastPosition.getDirectionTo(position);
             }
             lastPosition = position;
@@ -813,7 +818,10 @@ export class Traveler {
     private static deserializeState(travelData: TravelData, destination: RoomPosition): TravelState {
         let state = {} as TravelState;
         if (travelData.state) {
-            state.lastCoord = { x: travelData.state[STATE_PREV_X], y: travelData.state[STATE_PREV_Y] };
+            state.lastCoord = {
+                x: travelData.state[STATE_PREV_X],
+                y: travelData.state[STATE_PREV_Y]
+            };
             state.cpu = travelData.state[STATE_CPU];
             state.stuckCount = travelData.state[STATE_STUCK];
             state.destination = new RoomPosition(

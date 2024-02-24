@@ -1,20 +1,18 @@
-import { detect } from "lodash";
-import { getNode, registerNode, unregisterNode } from "system/hauling/HaulerInterface";
-import { getRallyPosition } from "system/scouting/ScoutInterface";
+import {getNode, registerNode, unregisterNode} from "system/hauling/HaulerInterface";
+import {getRallyPosition} from "system/scouting/ScoutInterface";
 import {
     ANALYTICS_ARTIFICER,
     ANALYTICS_CONSTRUCTION,
     ANALYTICS_PRIEST,
     ANALYTICS_REINFORCE,
-    ANALYTICS_REPAIR,
     ANALYTICS_UPGRADE
 } from "system/storage/AnalyticsConstants";
-import { getMainStorage, postAnalyticsEvent } from "system/storage/StorageInterface";
-import { unpackPos } from "utils/Packrat";
-import { Log } from "utils/logger/Logger";
-import { Traveler } from "utils/traveler/Traveler";
-import { getMultirooomDistance, insertSorted, minBy } from "utils/UtilityFunctions";
-import { networkInterfaces } from "os";
+import {getMainStorage, postAnalyticsEvent} from "system/storage/StorageInterface";
+import {unpackPos} from "utils/Packrat";
+import {Log} from "utils/logger/Logger";
+import {Traveler} from "utils/traveler/Traveler";
+import {getMultirooomDistance, minBy} from "utils/UtilityFunctions";
+import {completeWorkTarget} from "./WorkInterface";
 
 const CONSTRUCTION_PRIORITIES = [
     STRUCTURE_SPAWN,
@@ -57,6 +55,7 @@ interface TargetLockData {
     restocking: boolean;
     sourcePos?: RoomPosition;
 }
+
 const TARGET_LOCK_PRUNE_DELAY = 5;
 let lastTargetLockPrune = 0;
 //Creep name to target locking data
@@ -87,7 +86,12 @@ function getTargetLock(creep: Creep, detail: WorkDetail): TargetLockData | undef
             compareWorkTargets(creep.pos, detail, prev, cur)
         );
         if (workTarget) {
-            targetLock = { targetId: workTarget.targetId, detailId: detail.detailId, mining: false, restocking: false };
+            targetLock = {
+                targetId: workTarget.targetId,
+                detailId: detail.detailId,
+                mining: false,
+                restocking: false
+            };
             targetLocks.set(creep.name, targetLock);
         }
     }
@@ -304,7 +308,7 @@ export function _runCreep(
                     analyticsCategories.push(ANALYTICS_PRIEST, ANALYTICS_UPGRADE);
                     if (creep.upgradeController(target) === OK) energySpent = estimatedDrdt;
                     workTarget.currentProgress = target.progress;
-                    if(workTarget.targetProgress <= workTarget.currentProgress) {
+                    if (workTarget.targetProgress <= workTarget.currentProgress) {
                         done = true;
                     }
                 }

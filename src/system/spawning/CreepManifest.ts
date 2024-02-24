@@ -1,11 +1,11 @@
 //Persists a mapping of unique identifiers to creep names.
 //Also keeps track of process id's and associates creep names to it so you can find all
 
-import { MemoryComponent, updateMemory } from "utils/MemoryWriter";
-import { Log } from "utils/logger/Logger";
-import { FIRST_NAMES } from "./creepNames/FirstNames";
-import { LAST_NAMES } from "./creepNames/LastNames";
-import { registerResetFunction } from "utils/SystemResetter";
+import {MemoryComponent, updateMemory} from "utils/MemoryWriter";
+import {Log} from "utils/logger/Logger";
+import {FIRST_NAMES} from "./creepNames/FirstNames";
+import {LAST_NAMES} from "./creepNames/LastNames";
+import {registerResetFunction} from "utils/SystemResetter";
 
 class CreepManifest implements MemoryComponent {
     private memory?: ManifestMemory;

@@ -1,6 +1,6 @@
-import { getRoomData } from "system/scouting/ScoutInterface";
-import { Log } from "utils/logger/Logger";
-import { findStructure } from "utils/StructureFindCache";
+import {getRoomData} from "system/scouting/ScoutInterface";
+import {Log} from "utils/logger/Logger";
+import {findStructure} from "utils/StructureFindCache";
 
 export class RoomPlannerSystem {
     public roomName: string;

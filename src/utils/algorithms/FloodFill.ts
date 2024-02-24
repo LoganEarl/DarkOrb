@@ -1,7 +1,7 @@
 //Credit to Carson Burke. https://github.com/CarsonBurke/Screeps-Tutorials/blob/Master/basePlanningAlgorithms/floodFill.js
 
-import { Traveler } from "utils/traveler/Traveler";
-import { findPositionsInsideRect } from "utils/UtilityFunctions";
+import {Traveler} from "utils/traveler/Traveler";
+import {findPositionsInsideRect} from "utils/UtilityFunctions";
 
 //Produces a matrix where each slot is the distance from the nearest seed. Spreads out from the seed positions, and does not modify positions not covered by the fill
 export function floodFill(

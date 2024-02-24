@@ -1,4 +1,4 @@
-import { PriorityQueueItem } from "utils/PriorityQueue";
+import {PriorityQueueItem} from "utils/PriorityQueue";
 
 export abstract class Process implements PriorityQueueItem {
     public priority: number;
@@ -46,9 +46,11 @@ export abstract class Process implements PriorityQueueItem {
     }
 
     preRun?(): void;
+
     postRun?(): void;
 
     abstract run(): void;
+
     onCancel?(): void;
 
     public averageCpuUsage(): number {

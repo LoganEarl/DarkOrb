@@ -7,9 +7,11 @@ interface AnalyticEntry {
     firstSampleTime: number;
     nextTotal: number;
 }
+
 interface StorageMemory {
     analytics: { [category: string]: AnalyticEntry };
 }
+
 interface Memory {
     storageMemory?: StorageMemory;
 }

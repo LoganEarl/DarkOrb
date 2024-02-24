@@ -1,5 +1,4 @@
-import { unpackCoord } from "utils/Packrat";
-import { minBy } from "utils/UtilityFunctions";
+import {minBy} from "utils/UtilityFunctions";
 
 Object.defineProperty(RoomPosition.prototype, "print", {
     get() {
@@ -53,7 +52,7 @@ Object.defineProperty(RoomPosition.prototype, "coordName", {
 
 Object.defineProperty(RoomPosition.prototype, "localCoords", {
     get: function () {
-        return { x: this.x, y: this.y };
+        return {x: this.x, y: this.y};
     },
     configurable: true
 });
@@ -97,7 +96,7 @@ Object.defineProperty(RoomPosition.prototype, "roomCoords", {
         let y = parseInt(parsed![2], 10);
         if (this.roomName.includes("W")) x = -x - 1;
         if (this.roomName.includes("N")) y = -y - 1;
-        return { x: x, y: y } as Coord;
+        return {x: x, y: y} as Coord;
     },
     configurable: true
 });
@@ -283,7 +282,7 @@ Object.defineProperty(RoomPosition.prototype, "roomCoords", {
         let y = parseInt(parsed![2], 10);
         if (this.roomName.includes("W")) x = -x;
         if (this.roomName.includes("N")) y = -y;
-        return { x: x, y: y } as Coord;
+        return {x: x, y: y} as Coord;
     },
     configurable: true
 });

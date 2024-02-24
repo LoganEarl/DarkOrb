@@ -1,5 +1,5 @@
-import { MemoryComponent, updateMemory } from "utils/MemoryWriter";
-import { registerResetFunction } from "utils/SystemResetter";
+import {MemoryComponent, updateMemory} from "utils/MemoryWriter";
+import {registerResetFunction} from "utils/SystemResetter";
 
 class DetailMemoryComponent implements MemoryComponent {
     details: WorkDetailMemory = {};

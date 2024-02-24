@@ -1,13 +1,18 @@
-import { getRallyPosition, scoutRoom } from "system/scouting/ScoutInterface";
-import { getCreeps, maximizeBody, registerCreepConfig, unregisterHandle } from "system/spawning/SpawnInterface";
-import { getMainStorage } from "system/storage/StorageInterface";
-import { FEATURE_VISUALIZE_HAULING } from "utils/featureToggles/FeatureToggleConstants";
-import {getFeature, shouldVisualize} from "utils/featureToggles/FeatureToggles";
-import { profile } from "utils/profiler/Profiler";
-import { Traveler } from "utils/traveler/Traveler";
-import { clamp, drawBar, drawCircledItem } from "utils/UtilityFunctions";
-import { getNode, getNodes, unregisterNode } from "./HaulerInterface";
-import { haulerLogic } from "./HaulerLogic";
+import {getRallyPosition, scoutRoom} from "system/scouting/ScoutInterface";
+import {
+    getCreeps,
+    maximizeBody,
+    registerCreepConfig,
+    unregisterHandle
+} from "system/spawning/SpawnInterface";
+import {getMainStorage} from "system/storage/StorageInterface";
+import {FEATURE_VISUALIZE_HAULING} from "utils/featureToggles/FeatureToggleConstants";
+import {shouldVisualize} from "utils/featureToggles/FeatureToggles";
+import {profile} from "utils/profiler/Profiler";
+import {Traveler} from "utils/traveler/Traveler";
+import {clamp, drawBar, drawCircledItem} from "utils/UtilityFunctions";
+import {getNode, getNodes} from "./HaulerInterface";
+import {haulerLogic} from "./HaulerLogic";
 
 const MAX_HAULERS_PER_ROOM = 25; //Total haulers a single room can have after rcl3
 const MAX_HAULERS_PER_ROOM_LOW_RCL = 60; //Total haulers a single room can have before rcl4
@@ -40,7 +45,7 @@ export class RoomHaulerSystem {
         for (let node of Object.values(nodes)) {
             const carryParts = Math.ceil(
                 ((node.serviceRoute.pathLength * 2 * Math.abs(node.bodyDrdt ?? node.baseDrdt)) / 50) *
-                    HAULER_SAFTEY_MARGIN
+                HAULER_SAFTEY_MARGIN
             );
             this.targetCarryParts += carryParts;
         }
@@ -129,7 +134,7 @@ export class RoomHaulerSystem {
             } else {
                 let rally = getRallyPosition(this.roomName);
                 if (rally) {
-                    Traveler.travelTo(creep, rally, { range: 3 });
+                    Traveler.travelTo(creep, rally, {range: 3});
                 }
                 creep.sayWaiting();
             }

@@ -16,7 +16,11 @@ class StructureIdCache {
     }
 }
 
-type FindStructure = FIND_STRUCTURES | FIND_MY_SPAWNS | FIND_MY_STRUCTURES | FIND_HOSTILE_STRUCTURES;
+type FindStructure =
+    FIND_STRUCTURES
+    | FIND_MY_SPAWNS
+    | FIND_MY_STRUCTURES
+    | FIND_HOSTILE_STRUCTURES;
 
 export function findStructure(room: Room | undefined, find: FindStructure): Structure[] {
     if (!room) return [];

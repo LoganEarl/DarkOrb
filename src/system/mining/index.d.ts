@@ -19,6 +19,7 @@ interface MinerAssignment {
     depositLink?: Id<StructureLink>;
     constructionProject?: Id<ConstructionSite>;
 }
+
 interface SourceMinerMemory {
     state: MinerState;
     stopReasons: MinerStopReason[];

@@ -1,13 +1,11 @@
-import { pad } from "lodash";
-import { off } from "process";
-import { floodFill } from "utils/algorithms/FloodFill";
-import { LagoonDetector } from "utils/algorithms/LagoonFlow";
-import { getCutTiles, Rectangle } from "utils/algorithms/MinCut";
-import { FEATURE_VISUALIZE_PLANNING } from "utils/featureToggles/FeatureToggleConstants";
+import {floodFill} from "utils/algorithms/FloodFill";
+import {LagoonDetector} from "utils/algorithms/LagoonFlow";
+import {getCutTiles, Rectangle} from "utils/algorithms/MinCut";
+import {FEATURE_VISUALIZE_PLANNING} from "utils/featureToggles/FeatureToggleConstants";
 import {shouldVisualize} from "utils/featureToggles/FeatureToggles";
-import { Log } from "utils/logger/Logger";
-import { unpackCoordList, unpackPos, unpackPosList } from "utils/Packrat";
-import { PriorityQueue, PriorityQueueItem } from "utils/PriorityQueue";
+import {Log} from "utils/logger/Logger";
+import {unpackCoordList, unpackPos} from "utils/Packrat";
+import {PriorityQueue, PriorityQueueItem} from "utils/PriorityQueue";
 import {
     clamp,
     clone2DArray,
@@ -15,14 +13,13 @@ import {
     findPositionsInsideRect,
     insertSorted,
     isWalkableOwnedRoom,
-    manhattanDistance,
     roomPos,
     rotateMatrix
 } from "utils/UtilityFunctions";
-import { EXTENSION_GROUP } from "./stamp/ExtensionPod";
-import { FAST_FILLER_GROUP, FAST_FILLER_SPAWN_COORDS } from "./stamp/FastFiller";
-import { deepCopyGroup, deepCopyGroups, rotateGroup } from "./stamp/StampLogic";
-import { STORAGE_CORE_GROUP } from "./stamp/StorageCore";
+import {EXTENSION_GROUP} from "./stamp/ExtensionPod";
+import {FAST_FILLER_GROUP, FAST_FILLER_SPAWN_COORDS} from "./stamp/FastFiller";
+import {deepCopyGroups, rotateGroup} from "./stamp/StampLogic";
+import {STORAGE_CORE_GROUP} from "./stamp/StorageCore";
 
 type PlanningState =
     | "New"
@@ -150,7 +147,7 @@ export class RoomPlanner implements PriorityQueueItem {
             }
         }
 
-        new RoomVisual(this.roomName).text(this.planningState, 1, 1, { align: "left" });
+        new RoomVisual(this.roomName).text(this.planningState, 1, 1, {align: "left"});
 
         if (this.planningState === "Done") {
             return {
@@ -165,7 +162,7 @@ export class RoomPlanner implements PriorityQueueItem {
                 upgradeContainerPos: this.placedUpgradeContainer
             };
         } else if (this.planningState === "Failed") {
-            return { score: 0 };
+            return {score: 0};
         } else return undefined;
     }
 
@@ -262,7 +259,7 @@ export class RoomPlanner implements PriorityQueueItem {
             let buildings = FAST_FILLER_GROUP[8].buildings;
             let stampX = this.spawnPos.x - FAST_FILLER_SPAWN_COORDS[0].x;
             let stampY = this.spawnPos.y - FAST_FILLER_SPAWN_COORDS[0].y;
-            if (!this.place({ x: stampX, y: stampY }, buildings)) this.fail("Bad spawn position");
+            if (!this.place({x: stampX, y: stampY}, buildings)) this.fail("Bad spawn position");
             else {
                 this.placedFastFiller = {
                     dx: stampX,
@@ -322,7 +319,12 @@ export class RoomPlanner implements PriorityQueueItem {
         for (let y = 0; y < 50; y++) {
             for (let x = 0; x < 50; x++) {
                 if (this.pathMatrix?.get(x, y) !== 255 && this.forbiddenMatrix?.get(x, y) === 0) {
-                    placementOptions.enqueue({ x: x, y: y, score: this.lagoonMatrix!.get(x, y), queueIndex: 0 });
+                    placementOptions.enqueue({
+                        x: x,
+                        y: y,
+                        score: this.lagoonMatrix!.get(x, y),
+                        queueIndex: 0
+                    });
                 }
             }
         }
@@ -337,7 +339,7 @@ export class RoomPlanner implements PriorityQueueItem {
             for (let rotations = 0; rotations < 4 && !placedPos; rotations++) {
                 let offset = this.placeCentered(pos, toPlace);
                 if (offset !== false) {
-                    placedPos = { x: pos.x - offset, y: pos.y - offset };
+                    placedPos = {x: pos.x - offset, y: pos.y - offset};
                     placedRotation = rotations as 0 | 1 | 2 | 3;
                 } else rotateMatrix(toPlace);
             }
@@ -388,8 +390,8 @@ export class RoomPlanner implements PriorityQueueItem {
                 if (this.pathMatrix.get(x, y) !== 255 && this.forbiddenMatrix.get(x, y) === 0) {
                     let path = PathFinder.search(
                         new RoomPosition(x, y, this.roomName),
-                        { pos: this.storagePos, range: 1 },
-                        { roomCallback: callback }
+                        {pos: this.storagePos, range: 1},
+                        {roomCallback: callback}
                     );
 
                     //Slightly prefer it when they are closer in euclidian terms. Serves as a tiebreaker
@@ -397,7 +399,7 @@ export class RoomPlanner implements PriorityQueueItem {
                     let score = path.cost + clamp(euclidian / 100, 0, 0.9);
 
                     if (!path.incomplete) {
-                        let coord: ScoredCoord = { x: x, y: y, score: score, queueIndex: 0 };
+                        let coord: ScoredCoord = {x: x, y: y, score: score, queueIndex: 0};
                         this.scoredCoords = insertSorted(coord, this.scoredCoords, this.scoredCoordComparator);
                     }
                 }
@@ -437,7 +439,7 @@ export class RoomPlanner implements PriorityQueueItem {
             for (let rotations = 0; rotations < 4 && !placedPos; rotations++) {
                 let offset = this.placeCentered(pos, toPlace);
                 if (offset !== false) {
-                    placedPos = { x: pos.x - offset, y: pos.y - offset };
+                    placedPos = {x: pos.x - offset, y: pos.y - offset};
                     placedRotation = rotations as 0 | 1 | 2 | 3;
                 } else rotateMatrix(toPlace);
             }
@@ -484,7 +486,10 @@ export class RoomPlanner implements PriorityQueueItem {
             //Dont bother with rotations here
             let offSet = this.placeCentered(this.storageGradient[i], toPlace);
             if (offSet !== false) {
-                placedPos.push({ x: this.storageGradient[i].x - offSet, y: this.storageGradient[i].y - offSet });
+                placedPos.push({
+                    x: this.storageGradient[i].x - offSet,
+                    y: this.storageGradient[i].y - offSet
+                });
             }
             checkedTo = i;
         }
@@ -545,7 +550,10 @@ export class RoomPlanner implements PriorityQueueItem {
         let callback = (roomName: string) => (this.roomName === roomName ? this.pathMatrix! : false);
 
         for (let target of pathingTargets) {
-            let path = PathFinder.search(this.storagePos!, { pos: target, range: 1 }, { roomCallback: callback });
+            let path = PathFinder.search(this.storagePos!, {
+                pos: target,
+                range: 1
+            }, {roomCallback: callback});
             for (let pos of path.path) {
                 if (this.pathMatrix?.get(pos.x, pos.y) !== 1) {
                     this.pathMatrix?.set(pos.x, pos.y, 1);
@@ -569,7 +577,7 @@ export class RoomPlanner implements PriorityQueueItem {
             for (let roadPos of this.placedRoads) visual.structure(roadPos.x, roadPos.y, STRUCTURE_ROAD, {});
             visual.structure(this.placedUpgradeContainer!.x, this.placedUpgradeContainer!.y, STRUCTURE_CONTAINER, {});
             for (let upgradePos of this.upgraderPositions!)
-                visual.circle(upgradePos.x, upgradePos.y, { radius: 0.5, fill: "blue" });
+                visual.circle(upgradePos.x, upgradePos.y, {radius: 0.5, fill: "blue"});
             visual.connectRoads();
         }
 
@@ -606,7 +614,7 @@ export class RoomPlanner implements PriorityQueueItem {
             for (let y = 0; y < buildings.length; y++) {
                 for (let x = 0; x < buildings[y].length; x++) {
                     if (buildings[y][x].includes(STRUCTURE_EXTENSION)) {
-                        ePodPositions.push({ x: x + pod.dx, y: y + pod.dy });
+                        ePodPositions.push({x: x + pod.dx, y: y + pod.dy});
                     }
                 }
             }
@@ -655,7 +663,7 @@ export class RoomPlanner implements PriorityQueueItem {
 
         if (shouldVisualize(FEATURE_VISUALIZE_PLANNING)) {
             let visual = new RoomVisual(this.roomName);
-            visual.circle(avgX, avgY, { radius: 1, fill: "red" });
+            visual.circle(avgX, avgY, {radius: 1, fill: "red"});
 
             this.placedWalls!.forEach(pos => visual.structure(pos.x, pos.y, STRUCTURE_RAMPART, {}));
             this.placedExtensionPods!.forEach(p => drawPlacedStructureGroup(visual, p));
@@ -664,7 +672,7 @@ export class RoomPlanner implements PriorityQueueItem {
             for (let roadPos of this.placedRoads!) visual.structure(roadPos.x, roadPos.y, STRUCTURE_ROAD, {});
 
             fillCoords(visual, ePodPositions);
-            this.placedTowers.forEach(p => visual.circle(p.x, p.y, { radius: 0.5, fill: "green" }));
+            this.placedTowers.forEach(p => visual.circle(p.x, p.y, {radius: 0.5, fill: "green"}));
 
             visual.connectRoads();
         }
@@ -687,7 +695,7 @@ export class RoomPlanner implements PriorityQueueItem {
     // that can be subtracted from the center coord to result in the stamp being centered
     private placeCentered(center: Coord, group: BuildableStructureConstant[][][]): number | false {
         let offset = Math.floor(group.length / 2); //square matrix remember?
-        let upperLeft: Coord = { x: center.x - offset, y: center.y - offset };
+        let upperLeft: Coord = {x: center.x - offset, y: center.y - offset};
         if (this.place(upperLeft, group)) return offset;
         return false;
     }

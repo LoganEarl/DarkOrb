@@ -1,7 +1,6 @@
-import { MemoryComponent, updateMemory } from "utils/MemoryWriter";
-import { findStructure } from "utils/StructureFindCache";
-import { clamp, drawBar, exponentialMovingAverage, irregularExponentialMovingAverage } from "utils/UtilityFunctions";
-import {} from "./AnalyticsConstants";
+import {MemoryComponent, updateMemory} from "utils/MemoryWriter";
+import {findStructure} from "utils/StructureFindCache";
+import {clamp, drawBar, exponentialMovingAverage} from "utils/UtilityFunctions";
 
 const VISUAL_START_HEIGHT = 5;
 const ANALYTICS_WINDOW = 1500;

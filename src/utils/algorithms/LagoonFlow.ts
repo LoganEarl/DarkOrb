@@ -1,5 +1,5 @@
-import { clamp, findPositionsInsideRect } from "utils/UtilityFunctions";
-import { distanceTransformDiag } from "./DistanceTransform";
+import {clamp, findPositionsInsideRect} from "utils/UtilityFunctions";
+import {distanceTransformDiag} from "./DistanceTransform";
 
 const edgeValue = 255;
 const stdDevDivisor = 4; //Increase to slow down spread.

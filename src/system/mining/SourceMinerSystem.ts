@@ -1,13 +1,18 @@
-import { getNode, registerNode, unregisterNode, unregisterNodes } from "system/hauling/HaulerInterface";
-import { getRoomData, scoutRoom } from "system/scouting/ScoutInterface";
-import { getCreeps, registerCreepConfig, unregisterHandle } from "system/spawning/SpawnInterface";
-import { getMainStorage } from "system/storage/StorageInterface";
-import { Log } from "utils/logger/Logger";
-import { MemoryComponent, updateMemory } from "utils/MemoryWriter";
-import { packPos, unpackPos, unpackPosList } from "utils/Packrat";
-import { profile } from "utils/profiler/Profiler";
-import { Traveler } from "utils/traveler/Traveler";
-import { getMultirooomDistance, samePos } from "utils/UtilityFunctions";
+import {
+    getNode,
+    registerNode,
+    unregisterNode,
+    unregisterNodes
+} from "system/hauling/HaulerInterface";
+import {getRoomData, scoutRoom} from "system/scouting/ScoutInterface";
+import {getCreeps, registerCreepConfig, unregisterHandle} from "system/spawning/SpawnInterface";
+import {getMainStorage} from "system/storage/StorageInterface";
+import {Log} from "utils/logger/Logger";
+import {MemoryComponent, updateMemory} from "utils/MemoryWriter";
+import {packPos, unpackPos, unpackPosList} from "utils/Packrat";
+import {profile} from "utils/profiler/Profiler";
+import {Traveler} from "utils/traveler/Traveler";
+import {getMultirooomDistance, samePos} from "utils/UtilityFunctions";
 import {
     _assignMiningSpace,
     _designCreepsForMineral,
@@ -61,7 +66,7 @@ export class SourceMinerSystem implements MemoryComponent {
                 let color = "#ffffff";
                 if (state === "Active") color = "#00ff44";
                 else if (state === "Stopped") color = "#ff0044";
-                Game.map.visual.line(mainStorage.pos, this.freeSpaces[0], { color: color });
+                Game.map.visual.line(mainStorage.pos, this.freeSpaces[0], {color: color});
             }
         }
     }

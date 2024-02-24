@@ -1,8 +1,7 @@
-import { Process } from "core/Process";
-import { Log } from "utils/logger/Logger";
-import { profile } from "utils/profiler/Profiler";
-import { ScheduledJob } from "utils/ScheduledJob";
-import { _shardSpawnSystem } from "./ShardSpawnSystem";
+import {Process} from "core/Process";
+import {profile} from "utils/profiler/Profiler";
+import {ScheduledJob} from "utils/ScheduledJob";
+import {_shardSpawnSystem} from "./ShardSpawnSystem";
 
 //Responsible for triggering spawning code. Single process for the whole empire
 @profile
@@ -22,6 +21,7 @@ export class SpawnProcess extends Process {
     }
 
     private first = true;
+
     run(): void {
         this.periodicRoomScanner.run();
         _shardSpawnSystem._updateLogisticsNodes();

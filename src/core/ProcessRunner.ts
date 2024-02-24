@@ -1,6 +1,6 @@
-import { Process } from "./Process";
-import { PriorityQueue } from "utils/PriorityQueue";
-import { Log } from "utils/logger/Logger";
+import {Process} from "./Process";
+import {PriorityQueue} from "utils/PriorityQueue";
+import {Log} from "utils/logger/Logger";
 
 export class ProcessRunner {
     private compare: (a: any, b: any) => number;

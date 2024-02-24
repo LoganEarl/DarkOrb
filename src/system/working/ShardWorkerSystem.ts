@@ -1,9 +1,6 @@
-import { getRoomData } from "system/scouting/ScoutInterface";
-import { getMainStorage } from "system/storage/StorageInterface";
-import { Log } from "utils/logger/Logger";
-import { registerResetFunction } from "utils/SystemResetter";
-import { RoomWorkSystem } from "./RoomWorkerSystem";
-import { getWorkDetailsOfType, registerWorkDetail } from "./WorkInterface";
+import {Log} from "utils/logger/Logger";
+import {registerResetFunction} from "utils/SystemResetter";
+import {RoomWorkSystem} from "./RoomWorkerSystem";
 
 const SCAN_INTERVAL = 20;
 

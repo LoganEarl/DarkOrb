@@ -1,5 +1,4 @@
-import { clone } from "lodash";
-import { clone2DArray, rotateMatrixTurns } from "utils/UtilityFunctions";
+import {clone2DArray, rotateMatrixTurns} from "utils/UtilityFunctions";
 
 interface RawStructureGroup {
     name?: string;

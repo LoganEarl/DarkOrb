@@ -59,9 +59,9 @@ export class Graph {
      */
     newEdge(from: number, to: number, capacity: number) {
         // Normal forward Edge
-        this.edges[from].push({ to, resEdge: this.edges[to].length, capacity, flow: 0 });
+        this.edges[from].push({to, resEdge: this.edges[to].length, capacity, flow: 0});
         // reverse Edge for Residual Graph
-        this.edges[to].push({ to: from, resEdge: this.edges[from].length - 1, capacity: 0, flow: 0 });
+        this.edges[to].push({to: from, resEdge: this.edges[from].length - 1, capacity: 0, flow: 0});
     }
 
     /**
@@ -150,7 +150,7 @@ export class Graph {
                 }
                 if (edge.flow === edge.capacity && edge.capacity > 0) {
                     // blocking edge -> could be in min cut
-                    eInCut.push({ to: edge.to, unreachable: u });
+                    eInCut.push({to: edge.to, unreachable: u});
                 }
             }
         }
@@ -196,7 +196,7 @@ export class Graph {
  * An Array with Terrain information: -1 not usable, 2 Sink (Leads to Exit)
  * @param room - the room to generate the terrain map from
  */
-export function get2DArray(roomName: string, bounds: Rectangle = { x1: 0, y1: 0, x2: 49, y2: 49 }) {
+export function get2DArray(roomName: string, bounds: Rectangle = {x1: 0, y1: 0, x2: 49, y2: 49}) {
     const room2D = Array(50)
         .fill(NORMAL)
         .map(d => Array(50).fill(NORMAL)); // Array for room tiles
@@ -264,7 +264,7 @@ export function createGraph(
     preferCloserBarriers = true,
     preferCloserBarrierLimit = Infinity, // ignore the toProtect[n] for n > this value
     visualize = true,
-    bounds: Rectangle = { x1: 0, y1: 0, x2: 49, y2: 49 }
+    bounds: Rectangle = {x1: 0, y1: 0, x2: 49, y2: 49}
 ) {
     const visual = new RoomVisual(roomName);
     const roomArray = get2DArray(roomName, bounds);
@@ -328,19 +328,19 @@ export function createGraph(
         for (x = bounds.x1; x <= bounds.x2; x++) {
             for (y = bounds.y1; y <= bounds.y2; y++) {
                 if (roomArray[x][y] === UNWALKABLE) {
-                    visual.circle(x, y, { radius: 0.5, fill: "#1b1b9f", opacity: 0.3 });
+                    visual.circle(x, y, {radius: 0.5, fill: "#1b1b9f", opacity: 0.3});
                 } else if (roomArray[x][y] > UNWALKABLE && roomArray[x][y] < NORMAL) {
-                    visual.circle(x, y, { radius: 0.5, fill: "#42cce8", opacity: 0.3 });
+                    visual.circle(x, y, {radius: 0.5, fill: "#42cce8", opacity: 0.3});
                 } else if (roomArray[x][y] === NORMAL) {
-                    visual.circle(x, y, { radius: 0.5, fill: "#bdb8b8", opacity: 0.3 });
+                    visual.circle(x, y, {radius: 0.5, fill: "#bdb8b8", opacity: 0.3});
                 } else if (roomArray[x][y] > NORMAL && roomArray[x][y] < PROTECTED) {
-                    visual.circle(x, y, { radius: 0.5, fill: "#9929e8", opacity: 0.3 });
+                    visual.circle(x, y, {radius: 0.5, fill: "#9929e8", opacity: 0.3});
                 } else if (roomArray[x][y] === PROTECTED) {
-                    visual.circle(x, y, { radius: 0.5, fill: "#e800c6", opacity: 0.3 });
+                    visual.circle(x, y, {radius: 0.5, fill: "#e800c6", opacity: 0.3});
                 } else if (roomArray[x][y] === CANNOT_BUILD) {
-                    visual.circle(x, y, { radius: 0.5, fill: "#e8000f", opacity: 0.3 });
+                    visual.circle(x, y, {radius: 0.5, fill: "#e8000f", opacity: 0.3});
                 } else if (roomArray[x][y] === EXIT) {
-                    visual.circle(x, y, { radius: 0.5, fill: "#000000", opacity: 0.3 });
+                    visual.circle(x, y, {radius: 0.5, fill: "#000000", opacity: 0.3});
                 }
             }
         }
@@ -421,7 +421,7 @@ export function getCutTiles(
     preferCloserBarriers = true,
     preferCloserBarrierLimit = Infinity,
     visualize = true,
-    bounds: Rectangle = { x1: 0, y1: 0, x2: 49, y2: 49 }
+    bounds: Rectangle = {x1: 0, y1: 0, x2: 49, y2: 49}
 ): Coord[] {
     const graph = createGraph(roomName, toProtect, preferCloserBarriers, preferCloserBarrierLimit, visualize, bounds);
     if (!graph) {
@@ -441,14 +441,18 @@ export function getCutTiles(
             // x= vertex % 50  y=v/50 (math.floor?)
             x = v % 50;
             y = Math.floor(v / 50);
-            positions.push({ x, y });
+            positions.push({x, y});
         }
     }
     // Visualise Result
     if (positions.length > 0) {
         const visual = new RoomVisual(roomName);
         for (let i = positions.length - 1; i >= 0; i--) {
-            visual.circle(positions[i].x, positions[i].y, { radius: 0.5, fill: "#ff7722", opacity: 0.9 });
+            visual.circle(positions[i].x, positions[i].y, {
+                radius: 0.5,
+                fill: "#ff7722",
+                opacity: 0.9
+            });
         }
     } else {
         return [];

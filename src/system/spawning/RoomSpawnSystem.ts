@@ -1,15 +1,20 @@
 //Keeps track of the spawns in a room.
 //Holds queued creep configs
 
-import { getNode, registerNode, unregisterNode } from "system/hauling/HaulerInterface";
-import { ANALYTICS_SPAWNING, ANALYTICS_SPAWN_GENERATION } from "system/storage/AnalyticsConstants";
-import { getMainStorage, postAnalyticsEvent } from "system/storage/StorageInterface";
-import { Log } from "utils/logger/Logger";
-import { findStructure } from "utils/StructureFindCache";
-import { getMultirooomDistance } from "utils/UtilityFunctions";
-import { _creepManifest } from "./CreepManifest";
-import { _getConfigs } from "./SpawnInterface";
-import { _bodyCost, _configShouldBeSpawned, _haveSufficientCapacity, _priorityComparator } from "./SpawnLogic";
+import {getNode, registerNode, unregisterNode} from "system/hauling/HaulerInterface";
+import {ANALYTICS_SPAWN_GENERATION, ANALYTICS_SPAWNING} from "system/storage/AnalyticsConstants";
+import {getMainStorage, postAnalyticsEvent} from "system/storage/StorageInterface";
+import {Log} from "utils/logger/Logger";
+import {findStructure} from "utils/StructureFindCache";
+import {getMultirooomDistance} from "utils/UtilityFunctions";
+import {_creepManifest} from "./CreepManifest";
+import {_getConfigs} from "./SpawnInterface";
+import {
+    _bodyCost,
+    _configShouldBeSpawned,
+    _haveSufficientCapacity,
+    _priorityComparator
+} from "./SpawnLogic";
 
 export class RoomSpawnSystem {
     public roomName: string;
@@ -77,7 +82,7 @@ export class RoomSpawnSystem {
                 for (let spawn of readySpawns) {
                     readyToSpawn.sort(_priorityComparator);
                     let next = readyToSpawn[0];
-                    let result = spawn.spawnCreep(next.body, "SPAWN_TEST:" + Math.random(), { dryRun: true });
+                    let result = spawn.spawnCreep(next.body, "SPAWN_TEST:" + Math.random(), {dryRun: true});
                     if (result == OK) {
                         let name = _creepManifest._nextName(next.handle, next.jobName, next.subHandle);
                         let memory = next.memory ?? {
@@ -86,7 +91,7 @@ export class RoomSpawnSystem {
                             jobName: next.jobName
                         };
 
-                        result = spawn.spawnCreep(next.body, name, { memory: memory });
+                        result = spawn.spawnCreep(next.body, name, {memory: memory});
                         if (result == OK) {
                             //Remove the spawned creep from the list of ready ones if there is more than one spawn
                             if (readySpawns.length > 1) {

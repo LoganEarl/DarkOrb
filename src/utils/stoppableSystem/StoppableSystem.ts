@@ -1,7 +1,6 @@
-import { type } from "os";
-
 abstract class StoppableSystem<V> {
     abstract loadMemory(): StoppableMemory<V>;
+
     abstract saveMemory(memory: StoppableMemory<V>): void;
 
     public addStopReason(reason: V) {

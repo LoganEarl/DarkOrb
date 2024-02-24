@@ -1,5 +1,4 @@
-import { getNode } from "system/hauling/HaulerInterface";
-import { getRallyPosition } from "system/scouting/ScoutInterface";
+import {getRoomData} from "system/scouting/ScoutInterface";
 import {
     getCreeps,
     maximizeBodyForTargetParts,
@@ -7,17 +6,13 @@ import {
     unregisterHandle
 } from "system/spawning/SpawnInterface";
 import {
-    ANALYTICS_ALL,
     ANALYTICS_ARTIFICER,
     ANALYTICS_GOSS_INCOME,
     ANALYTICS_SPAWNING
 } from "system/storage/AnalyticsConstants";
-import { getEnergyPerTick, getMainStorage } from "system/storage/StorageInterface";
-import { Log } from "utils/logger/Logger";
-import { Traveler } from "utils/traveler/Traveler";
-import { drawBar } from "utils/UtilityFunctions";
-import { deleteWorkDetail, getWorkDetails } from "./WorkInterface";
-import { _assignWorkDetail } from "./WorkerLogic";
+import {getEnergyPerTick, getMainStorage} from "system/storage/StorageInterface";
+import {getWorkDetails} from "./WorkInterface";
+import {_assignWorkDetail, _runCreep} from "./WorkerLogic";
 
 export class RoomWorkSystem {
     public roomName: string;
@@ -72,7 +67,9 @@ export class RoomWorkSystem {
         this.runCreepPool("EmergencyRepairers", this.eRepairHandle, details);
     }
 
-    private runCreepPool(pool: WorkerPool, handle: string, workDetails: { [id: string]: WorkDetail }) {
+    private runCreepPool(pool: WorkerPool, handle: string, workDetails: {
+        [id: string]: WorkDetail
+    }) {
         let workers = getCreeps(handle);
         for (let creep of workers) {
             let assignment: WorkDetail | undefined = this.creepAssignments.get(creep.name)
@@ -82,7 +79,7 @@ export class RoomWorkSystem {
             if (assignment) {
                 this.creepAssignments.set(creep.name, assignment.detailId);
                 let finished = _runCreep(creep, assignment, this.roomName, handle, [], getRoomData(creep.pos.roomName)!)
-                if(finished) {
+                if (finished) {
                     this.creepAssignments.delete(creep.name);
                 }
             }

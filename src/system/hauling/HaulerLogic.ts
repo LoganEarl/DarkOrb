@@ -1,11 +1,9 @@
-import { postAnalyticsEvent } from "system/storage/StorageInterface";
-import { FEATURE_VISUALIZE_HAULING } from "utils/featureToggles/FeatureToggleConstants";
-import {getFeature, shouldVisualize} from "utils/featureToggles/FeatureToggles";
-import { Log } from "utils/logger/Logger";
-import { PriorityQueue } from "utils/PriorityQueue";
-import { profile } from "utils/profiler/Profiler";
-import { Traveler } from "utils/traveler/Traveler";
-import { clamp, findSortedIndex, insertSorted, insertSortedAndTruncate, maxBy } from "utils/UtilityFunctions";
+import {FEATURE_VISUALIZE_HAULING} from "utils/featureToggles/FeatureToggleConstants";
+import {shouldVisualize} from "utils/featureToggles/FeatureToggles";
+import {Log} from "utils/logger/Logger";
+import {profile} from "utils/profiler/Profiler";
+import {Traveler} from "utils/traveler/Traveler";
+import {clamp, findSortedIndex, maxBy} from "utils/UtilityFunctions";
 
 const MAX_ASSIGNMENTS_PER_NODE = 10; //No more than this many creeps assigned to a single node
 

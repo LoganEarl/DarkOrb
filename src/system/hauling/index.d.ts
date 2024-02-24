@@ -1,4 +1,4 @@
-import { PriorityQueueItem } from "utils/PriorityQueue";
+import {PriorityQueueItem} from "utils/PriorityQueue";
 
 declare global {
     type LogisticsNodeType = "Source" | "Sink"; //Source means we are sourcing energy. I.e. take the energy away from here. Sink means we want energy and are spending it

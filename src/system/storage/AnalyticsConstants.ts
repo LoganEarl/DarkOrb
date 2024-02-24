@@ -1,4 +1,4 @@
-import { _ANALYTICS_ALL, _ANALYTICS_EXPENDATURE, _ANALYTICS_GOSS_INCOME } from "./RoomStorageSystem";
+import {_ANALYTICS_ALL, _ANALYTICS_EXPENDATURE, _ANALYTICS_GOSS_INCOME} from "./RoomStorageSystem";
 
 export const ANALYTICS_ARTIFICER = "Artificer";
 export const ANALYTICS_PRIEST = "Priest";

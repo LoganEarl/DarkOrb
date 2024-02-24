@@ -50,6 +50,7 @@ const BUILD_PRIORITY_COMPARATOR = (a: BuildableStructureConstant, b: BuildableSt
 
 interface TargetLockData {
     targetId: string;
+    gameObjectId: string;
     detailId: string;
     mining: boolean;
     restocking: boolean;
@@ -88,6 +89,7 @@ function getTargetLock(creep: Creep, detail: WorkDetail): TargetLockData | undef
         if (workTarget) {
             targetLock = {
                 targetId: workTarget.targetId,
+                gameObjectId: workTarget.gameObjectId,
                 detailId: detail.detailId,
                 mining: false,
                 restocking: false
@@ -105,7 +107,8 @@ export function _assignWorkDetail(
     details: { [detailId: string]: WorkDetail },
     assignments: Map<string, string>
 ): WorkDetail | undefined {
-    if (!details.length) return undefined;
+    let detailArray = Object.values(details)
+    if (!detailArray.length) return undefined;
 
     //Figure out how many work parts are already assigned to each work detail
     let workPartsPerDetail = new Map<string, number>();
@@ -170,18 +173,45 @@ function compareWorkTargets(
     target2: WorkTarget
 ): WorkTarget {
     if (detail.detailType === "Upgrade") {
-        //We will have a target for each place an upgrader can stand. First go for empty spots
-        //Use the distance to each tile as a tiebreaker to handle global resets well
-        //No empty spots? Assign to the oldest creep's spot
+        let creepOnWorkTarget1: Creep | undefined = undefined;
+        let creepOnWorkTarget2: Creep | undefined = undefined;
+
+        for (let entry of Array.from(targetLocks.entries())) {
+            let creepName = entry[0]
+            let targetLock = entry[1]
+            if (target1.targetId === targetLock.targetId) creepOnWorkTarget1 = Game.creeps[creepName];
+            if (target2.targetId === targetLock.targetId) creepOnWorkTarget2 = Game.creeps[creepName];
+        }
+
+        //Pick empty spots over occupied spots
+        if (creepOnWorkTarget1 === undefined && creepOnWorkTarget2 !== undefined) return target1;
+        if (creepOnWorkTarget1 !== undefined && creepOnWorkTarget2 === undefined) return target2;
+
+        //Pick closer spots over further ones
+        let distance1 = getMultirooomDistance(workerPos, unpackPos(target1.packedPosition))
+        let distance2 = getMultirooomDistance(workerPos, unpackPos(target2.packedPosition))
+        if (distance1 > distance2) return target2;
+        if (distance1 < distance2) return target1;
+
+        //If both occupied, pick spot with older creep
+        if (creepOnWorkTarget1 && creepOnWorkTarget2) {
+            if ((creepOnWorkTarget1!.ticksToLive ?? CREEP_LIFE_TIME) > (creepOnWorkTarget2!.ticksToLive ?? CREEP_LIFE_TIME))
+                return target1;
+            else
+                return target2;
+        }
+
+        //If all else fails, pick an arbitrary deterministic decision maker
+        return target1.targetId.localeCompare(target2.targetId) < 0 ? target1 : target2;
     } else if (detail.detailType == "Construction" || detail.detailType === "Repair") {
         //First prioritize with the building priority
         let comparison = BUILD_PRIORITY_COMPARATOR(
-            target1.targetType as BuildableStructureConstant,
-            target2.targetType as BuildableStructureConstant
+            target1.gameObjectType as BuildableStructureConstant,
+            target2.gameObjectType as BuildableStructureConstant
         );
 
         //If there is a tie here and we are talking about roads, go with distance to the road instead of what comes next
-        if (comparison === 0 && target1.targetType === STRUCTURE_ROAD) {
+        if (comparison === 0 && target1.gameObjectType === STRUCTURE_ROAD) {
             const dist1 = workerPos.getRangeTo(unpackPos(target1.packedPosition));
             const dist2 = workerPos.getRangeTo(unpackPos(target2.packedPosition));
             comparison = dist1 - dist2;
@@ -196,7 +226,7 @@ function compareWorkTargets(
 
         //Finally prioritize with the id of the structures. This makes sure that creeps target the same buildings
         if (comparison === 0) {
-            comparison = target1.targetId.localeCompare(target2.targetId);
+            comparison = target1.gameObjectId.localeCompare(target2.gameObjectId);
         }
 
         return comparison <= 0 ? target1 : target2;
@@ -263,11 +293,11 @@ export function _runCreep(
 
         if (Game.rooms[targetPos.roomName]) {
             let target: ConstructionSite | Structure<BuildableStructureConstant> | null = Game.getObjectById(
-                targetLock.targetId
+                targetLock.gameObjectId
             );
 
             //If we do not see our target and are working on a ramp cSite, look for a new ramp on the square and target it
-            if (!target && workTarget.targetType === STRUCTURE_RAMPART) {
+            if (!target && workTarget.gameObjectType === STRUCTURE_RAMPART) {
                 let builtRampart = targetPos.lookForStructure(STRUCTURE_RAMPART) as StructureRampart | undefined;
                 if (builtRampart && builtRampart.hits < RAMPART_HP_BUCKET) target = builtRampart;
                 else if (!builtRampart) done = true;
@@ -300,7 +330,7 @@ export function _runCreep(
         navigateToTarget(creep, standPos, 0);
 
         if (Game.rooms[standPos.roomName]) {
-            let target: StructureController | null = Game.getObjectById(targetLock.targetId);
+            let target: StructureController | null = Game.getObjectById(targetLock.gameObjectId);
 
             if (target) {
                 estimatedDrdt = creep.getActiveBodyparts(WORK) * UPGRADE_CONTROLLER_POWER;
@@ -335,7 +365,7 @@ export function _runCreep(
 
         if (Game.rooms[targetPos.roomName]) {
             let target: Structure<BuildableStructureConstant> | null = Game.getObjectById(
-                workTarget.targetId
+                workTarget.gameObjectId
             ) as Structure<BuildableStructureConstant> | null;
 
             if (target) {

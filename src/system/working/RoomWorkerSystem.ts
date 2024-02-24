@@ -13,6 +13,7 @@ import {
 import {getEnergyPerTick, getMainStorage} from "system/storage/StorageInterface";
 import {getWorkDetails} from "./WorkInterface";
 import {_assignWorkDetail, _runCreep} from "./WorkerLogic";
+import {Log} from "../../utils/logger/Logger";
 
 export class RoomWorkSystem {
     public roomName: string;

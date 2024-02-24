@@ -1,6 +1,11 @@
 import {Log} from "utils/logger/Logger";
-import {registerResetFunction} from "utils/SystemResetter";
 import {RoomWorkSystem} from "./RoomWorkerSystem";
+import {getRoomData} from "../scouting/ScoutInterface";
+import {registerWorkDetail} from "./WorkInterface";
+import {registerResetFunction} from "../../utils/SystemResetter";
+import {roomPos} from "../../utils/UtilityFunctions";
+import {packPos} from "../../utils/Packrat";
+import {min} from "lodash";
 
 const SCAN_INTERVAL = 20;
 
@@ -46,127 +51,159 @@ class ShardWorkerSystem {
     _scanForWork() {
         //TODO we need to find a different way to scan for work. It needs to be cached and triggered through the work interface
 
-        // for (let roomName in Game.rooms) {
-        //     let room = Game.rooms[roomName];
-        //     let lastScan = this.lastWorkScan[roomName];
-        //     let mapData = getRoomData(roomName);
+        for (let roomName in Game.rooms) {
+            let room = Game.rooms[roomName];
+            let lastScan = this.lastWorkScan[roomName];
+            let mapData = getRoomData(roomName);
 
-        //     //If we own the room and havent scanned it recently
-        //     if (
-        //         mapData?.ownership?.username === global.PLAYER_USERNAME &&
-        //         (!lastScan || lastScan > Game.time - SCAN_INTERVAL)
-        //     ) {
-        //         //Send the job to whichever room is closest
-        //         let closest = mapData.territoryInfo.claims[0].roomName;
-        //         let bestRoom = this.roomWorkSystems[closest];
+            //If we own the room and havent scanned it recently
+            if (
+                mapData?.ownership?.username === global.PLAYER_USERNAME &&
+                (!lastScan || lastScan > Game.time - SCAN_INTERVAL)
+            ) {
+                //Send the job to whichever room is closest
+                let closest = mapData.territoryInfo.claims[0].roomName;
+                let bestRoom = this.roomWorkSystems[closest];
 
-        //         let structures = room.find(FIND_STRUCTURES);
+                // let structures = room.find(FIND_STRUCTURES);
+                // let constructionSites = room.find(FIND_MY_CONSTRUCTION_SITES);
+                // this.updateCSites(bestRoom, constructionSites);
 
-        //         let constructionSites = room.find(FIND_MY_CONSTRUCTION_SITES);
-        //         this.updateCSites(bestRoom, constructionSites);
+                if (room.controller?.owner?.username === global.PLAYER_USERNAME) {
+                    let workTargets: {[targetId: string]: WorkTarget} = {};
+                    var countWorkTargets = 0;
+                    for(let pos of mapData.roomPlan?.upgraderPositions ?? []) {
+                        let targetId = `${pos.x}:${pos.y}:${room.controller.id}`
+                        workTargets[targetId] = {
+                            currentProgress: room.controller.progress,
+                            gameObjectId: room.controller.id,
+                            gameObjectType: STRUCTURE_CONTROLLER,
+                            packedPosition: packPos(roomPos(pos, room.name)),
+                            targetId: targetId,
+                            targetProgress: Math.min(room.controller.progressTotal, room.controller.progress + 1000)
+                        }
+                        countWorkTargets++;
+                    }
 
-        //         let repairBuildings = structures.filter(
-        //             s =>
-        //                 s.hits < s.hitsMax * 0.5 &&
-        //                 s.structureType !== STRUCTURE_RAMPART &&
-        //                 s.structureType !== STRUCTURE_WALL &&
-        //                 s.structureType !== STRUCTURE_CONTROLLER
-        //         );
-        //         this.updateStructureRepair(bestRoom, repairBuildings);
+                    if(countWorkTargets) {
+                        registerWorkDetail(bestRoom.roomName, {
+                            detailId: "Upgrade:" + room.controller!.id,
+                            maxCreeps: countWorkTargets,
+                            maxWorkParts: 0,
+                            parentRoom: bestRoom.roomName,
+                            primaryPool: "Upgraders",
+                            priority: "Normal",
+                            workerPools: ["Upgraders"],
+                            detailType: "Upgrade",
+                            targets: workTargets
+                        });
+                    }
+                }
+            }
 
-        //         let rampartsAndWalls = structures
-        //             .filter(s => s.structureType === STRUCTURE_RAMPART || s.structureType === STRUCTURE_WALL)
-        //             .map(s => s as StructureWall | StructureRampart);
+            //         let repairBuildings = structures.filter(
+            //             s =>
+            //                 s.hits < s.hitsMax * 0.5 &&
+            //                 s.structureType !== STRUCTURE_RAMPART &&
+            //                 s.structureType !== STRUCTURE_WALL &&
+            //                 s.structureType !== STRUCTURE_CONTROLLER
+            //         );
+            //         this.updateStructureRepair(bestRoom, repairBuildings);
 
-        //         let lowRamps = rampartsAndWalls.filter(s => s.structureType === STRUCTURE_RAMPART && s.hits < 10000);
-        //         this.updateLowRampRepair(bestRoom, lowRamps);
+            //         let rampartsAndWalls = structures
+            //             .filter(s => s.structureType === STRUCTURE_RAMPART || s.structureType === STRUCTURE_WALL)
+            //             .map(s => s as StructureWall | StructureRampart);
 
-        //         let reinforementTargets = rampartsAndWalls.filter(
-        //             r => r.structureType !== STRUCTURE_RAMPART || r.hits > 10000
-        //         );
-        //         let lowestWallBucket: (StructureWall | StructureRampart)[] = [];
-        //         let minBucket: number | undefined;
+            //         let lowRamps = rampartsAndWalls.filter(s => s.structureType === STRUCTURE_RAMPART && s.hits < 10000);
+            //         this.updateLowRampRepair(bestRoom, lowRamps);
 
-        //         reinforementTargets.forEach(r => {
-        //             let bucket = Math.floor(r.hits / 10000);
-        //             if (minBucket === undefined || minBucket > bucket) {
-        //                 minBucket = bucket;
-        //                 lowestWallBucket = [r as StructureWall | StructureRampart];
-        //             } else if (minBucket === bucket) {
-        //                 lowestWallBucket.push(r as StructureWall | StructureRampart);
-        //             }
+            //         let reinforementTargets = rampartsAndWalls.filter(
+            //             r => r.structureType !== STRUCTURE_RAMPART || r.hits > 10000
+            //         );
+            //         let lowestWallBucket: (StructureWall | StructureRampart)[] = [];
+            //         let minBucket: number | undefined;
+
+            //         reinforementTargets.forEach(r => {
+            //             let bucket = Math.floor(r.hits / 10000);
+            //             if (minBucket === undefined || minBucket > bucket) {
+            //                 minBucket = bucket;
+            //                 lowestWallBucket = [r as StructureWall | StructureRampart];
+            //             } else if (minBucket === bucket) {
+            //                 lowestWallBucket.push(r as StructureWall | StructureRampart);
+            //             }
+            //         });
+            //         this.updateWallReinforcement(bestRoom, reinforementTargets, minBucket ?? 0);
+
+            //         if (room.controller?.owner?.username === global.PLAYER_USERNAME) {
+            //             registerWorkDetail(bestRoom.roomName, {
+            //                 detailId: "Upgrade:" + room.controller!.id,
+            //                 detailType: "Upgrade",
+            //                 targetStructureType: STRUCTURE_CONTROLLER,
+            //                 destPosition: room.controller!.pos,
+            //                 targetId: room.controller!.id
+            //             });
+            //         }
+
+            //         break; //only scan one room per tick
+            //     }
+            // }
+        }
+
+        // private updateCSites(system: RoomWorkSystem, sites: ConstructionSite[]) {
+        //     if(sites.length)
+        //         registerWorkDetail(system.roomName, {
+        //             detailId: "Construct:" + system.roomName,
+        //             detailType: "Construction",
+        //             currentProgress: site.progress,
+        //             targetProgress: site.progressTotal,
+        //             targetId: site.id
         //         });
-        //         this.updateWallReinforcement(bestRoom, reinforementTargets, minBucket ?? 0);
+        //     });
+        // }
 
-        //         if (room.controller?.owner?.username === global.PLAYER_USERNAME) {
-        //             registerWorkDetail(bestRoom.roomName, {
-        //                 detailId: "Upgrade:" + room.controller!.id,
-        //                 detailType: "Upgrade",
-        //                 targetStructureType: STRUCTURE_CONTROLLER,
-        //                 destPosition: room.controller!.pos,
-        //                 targetId: room.controller!.id
-        //             });
-        //         }
+        // private updateStructureRepair(system: RoomWorkSystem, structures: Structure[]) {
+        //     structures.forEach(structure => {
+        //         registerWorkDetail(system.roomName, {
+        //             detailId: "Repair:" + structure.id,
+        //             detailType: "Repair",
+        //             destPosition: structure.pos,
+        //             targetId: structure.id
+        //         });
+        //     });
+        // }
 
-        //         break; //only scan one room per tick
-        //     }
+        // private updateLowRampRepair(system: RoomWorkSystem, structures: Structure[]) {
+        //     structures.forEach(structure => {
+        //         registerWorkDetail(system.roomName, {
+        //             detailId: "RepairRamp:" + structure.id,
+        //             detailType: "Repair",
+        //             destPosition: structure.pos,
+        //             targetProgress: 15000,
+        //             currentProgress: structure.hits,
+        //             targetId: structure.id,
+        //             targetStructureType: STRUCTURE_RAMPART
+        //         });
+        //     });
+        // }
+
+        // private updateWallReinforcement(
+        //     system: RoomWorkSystem,
+        //     walls: (StructureWall | StructureRampart)[],
+        //     bucket: number
+        // ) {
+        //     let targetHits = (bucket + 1) * 10000 + 5000;
+        //     walls.forEach(wall => {
+        //         registerWorkDetail(system.roomName, {
+        //             detailId: "Reinforce:" + wall.id,
+        //             detailType: "Reinforce",
+        //             destPosition: wall.pos,
+        //             currentProgress: wall.hits,
+        //             targetProgress: targetHits,
+        //             targetId: wall.id
+        //         });
+        //     });
         // }
     }
-
-    // private updateCSites(system: RoomWorkSystem, sites: ConstructionSite[]) {
-    //     if(sites.length)
-    //         registerWorkDetail(system.roomName, {
-    //             detailId: "Construct:" + system.roomName,
-    //             detailType: "Construction",
-    //             currentProgress: site.progress,
-    //             targetProgress: site.progressTotal,
-    //             targetId: site.id
-    //         });
-    //     });
-    // }
-
-    // private updateStructureRepair(system: RoomWorkSystem, structures: Structure[]) {
-    //     structures.forEach(structure => {
-    //         registerWorkDetail(system.roomName, {
-    //             detailId: "Repair:" + structure.id,
-    //             detailType: "Repair",
-    //             destPosition: structure.pos,
-    //             targetId: structure.id
-    //         });
-    //     });
-    // }
-
-    // private updateLowRampRepair(system: RoomWorkSystem, structures: Structure[]) {
-    //     structures.forEach(structure => {
-    //         registerWorkDetail(system.roomName, {
-    //             detailId: "RepairRamp:" + structure.id,
-    //             detailType: "Repair",
-    //             destPosition: structure.pos,
-    //             targetProgress: 15000,
-    //             currentProgress: structure.hits,
-    //             targetId: structure.id,
-    //             targetStructureType: STRUCTURE_RAMPART
-    //         });
-    //     });
-    // }
-
-    // private updateWallReinforcement(
-    //     system: RoomWorkSystem,
-    //     walls: (StructureWall | StructureRampart)[],
-    //     bucket: number
-    // ) {
-    //     let targetHits = (bucket + 1) * 10000 + 5000;
-    //     walls.forEach(wall => {
-    //         registerWorkDetail(system.roomName, {
-    //             detailId: "Reinforce:" + wall.id,
-    //             detailType: "Reinforce",
-    //             destPosition: wall.pos,
-    //             currentProgress: wall.hits,
-    //             targetProgress: targetHits,
-    //             targetId: wall.id
-    //         });
-    //     });
-    // }
 }
 
 export let _shardWorkerSystem: ShardWorkerSystem = new ShardWorkerSystem();

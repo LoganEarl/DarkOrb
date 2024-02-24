@@ -3,21 +3,21 @@
 
     There are types of work that can be done. If a given type of work needs attention, a work detail is 
     created for the work type. Targets are registered to that work detail. A portion of the worker pool
-    will be dispatched to accomplish the work when convinient. 
+    will be dispatched to accomplish the work when convenient.
 
-    There are multiple pools of workers, deliniated by their body composition. Each work detail specifies
+    There are multiple pools of workers, delineated by their body composition. Each work detail specifies
     which pools of workers have access to the work. 
 
     Work details are prioritized within their worker pools. Idle workers will be assigned to the detail
     with the highest priority. 
 
-    When posting a work detail, it is preffered if the detail's target progress can be reasonably 
+    When posting a work detail, it is preferred if the detail's target progress can be reasonably
     reached within a few hundred ticks. This keeps workers from getting stuck on a single job for too
     long.
 
     Work targets each have their own sub-priority. This is used when individual workers are choosing 
     a target. If none is provided workers will choose whichever is the closest for roads and walls,
-    and choose from a preset build priority list for buildings and upgrde jobs
+    and choose from a preset build priority list for buildings and upgrder jobs
 
 */
 type DetailType =
@@ -25,7 +25,7 @@ type DetailType =
     | "Construction" //Build buildings
     | "Reinforce" //Build ramparts/walls higher. Used when all ramparts are around the same hits
     | "Repair" //Repair buildings in the room
-    | "RampartRepair"; //Repair ramparts that are very low and rampars that are significantly lower than their neighboors
+    | "RampartRepair"; //Repair ramparts that are very low and ramparts that are significantly lower than their neighbors
 
 type WorkerPool = "Workers" | "Upgraders" | "EmergencyRepairers";
 
@@ -43,8 +43,11 @@ interface WorkTarget {
     packedPosition: string;
     currentProgress: number;
     targetProgress: number;
-    targetId: Id<Structure | ConstructionSite | StructureController>;
-    targetType: StructureConstant;
+    //A unique id for this work target. Not necessarily the game object id, like in the case of upgraders
+    targetId: string;
+    //Corresponds with the game object we will be operating on
+    gameObjectId: Id<Structure | ConstructionSite | StructureController>;
+    gameObjectType: StructureConstant;
 }
 
 interface WorkDetail {
@@ -61,7 +64,7 @@ interface WorkDetail {
     //The max number of creeps that can work on this
     maxCreeps: number;
 
-    //Maps the target id as a string to the work target
+    //Maps the target id as a string to the work target. targetId != game object id
     targets: { [targetId: string]: WorkTarget };
 }
 

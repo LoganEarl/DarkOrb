@@ -160,7 +160,9 @@ export class RoomPlanner implements PriorityQueueItem {
                 extensionPods: this.placedExtensionPods,
                 roadPositions: this.placedRoads,
                 towerPositions: this.placedTowers,
-                wallPositions: this.placedWalls
+                wallPositions: this.placedWalls,
+                upgraderPositions: this.upgraderPositions,
+                upgradeContainerPos: this.placedUpgradeContainer
             };
         } else if (this.planningState === "Failed") {
             return { score: 0 };

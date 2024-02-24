@@ -81,7 +81,10 @@ export class RoomWorkSystem {
             if (!assignment) assignment = _assignWorkDetail(creep, pool, workDetails, this.creepAssignments);
             if (assignment) {
                 this.creepAssignments.set(creep.name, assignment.detailId);
-                //TODO do the thing
+                let finished = _runCreep(creep, assignment, this.roomName, handle, [], getRoomData(creep.pos.roomName)!)
+                if(finished) {
+                    this.creepAssignments.delete(creep.name);
+                }
             }
         }
     }

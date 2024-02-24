@@ -304,6 +304,9 @@ export function _runCreep(
                     analyticsCategories.push(ANALYTICS_PRIEST, ANALYTICS_UPGRADE);
                     if (creep.upgradeController(target) === OK) energySpent = estimatedDrdt;
                     workTarget.currentProgress = target.progress;
+                    if(workTarget.targetProgress <= workTarget.currentProgress) {
+                        done = true;
+                    }
                 }
 
                 //TODO do this in such a way that we never drop energy on the ground during death
@@ -511,6 +514,8 @@ export function _runCreep(
     //         );
     //     }
     // }
+
+    if (done) completeWorkTarget(parentRoomName, workDetail.detailId, targetLock.targetId);
 
     return done;
 }

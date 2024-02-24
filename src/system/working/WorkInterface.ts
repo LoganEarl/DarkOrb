@@ -42,3 +42,10 @@ export function deleteWorkDetail(roomName: string, detailId: string) {
     if (memory.details[roomName]?.[detailId]) delete memory.details[roomName]?.[detailId];
     updateMemory(memory);
 }
+
+export function completeWorkTarget(roomName: string, detailId: string, targetId: string) {
+    memory.loadMemory();
+    if (memory.details[roomName]?.[detailId]?.targets[targetId])
+        delete memory.details[roomName][detailId].targets[targetId];
+    updateMemory(memory);
+}

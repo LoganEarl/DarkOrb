@@ -8,7 +8,7 @@ import {
 import { getRoomData } from "system/scouting/ScoutInterface";
 import { getMainStorage } from "system/storage/StorageInterface";
 import { FEATURE_VISUALIZE_FAST_FILLER } from "utils/featureToggles/FeatureToggleConstants";
-import { getFeature } from "utils/featureToggles/FeatureToggles";
+import {shouldVisualize} from "utils/featureToggles/FeatureToggles";
 import { Log } from "utils/logger/Logger";
 import { findPositionsInsideRect, getFreeSpacesNextTo, getMultirooomDistance, roomPos } from "utils/UtilityFunctions";
 import { getCreeps, registerCreepConfig, unregisterHandle } from "../SpawnInterface";
@@ -57,17 +57,17 @@ export class RoomFastFillerSystem {
 
             if (fillersForPosition.length) {
                 runFillersForPosition(fillersForPosition, this.fillerPositions[i], fillRecords);
-                if (getFeature(FEATURE_VISUALIZE_FAST_FILLER)) {
+                if (shouldVisualize(FEATURE_VISUALIZE_FAST_FILLER)) {
                     visual.circle(this.fillerPositions[i].standingPosition, { radius: 0.5, fill: "blue" });
                 }
             } else {
-                if (getFeature(FEATURE_VISUALIZE_FAST_FILLER)) {
+                if (shouldVisualize(FEATURE_VISUALIZE_FAST_FILLER)) {
                     visual.circle(this.fillerPositions[i].standingPosition, { radius: 0.5, fill: "red" });
                 }
             }
         }
 
-        if (getFeature(FEATURE_VISUALIZE_FAST_FILLER)) {
+        if (shouldVisualize(FEATURE_VISUALIZE_FAST_FILLER)) {
             let placedFiller = getRoomData(this.roomName)?.roomPlan?.fastFiller;
             if (placedFiller) {
                 let width = placedFiller.group[8].buildings.length;

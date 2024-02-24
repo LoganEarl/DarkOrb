@@ -4,7 +4,7 @@ import { floodFill } from "utils/algorithms/FloodFill";
 import { LagoonDetector } from "utils/algorithms/LagoonFlow";
 import { getCutTiles, Rectangle } from "utils/algorithms/MinCut";
 import { FEATURE_VISUALIZE_PLANNING } from "utils/featureToggles/FeatureToggleConstants";
-import { getFeature } from "utils/featureToggles/FeatureToggles";
+import {shouldVisualize} from "utils/featureToggles/FeatureToggles";
 import { Log } from "utils/logger/Logger";
 import { unpackCoordList, unpackPos, unpackPosList } from "utils/Packrat";
 import { PriorityQueue, PriorityQueueItem } from "utils/PriorityQueue";
@@ -139,7 +139,7 @@ export class RoomPlanner implements PriorityQueueItem {
             this.placeTowers();
             this.planningState = "Done";
         } else if (this.planningState === "Done") {
-            if (getFeature(FEATURE_VISUALIZE_PLANNING)) {
+            if (shouldVisualize(FEATURE_VISUALIZE_PLANNING)) {
                 let visual = new RoomVisual(this.roomName);
                 this.placedWalls!.forEach(pos => visual.structure(pos.x, pos.y, STRUCTURE_RAMPART, {}));
                 this.placedExtensionPods!.forEach(p => drawPlacedStructureGroup(visual, p));
@@ -181,7 +181,7 @@ export class RoomPlanner implements PriorityQueueItem {
             }
         }
 
-        if (getFeature(FEATURE_VISUALIZE_PLANNING)) {
+        if (shouldVisualize(FEATURE_VISUALIZE_PLANNING)) {
             drawPathMatrix(new RoomVisual(this.roomName), pathMatrix);
         }
 
@@ -245,7 +245,7 @@ export class RoomPlanner implements PriorityQueueItem {
             forbiddenMatrix.set(p.x, p.y, 255);
         }
 
-        if (getFeature(FEATURE_VISUALIZE_PLANNING)) {
+        if (shouldVisualize(FEATURE_VISUALIZE_PLANNING)) {
             drawForbiddenMatrix(new RoomVisual(this.roomName), forbiddenMatrix);
         }
 
@@ -269,7 +269,7 @@ export class RoomPlanner implements PriorityQueueItem {
                 };
             }
 
-            if (getFeature(FEATURE_VISUALIZE_PLANNING)) {
+            if (shouldVisualize(FEATURE_VISUALIZE_PLANNING)) {
                 let visual = new RoomVisual(this.roomName);
                 drawPlacedStructureGroup(visual, this.placedFastFiller);
                 visual.connectRoads();
@@ -302,7 +302,7 @@ export class RoomPlanner implements PriorityQueueItem {
             }
         }
 
-        if (getFeature(FEATURE_VISUALIZE_PLANNING)) {
+        if (shouldVisualize(FEATURE_VISUALIZE_PLANNING)) {
             let visual = new RoomVisual(this.roomName);
             if (lagoonMatrix) drawLagoonMatrix(visual, lagoonMatrix);
             else this.laggonDetector.visualize(visual);
@@ -361,7 +361,7 @@ export class RoomPlanner implements PriorityQueueItem {
             };
         } else this.fail("Couldn't find a place for the storage core");
 
-        if (getFeature(FEATURE_VISUALIZE_PLANNING)) {
+        if (shouldVisualize(FEATURE_VISUALIZE_PLANNING)) {
             let visual = new RoomVisual(this.roomName);
             drawPathMatrix(visual, this.pathMatrix!);
             drawPlacedStructureGroup(visual, this.placedFastFiller);
@@ -409,7 +409,7 @@ export class RoomPlanner implements PriorityQueueItem {
             this.storageGradient = results;
         }
 
-        if (getFeature(FEATURE_VISUALIZE_PLANNING)) {
+        if (shouldVisualize(FEATURE_VISUALIZE_PLANNING)) {
             let visual = new RoomVisual(this.roomName);
             fillCoords(visual, this.storageGradient ?? this.scoredCoords);
             drawPlacedStructureGroup(visual, this.placedStorageCore);
@@ -451,7 +451,7 @@ export class RoomPlanner implements PriorityQueueItem {
             return this.fail("Unable to place fast filler");
         }
 
-        if (getFeature(FEATURE_VISUALIZE_PLANNING)) {
+        if (shouldVisualize(FEATURE_VISUALIZE_PLANNING)) {
             let visual = new RoomVisual(this.roomName);
             drawPlacedStructureGroup(visual, this.placedFastFiller);
             drawPlacedStructureGroup(visual, this.placedStorageCore);
@@ -495,7 +495,7 @@ export class RoomPlanner implements PriorityQueueItem {
             };
         });
 
-        if (getFeature(FEATURE_VISUALIZE_PLANNING)) {
+        if (shouldVisualize(FEATURE_VISUALIZE_PLANNING)) {
             let visual = new RoomVisual(this.roomName);
             fillCoords(visual, this.storageGradient.slice(0, checkedTo + 1));
             this.placedExtensionPods.forEach(p => drawPlacedStructureGroup(visual, p));
@@ -559,7 +559,7 @@ export class RoomPlanner implements PriorityQueueItem {
             this.upgraderPositions = this.upgraderPositions!.filter(p => this.pathMatrix?.get(p.x, p.y) !== 1);
         }
 
-        if (getFeature(FEATURE_VISUALIZE_PLANNING)) {
+        if (shouldVisualize(FEATURE_VISUALIZE_PLANNING)) {
             let visual = new RoomVisual(this.roomName);
             this.placedExtensionPods!.forEach(p => drawPlacedStructureGroup(visual, p));
             drawPlacedStructureGroup(visual, this.placedStorageCore);
@@ -651,7 +651,7 @@ export class RoomPlanner implements PriorityQueueItem {
             }
         });
 
-        if (getFeature(FEATURE_VISUALIZE_PLANNING)) {
+        if (shouldVisualize(FEATURE_VISUALIZE_PLANNING)) {
             let visual = new RoomVisual(this.roomName);
             visual.circle(avgX, avgY, { radius: 1, fill: "red" });
 

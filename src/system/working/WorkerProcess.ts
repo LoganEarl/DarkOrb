@@ -1,6 +1,6 @@
 import { Process } from "core/Process";
 import { FEATURE_VISUALIZE_WORK } from "utils/featureToggles/FeatureToggleConstants";
-import { getFeature } from "utils/featureToggles/FeatureToggles";
+import {shouldVisualize} from "utils/featureToggles/FeatureToggles";
 import { profile } from "utils/profiler/Profiler";
 import { ScheduledJob } from "utils/ScheduledJob";
 import { _shardWorkerSystem } from "./ShardWorkerSystem";
@@ -29,7 +29,7 @@ export class WorkerProcess extends Process {
         _shardWorkerSystem._runCreeps();
         _shardWorkerSystem._scanForWork();
 
-        if (getFeature(FEATURE_VISUALIZE_WORK)) {
+        if (shouldVisualize(FEATURE_VISUALIZE_WORK)) {
             _shardWorkerSystem._visualize();
         }
     }

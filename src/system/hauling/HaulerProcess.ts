@@ -1,7 +1,7 @@
 import { Process } from "core/Process";
 import { _shardMinerSystem } from "system/mining/ShardMinerSystem";
 import { FEATURE_VISUALIZE_HAULING } from "utils/featureToggles/FeatureToggleConstants";
-import { getFeature } from "utils/featureToggles/FeatureToggles";
+import {getFeature, shouldVisualize} from "utils/featureToggles/FeatureToggles";
 import { profile } from "utils/profiler/Profiler";
 import { ScheduledJob } from "utils/ScheduledJob";
 import { _shardHaulerSystem } from "./ShardHaulerSystem";
@@ -30,7 +30,7 @@ export class HaulerProcess extends Process {
 
         _shardHaulerSystem._runCreeps();
 
-        if (getFeature(FEATURE_VISUALIZE_HAULING)) {
+        if (shouldVisualize(FEATURE_VISUALIZE_HAULING)) {
             _shardHaulerSystem._visualize();
         }
     }

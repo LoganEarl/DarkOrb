@@ -1,6 +1,6 @@
 import { Process } from "core/Process";
 import { FEATURE_VISUALIZE_STORAGE } from "utils/featureToggles/FeatureToggleConstants";
-import { getFeature } from "utils/featureToggles/FeatureToggles";
+import {shouldVisualize} from "utils/featureToggles/FeatureToggles";
 import { profile } from "utils/profiler/Profiler";
 import { ScheduledJob } from "utils/ScheduledJob";
 import { _shardStorageSystem } from "./ShardStorageSystem";
@@ -27,7 +27,7 @@ export class StorageProcess extends Process {
     postRun(): void {
         _shardStorageSystem._totalAnalytics();
 
-        if (getFeature(FEATURE_VISUALIZE_STORAGE)) {
+        if (shouldVisualize(FEATURE_VISUALIZE_STORAGE)) {
             _shardStorageSystem._visualize();
         }
     }

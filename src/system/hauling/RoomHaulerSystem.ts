@@ -2,7 +2,7 @@ import { getRallyPosition, scoutRoom } from "system/scouting/ScoutInterface";
 import { getCreeps, maximizeBody, registerCreepConfig, unregisterHandle } from "system/spawning/SpawnInterface";
 import { getMainStorage } from "system/storage/StorageInterface";
 import { FEATURE_VISUALIZE_HAULING } from "utils/featureToggles/FeatureToggleConstants";
-import { getFeature } from "utils/featureToggles/FeatureToggles";
+import {getFeature, shouldVisualize} from "utils/featureToggles/FeatureToggles";
 import { profile } from "utils/profiler/Profiler";
 import { Traveler } from "utils/traveler/Traveler";
 import { clamp, drawBar, drawCircledItem } from "utils/UtilityFunctions";
@@ -166,7 +166,7 @@ export class RoomHaulerSystem {
     }
 
     public _visualize() {
-        if (!getFeature(FEATURE_VISUALIZE_HAULING)) return;
+        if (!shouldVisualize(FEATURE_VISUALIZE_HAULING)) return;
         let nodes = getNodes(this.roomName);
 
         let visuals: { [roomName: string]: RoomVisual } = {};

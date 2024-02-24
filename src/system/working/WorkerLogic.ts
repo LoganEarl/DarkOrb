@@ -101,7 +101,7 @@ export function _assignWorkDetail(
     details: { [detailId: string]: WorkDetail },
     assignments: Map<string, string>
 ): WorkDetail | undefined {
-    if (!details) return undefined;
+    if (!details.length) return undefined;
 
     //Figure out how many work parts are already assigned to each work detail
     let workPartsPerDetail = new Map<string, number>();

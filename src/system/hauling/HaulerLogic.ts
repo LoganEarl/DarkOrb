@@ -1,6 +1,6 @@
 import { postAnalyticsEvent } from "system/storage/StorageInterface";
 import { FEATURE_VISUALIZE_HAULING } from "utils/featureToggles/FeatureToggleConstants";
-import { getFeature } from "utils/featureToggles/FeatureToggles";
+import {getFeature, shouldVisualize} from "utils/featureToggles/FeatureToggles";
 import { Log } from "utils/logger/Logger";
 import { PriorityQueue } from "utils/PriorityQueue";
 import { profile } from "utils/profiler/Profiler";
@@ -60,7 +60,7 @@ class HaulerLogic {
             return runResults;
         }
 
-        if (getFeature(FEATURE_VISUALIZE_HAULING)) {
+        if (shouldVisualize(FEATURE_VISUALIZE_HAULING)) {
             let color = targetNode.type === "Sink" ? "green" : "yellow";
 
             if (creep.room.name === targetPos.roomName) {

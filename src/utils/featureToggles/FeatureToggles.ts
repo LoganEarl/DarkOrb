@@ -1,4 +1,10 @@
+import {FEATURE_VISUALIZE_ALL} from "./FeatureToggleConstants";
+
 var featureCache: { [feature: string]: boolean } = {};
+
+export function shouldVisualize(visualizationFeature: string): boolean {
+    return getFeature(visualizationFeature) || getFeature(FEATURE_VISUALIZE_ALL);
+}
 
 export function getFeature(feature: string): boolean {
     if (!featureCache[feature]) {

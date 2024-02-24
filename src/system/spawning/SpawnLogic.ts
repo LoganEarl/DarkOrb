@@ -16,8 +16,10 @@ const defaultPriorities = [
 ];
 
 export const _priorityComparator = (a: CreepConfig, b: CreepConfig) => {
-    let aPriority = defaultPriorities.indexOf(a.jobName) ?? 9999999;
+    let aPriority = defaultPriorities.indexOf(a.jobName);
+    if(aPriority === -1) aPriority = 9999999
     let bPriority = defaultPriorities.indexOf(b.jobName) ?? 9999999;
+    if(bPriority === -1) bPriority = 9999999
     if (aPriority === bPriority) {
         aPriority = a.subPriority ?? 9999999;
         bPriority = b.subPriority ?? 9999999;

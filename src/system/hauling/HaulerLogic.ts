@@ -5,7 +5,7 @@ import {profile} from "utils/profiler/Profiler";
 import {Traveler} from "utils/traveler/Traveler";
 import {clamp, findSortedIndex, maxBy} from "utils/UtilityFunctions";
 
-const MAX_ASSIGNMENTS_PER_NODE = 10; //No more than this many creeps assigned to a single node
+const MAX_ASSIGNMENTS_PER_NODE = 3; //No more than this many creeps assigned to a single node
 
 //Have hauler carry out its assignment. Will return true if done with current assignment
 

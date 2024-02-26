@@ -157,6 +157,8 @@ export class RoomFastFillerSystem {
             } else {
                 node.priorityScalar = 50;
             }
+        } else if (node) {
+            unregisterNode(this.roomName, this.handle, nodeId);
         }
         //Make new node
         else if (container.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {

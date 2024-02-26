@@ -12,13 +12,19 @@ import {
 } from "system/storage/AnalyticsConstants";
 import {getEnergyPerTick, getMainStorage} from "system/storage/StorageInterface";
 import {getWorkDetails} from "./WorkInterface";
-import {_assignWorkDetail, _runCreep} from "./WorkerLogic";
-import {Log} from "../../utils/logger/Logger";
+import {workerLogic} from "./WorkerLogic";
+import {findStructure} from "../../utils/StructureFindCache";
+import {drawBar, roomPos} from "../../utils/UtilityFunctions";
+import {unpackPos} from "../../utils/Packrat";
+import {getNode, registerNode} from "../hauling/HaulerInterface";
+import {Traveler} from "../../utils/traveler/Traveler";
 
 export class RoomWorkSystem {
     public roomName: string;
     //Creep name to work detail id
     private creepAssignments: Map<string, string> = new Map();
+    private targetWorkParts: number = 0;
+    private targetUpgradeParts: number = 0;
 
     constructor(roomName: string) {
         this.roomName = roomName;
@@ -37,27 +43,30 @@ export class RoomWorkSystem {
     }
 
     _visualize() {
-        // if (Game.rooms[this.roomName]) {
-        //     Object.values(getWorkDetails(this.roomName)).forEach(detail => {
-        //         new RoomVisual(detail.destPosition.roomName).rect(
-        //             detail.destPosition.x - 0.5,
-        //             detail.destPosition.y - 0.5,
-        //             1,
-        //             1,
-        //             {
-        //                 fill: "transparent",
-        //                 stroke: "yellow"
-        //             }
-        //         );
-        //     });
-        //     let numWork = _.sum(getCreeps(this.handle), c => _.sum(c.body, p => (p.type === WORK ? 1 : 0)));
-        //     drawBar(
-        //         `WorkerParts: ${numWork}/${this.targetWorkParts}`,
-        //         2,
-        //         numWork / this.targetWorkParts,
-        //         Game.rooms[this.roomName].visual
-        //     );
-        // }
+        if (Game.rooms[this.roomName]) {
+            Object.values(getWorkDetails(this.roomName)).forEach(detail => {
+                Object.values(detail.targets).forEach(target => {
+                    let destPosition = unpackPos(target.packedPosition)
+                    new RoomVisual(destPosition.roomName).rect(
+                        destPosition.x - 0.5,
+                        destPosition.y - 0.5,
+                        1,
+                        1,
+                        {
+                            fill: "transparent",
+                            stroke: "yellow"
+                        }
+                    );
+                })
+            });
+            let numWork = _.sum(getCreeps(this.workHandle), c => _.sum(c.body, p => (p.type === WORK ? 1 : 0)));
+            drawBar(
+                `WorkerParts: ${numWork}/${this.targetWorkParts}`,
+                2,
+                numWork / this.targetWorkParts,
+                Game.rooms[this.roomName].visual
+            );
+        }
     }
 
     _runCreeps() {
@@ -66,6 +75,7 @@ export class RoomWorkSystem {
         this.runCreepPool("Upgraders", this.upgradeHandle, details);
         this.runCreepPool("Workers", this.workHandle, details);
         this.runCreepPool("EmergencyRepairers", this.eRepairHandle, details);
+        this.updateUpgraderContainerNode();
     }
 
     private runCreepPool(pool: WorkerPool, handle: string, workDetails: {
@@ -76,14 +86,60 @@ export class RoomWorkSystem {
             let assignment: WorkDetail | undefined = this.creepAssignments.get(creep.name)
                 ? workDetails[this.creepAssignments.get(creep.name)!]
                 : undefined;
-            if (!assignment) assignment = _assignWorkDetail(creep, pool, workDetails, this.creepAssignments);
+            if (!assignment) assignment = workerLogic._assignWorkDetail(creep, pool, workDetails, this.creepAssignments);
             if (assignment) {
                 this.creepAssignments.set(creep.name, assignment.detailId);
-                let finished = _runCreep(creep, assignment, this.roomName, handle, [], getRoomData(creep.pos.roomName)!)
+                let finished = workerLogic._runCreep(creep, assignment, this.roomName, handle, [], getRoomData(creep.pos.roomName)!)
                 if (finished) {
                     this.creepAssignments.delete(creep.name);
                 }
             }
+        }
+    }
+
+    private updateUpgraderContainerNode() {
+        let mapData = getRoomData(this.roomName);
+        if (mapData?.roomPlan?.upgradeContainerPos) {
+            let containerPos = roomPos(mapData!.roomPlan!.upgradeContainerPos!, this.roomName);
+            let upgradeContainer = findStructure(Game.rooms[this.roomName], FIND_STRUCTURES)
+                .find(s => s instanceof StructureContainer &&
+                    s.pos.getRangeTo(containerPos) === 0) as StructureContainer | undefined
+            if (upgradeContainer) {
+                let existingNode = getNode(this.roomName, "UpgradeContainer")
+                //The mod thing makes sure we re-measure the path cost every once in a while
+                if(existingNode && Game.time % 150 != 43) {
+                    existingNode.level = upgradeContainer.store.getUsedCapacity(RESOURCE_ENERGY)
+                    existingNode.baseDrdt = this.targetUpgradeParts * UPGRADE_CONTROLLER_POWER
+                } else {
+                    let pathCost = 40;
+                    let pathLength = 20;
+                    let storage = getMainStorage(this.roomName)
+                    if(storage) {
+                        let pathInfo = Traveler.findTravelPath(storage, Game.rooms[this.roomName].controller!, {
+                            plainCost: 2,
+                            range: 1,
+                            ignoreRoads: false,
+                            ignoreStructures: false
+                        });
+                        pathCost = pathInfo.cost;
+                        pathLength = pathInfo.path.length
+                    }
+
+                    registerNode(this.roomName, this.upgradeHandle, {
+                        analyticsCategories: [],
+                        baseDrdt: this.targetUpgradeParts * UPGRADE_CONTROLLER_POWER,
+                        lastKnownPosition: upgradeContainer.pos,
+                        level: upgradeContainer.store.getUsedCapacity(RESOURCE_ENERGY),
+                        maxLevel: upgradeContainer.store.getCapacity(RESOURCE_ENERGY),
+                        nodeId: "UpgradeContainer",
+                        resource: RESOURCE_ENERGY,
+                        serviceRoute: {pathCost: pathCost, pathLength: pathLength},
+                        targetId: upgradeContainer.id,
+                        type: "Sink"
+                    })
+                }
+            }
+
         }
     }
 
@@ -123,9 +179,13 @@ export class RoomWorkSystem {
         }
 
         let energyBudgetPerWorkerPool: Map<WorkerPool, number> = new Map();
+        let maxUpgraders = 0;
         for (let detail of details) {
             //First just signal that this pool is needed
             energyBudgetPerWorkerPool.set(detail.primaryPool, 1);
+            if (detail.primaryPool === "Upgraders") {
+                maxUpgraders += detail.maxCreeps;
+            }
         }
         //TODO this is super crude. Eventually we will want more granular control over energy distribution per rcl
         //Next scale each pool to match the desired ratio (for now, just even distribution)
@@ -140,20 +200,21 @@ export class RoomWorkSystem {
             //Split the energy amongst the pools
             for (let pool of energyBudgetPerWorkerPool.keys()) {
                 //Minimum of 1e/t
-                energyBudgetPerWorkerPool.set(pool, Math.min(Math.floor(availableEnergy / numActivePools), 1));
+                let energy = Math.max(Math.floor(availableEnergy / numActivePools), 1);
+                energyBudgetPerWorkerPool.set(pool, energy);
             }
         }
 
         //If we need workers, queue them up
         let workEnergy = energyBudgetPerWorkerPool.get("Workers");
         if (workEnergy) {
-            let targetWorkParts = Math.ceil(workEnergy / BUILD_POWER);
+            this.targetWorkParts = Math.ceil(workEnergy / BUILD_POWER);
             //TODO make a new version of this that makes all the creeps the same size
             let bodies = maximizeBodyForTargetParts(
                 [WORK, CARRY, CARRY, MOVE, MOVE],
                 [WORK, CARRY, CARRY, MOVE, MOVE],
                 WORK,
-                targetWorkParts,
+                this.targetWorkParts,
                 Game.rooms[this.roomName]!.energyCapacityAvailable
             );
             let configs: CreepConfig[] = [];
@@ -173,24 +234,28 @@ export class RoomWorkSystem {
 
         let upgradeEnergy = energyBudgetPerWorkerPool.get("Upgraders");
         if (upgradeEnergy) {
-            let targetWorkParts = Math.ceil(upgradeEnergy / UPGRADE_CONTROLLER_POWER);
+            this.targetUpgradeParts = Math.ceil(upgradeEnergy / UPGRADE_CONTROLLER_POWER);
             let bodies = maximizeBodyForTargetParts(
                 [WORK, WORK, CARRY, MOVE],
                 [WORK, WORK, MOVE],
                 WORK,
-                targetWorkParts,
+                this.targetUpgradeParts,
                 Game.rooms[this.roomName].energyAvailable
             );
             let configs: CreepConfig[] = [];
-            for (let i = 0; i < bodies.length; i++) {
+            for (let i = 0; i < bodies.length && i < maxUpgraders; i++) {
                 configs.push({
                     handle: this.upgradeHandle,
-                    subHandle: "Priest:" + 1,
+                    subHandle: "Priest:" + i,
                     body: bodies[i],
                     jobName: "Priest",
-                    quantity: 1
+                    quantity: 1,
+                    dontPrespawnParts: true //We do this because there is limited space available.
                 });
             }
+            registerCreepConfig(this.upgradeHandle, configs, this.roomName);
+        } else {
+            unregisterHandle(this.upgradeHandle);
         }
 
         //TODO emergency builders would go here. Need to figure out boosts before I mess with that...

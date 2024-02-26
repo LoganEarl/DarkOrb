@@ -2,8 +2,8 @@ import {getMainStorage} from "system/storage/StorageInterface";
 import {unpackPosList} from "utils/Packrat";
 import {profile} from "utils/profiler/Profiler";
 import {drawBar} from "utils/UtilityFunctions";
-import {_calcualteMiningPath} from "./MinerLogic";
 import {SourceMinerSystem} from "./SourceMinerSystem";
+import {minerLogic} from "./MinerLogic";
 
 //TODO Hardcoded for now. Replace when I have spawn loading controls
 const MAX_MINING_OPERATIONS = 6;
@@ -11,7 +11,7 @@ const MAX_MINING_OPERATIONS = 6;
 @profile
 export class RoomMinerSystem {
     private sourceMinerSystems: { [sourceId: string]: SourceMinerSystem } = {};
-    private roomName: string;
+    public roomName: string;
 
     constructor(roomName: string) {
         this.roomName = roomName;
@@ -25,7 +25,7 @@ export class RoomMinerSystem {
         )?.packedFreeSpots;
         let mainStorage = getMainStorage(this.roomName);
         if (packedFreeSpots !== undefined && mainStorage !== undefined) {
-            let miningPath = _calcualteMiningPath(mainStorage.pos, unpackPosList(packedFreeSpots)[0]);
+            let miningPath = minerLogic._calcualteMiningPath(mainStorage.pos, unpackPosList(packedFreeSpots)[0]);
             return miningPath.incomplete ? 999 : miningPath.path.length;
         }
         return 999;
@@ -77,7 +77,8 @@ export class RoomMinerSystem {
     }
 
     _runCreeps() {
-        Object.values(this.sourceMinerSystems).forEach(s => s._runCreeps());
+        Object.values(this.sourceMinerSystems)
+            .forEach(s => s._runCreeps());
     }
 
     _reloadAllConfigs() {

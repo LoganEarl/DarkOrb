@@ -13,13 +13,7 @@ import {packPos, unpackPos, unpackPosList} from "utils/Packrat";
 import {profile} from "utils/profiler/Profiler";
 import {Traveler} from "utils/traveler/Traveler";
 import {getMultirooomDistance, samePos} from "utils/UtilityFunctions";
-import {
-    _assignMiningSpace,
-    _designCreepsForMineral,
-    _designCreepsForSource,
-    _findPathToFreeSpace,
-    _runSourceMiner
-} from "./MinerLogic";
+import {minerLogic} from "./MinerLogic";
 
 /*
     We don't want to do too much here. Calcuate the mining path, figure out our creep configs, and know how to run the logic
@@ -33,7 +27,7 @@ export class SourceMinerSystem implements MemoryComponent {
     private parentRoomName: string;
     private sourceId: Id<Source | Mineral>;
     private isSource: boolean;
-    private freeSpaces: RoomPosition[] = [];
+    private miningStandSpaces: RoomPosition[] = [];
     private creepAssignments: { [creepName: string]: MinerAssignment } = {};
     private configs: CreepConfig[] = [];
 
@@ -59,14 +53,14 @@ export class SourceMinerSystem implements MemoryComponent {
 
     _visualize() {
         this.loadMemory();
-        if (this.freeSpaces.length) {
+        if (this.miningStandSpaces.length) {
             let mainStorage = getMainStorage(this.parentRoomName);
             if (mainStorage) {
                 let state = this.memory!.state;
                 let color = "#ffffff";
                 if (state === "Active") color = "#00ff44";
                 else if (state === "Stopped") color = "#ff0044";
-                Game.map.visual.line(mainStorage.pos, this.freeSpaces[0], {color: color});
+                Game.map.visual.line(mainStorage.pos, this.miningStandSpaces[0], {color: color});
             }
         }
     }
@@ -82,7 +76,7 @@ export class SourceMinerSystem implements MemoryComponent {
         if (this.isSource && roomData?.miningInfo) {
             let ourSourceData = _.find(roomData!.miningInfo!.sources, s => s.id == (this.sourceId as string));
             if (ourSourceData) {
-                this.freeSpaces = unpackPosList(ourSourceData.packedFreeSpots);
+                this.miningStandSpaces = unpackPosList(ourSourceData.packedFreeSpots);
                 this.clearStopReason("NoMapData");
             } else {
                 Log.e(
@@ -91,7 +85,7 @@ export class SourceMinerSystem implements MemoryComponent {
                 this.addStopReason("NoMapData");
             }
         } else if (!this.isSource && roomData?.miningInfo) {
-            this.freeSpaces = unpackPosList(roomData.miningInfo.mineral.packedFreeSpots);
+            this.miningStandSpaces = unpackPosList(roomData.miningInfo.mineral.packedFreeSpots);
             this.clearStopReason("NoMapData");
         } else {
             Log.e(
@@ -107,7 +101,7 @@ export class SourceMinerSystem implements MemoryComponent {
         let mainStorage = getMainStorage(this.parentRoomName);
         if (mainStorage) {
             this.loadFreeSpaces();
-            let path: PathFinderPath | undefined = _findPathToFreeSpace(this.freeSpaces, mainStorage.pos);
+            let path: PathFinderPath | undefined = minerLogic._findPathToFreeSpace(this.miningStandSpaces, mainStorage.pos);
             if (path) {
                 this.clearStopReason("PathBlocked");
                 this.memory!.pathCost = path.cost;
@@ -151,9 +145,9 @@ export class SourceMinerSystem implements MemoryComponent {
             if (mapData) {
                 this.clearStopReason("NoMapData");
                 if (this.isSource) {
-                    this.configs = _designCreepsForSource(
+                    this.configs = minerLogic._designCreepsForSource(
                         handle,
-                        this.freeSpaces.length,
+                        this.miningStandSpaces.length,
                         parentRoom,
                         this.memory!.pathLength,
                         mapData,
@@ -171,7 +165,7 @@ export class SourceMinerSystem implements MemoryComponent {
                     }
                 } else {
                     this.configs = [
-                        _designCreepsForMineral(handle, this.freeSpaces.length, parentRoom, this.memory!.pathLength)
+                        minerLogic._designCreepsForMineral(handle, this.miningStandSpaces.length, parentRoom, this.memory!.pathLength)
                     ];
                 }
                 this.targetWorkParts = _.sum(this.configs, c => _.sum(c.body, p => (p === WORK ? 1 : 0)));
@@ -216,7 +210,7 @@ export class SourceMinerSystem implements MemoryComponent {
                     let threats = (getRoomData(creep.room.name)?.hazardInfo?.numCombatants ?? 0) > 0;
                     if (threats) this.addStopReason("Attacked");
 
-                    if (this.freeSpaces.length < creeps.length && creep.memory.jobName === "Primordial") {
+                    if (this.miningStandSpaces.length < creeps.length && creep.memory.jobName === "Primordial") {
                         creep.suicide();
                         delete this.creepAssignments[creep.name];
                     } else {
@@ -226,19 +220,19 @@ export class SourceMinerSystem implements MemoryComponent {
                                 creeps.length
                             );
 
-                            this.creepAssignments[creep.name] = _assignMiningSpace(
+                            this.creepAssignments[creep.name] = minerLogic._assignMiningSpace(
                                 creep,
-                                this.freeSpaces,
+                                this.miningStandSpaces,
                                 this.sourceId,
                                 this.creepAssignments,
                                 populationSize
                             );
                         }
                         let assignment = this.creepAssignments[creep.name];
-                        let primary = samePos(this.freeSpaces[0], assignment.placeToStand);
+                        let primary = samePos(this.miningStandSpaces[0], assignment.placeToStand);
                         // Log.d(`${creep.name} running with data ${primary}`);
                         if (this.isSource) {
-                            _runSourceMiner(creep, this.parentRoomName, this.handle, assignment, primary);
+                            minerLogic._runSourceMiner(creep, this.parentRoomName, this.handle, assignment, primary);
                             this.updateSourceLogisticsNodes(creep, assignment);
                         } else {
                             //TODO Run mineral miner
@@ -306,9 +300,9 @@ export class SourceMinerSystem implements MemoryComponent {
                 let pathEstimate = 50;
 
                 let mainStorage = getMainStorage(this.parentRoomName);
-                if (this.freeSpaces.length > 0 && mainStorage) {
+                if (this.miningStandSpaces.length > 0 && mainStorage) {
                     //No need to pick the best free space because we are ignoring terrain
-                    pathEstimate = getMultirooomDistance(mainStorage.pos, this.freeSpaces[0]) * 1.25;
+                    pathEstimate = getMultirooomDistance(mainStorage.pos, this.miningStandSpaces[0]) * 1.25;
                 }
 
                 this.memory = {
@@ -340,60 +334,67 @@ export class SourceMinerSystem implements MemoryComponent {
         this.loadMemory();
         let pathLength = this.memory!.pathLength;
         let pathCost = this.memory!.pathCost;
+        let drdt = creep.getBodyPower(WORK, "harvest", HARVEST_POWER) - (creep.getActiveBodyparts(CARRY) ? 0 : 1);
 
+        let containerKey = RESOURCE_ENERGY + ":" + packPos(creep.pos) + ":c"
+        let container = assignment.depositContainer ? Game.getObjectById(assignment.depositContainer) : undefined;
+        if (container) {
+            this.updateSingleNode(containerKey,
+                container.id,
+                container.store.getUsedCapacity(RESOURCE_ENERGY),
+                container.store.getCapacity(RESOURCE_ENERGY),
+                container.pos,
+                pathCost,
+                pathLength,
+                drdt
+            );
+        } else {
+            unregisterNode(this.parentRoomName, this.handle, containerKey);
+        }
+
+        let pileKey = RESOURCE_ENERGY + ":" + packPos(creep.pos) + ":p"
         const piles = creep.pos.lookFor(LOOK_RESOURCES).filter(pile => pile.resourceType === RESOURCE_ENERGY);
         let pile: Resource | undefined;
         if (piles.length) pile = piles[0];
-
-        let container = assignment.depositContainer ? Game.getObjectById(assignment.depositContainer) : undefined;
-
-        let positionKey = RESOURCE_ENERGY + ":" + packPos(creep.pos);
-        if (!container && !pile) {
-            unregisterNode(this.parentRoomName, this.handle, positionKey);
+        if (pile) {
+            this.updateSingleNode(pileKey,
+                pile.id,
+                pile.amount,
+                10000, //Just a big number
+                pile.pos,
+                pathCost, pathLength, drdt);
         } else {
-            let id: string;
-            let level: number, maxLevel: number;
-            let pos: RoomPosition;
+            unregisterNode(this.parentRoomName, this.handle, pileKey);
+        }
+    }
 
-            if (container) {
-                id = container.id;
-                level = container.store.getUsedCapacity(RESOURCE_ENERGY);
-                maxLevel = container.store.getCapacity(RESOURCE_ENERGY);
-                pos = container.pos;
-            } else {
-                pile = pile!;
-                id = pile.id;
-                level = pile.amount;
-                maxLevel = 10000; //just an arbitrarily high number
-                pos = pile.pos;
-            }
-
-            let existingNode = getNode(this.parentRoomName, positionKey);
-            if (existingNode) {
-                existingNode.targetId = id;
-                existingNode.level = level;
-                existingNode.maxLevel = maxLevel;
-                existingNode.lastKnownPosition = pos;
-                existingNode.serviceRoute.pathLength = pathLength;
-                existingNode.serviceRoute.pathCost = pathCost;
-            } else {
-                registerNode(this.parentRoomName, this.handle, {
-                    nodeId: positionKey,
-                    targetId: id,
-                    level: level,
-                    maxLevel: maxLevel,
-                    resource: RESOURCE_ENERGY,
-                    baseDrdt:
-                        creep.getBodyPower(WORK, "harvest", HARVEST_POWER) - (creep.getActiveBodyparts(CARRY) ? 0 : 1),
-                    type: "Source",
-                    analyticsCategories: [this.handle, "Exhumer"],
-                    lastKnownPosition: pos,
-                    serviceRoute: {
-                        pathLength: pathLength,
-                        pathCost: pathCost
-                    }
-                });
-            }
+    private updateSingleNode(nodeId: string, id: string, level: number, maxLevel: number,
+                             pos: RoomPosition, pathCost: number, pathLength: number, drdt: number
+    ) {
+        let existingNode = getNode(this.parentRoomName, nodeId);
+        if (existingNode) {
+            existingNode.targetId = id;
+            existingNode.level = level;
+            existingNode.maxLevel = maxLevel;
+            existingNode.lastKnownPosition = pos;
+            existingNode.serviceRoute.pathLength = pathLength;
+            existingNode.serviceRoute.pathCost = pathCost;
+        } else {
+            registerNode(this.parentRoomName, this.handle, {
+                nodeId: nodeId,
+                targetId: id,
+                level: level,
+                maxLevel: maxLevel,
+                resource: RESOURCE_ENERGY,
+                baseDrdt: drdt,
+                type: "Source",
+                analyticsCategories: [this.handle, "Exhumer"],
+                lastKnownPosition: pos,
+                serviceRoute: {
+                    pathLength: pathLength,
+                    pathCost: pathCost
+                }
+            });
         }
     }
 }

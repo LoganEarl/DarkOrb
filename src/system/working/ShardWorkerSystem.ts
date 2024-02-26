@@ -1,11 +1,15 @@
 import {Log} from "utils/logger/Logger";
 import {RoomWorkSystem} from "./RoomWorkerSystem";
 import {getRoomData} from "../scouting/ScoutInterface";
-import {registerWorkDetail} from "./WorkInterface";
+import {
+    deleteWorkDetail,
+    getWorkDetailById,
+    getWorkDetailsOfType,
+    registerWorkDetail
+} from "./WorkInterface";
 import {registerResetFunction} from "../../utils/SystemResetter";
 import {roomPos} from "../../utils/UtilityFunctions";
 import {packPos} from "../../utils/Packrat";
-import {min} from "lodash";
 
 const SCAN_INTERVAL = 20;
 
@@ -61,61 +65,37 @@ class ShardWorkerSystem {
                 mapData?.ownership?.username === global.PLAYER_USERNAME &&
                 (!lastScan || lastScan > Game.time - SCAN_INTERVAL)
             ) {
+                this.lastWorkScan[roomName] = Game.time;
                 //Send the job to whichever room is closest
                 let closest = mapData.territoryInfo.claims[0].roomName;
                 let bestRoom = this.roomWorkSystems[closest];
 
-                // let structures = room.find(FIND_STRUCTURES);
-                // let constructionSites = room.find(FIND_MY_CONSTRUCTION_SITES);
-                // this.updateCSites(bestRoom, constructionSites);
-
-                if (room.controller?.owner?.username === global.PLAYER_USERNAME) {
-                    let workTargets: {[targetId: string]: WorkTarget} = {};
-                    var countWorkTargets = 0;
-                    for(let pos of mapData.roomPlan?.upgraderPositions ?? []) {
-                        let targetId = `${pos.x}:${pos.y}:${room.controller.id}`
-                        workTargets[targetId] = {
-                            currentProgress: room.controller.progress,
-                            gameObjectId: room.controller.id,
-                            gameObjectType: STRUCTURE_CONTROLLER,
-                            packedPosition: packPos(roomPos(pos, room.name)),
-                            targetId: targetId,
-                            targetProgress: Math.min(room.controller.progressTotal, room.controller.progress + 1000)
-                        }
-                        countWorkTargets++;
-                    }
-
-                    if(countWorkTargets) {
-                        registerWorkDetail(bestRoom.roomName, {
-                            detailId: "Upgrade:" + room.controller!.id,
-                            maxCreeps: countWorkTargets,
-                            maxWorkParts: 0,
-                            parentRoom: bestRoom.roomName,
-                            primaryPool: "Upgraders",
-                            priority: "Normal",
-                            workerPools: ["Upgraders"],
-                            detailType: "Upgrade",
-                            targets: workTargets
-                        });
-                    }
+                let upgraderPositions = mapData?.roomPlan?.upgraderPositions;
+                if (upgraderPositions && room.controller?.owner?.username === global.PLAYER_USERNAME) {
+                    this.updateControllerUpgrades(room, upgraderPositions);
                 }
+
+                let constructionSites = room.find(FIND_MY_CONSTRUCTION_SITES);
+                this.updateCSites(bestRoom, constructionSites);
+
+                let structures = room.find(FIND_STRUCTURES);
+                let repairBuildings = structures.filter(
+                    s =>
+                        s.hits < s.hitsMax * 0.5 &&
+                        s.structureType !== STRUCTURE_RAMPART &&
+                        s.structureType !== STRUCTURE_WALL &&
+                        s.structureType !== STRUCTURE_CONTROLLER
+                );
+                this.updateStructureRepair(bestRoom, repairBuildings);
+
+                let rampartsAndWalls = structures
+                    .filter(s => s.structureType === STRUCTURE_RAMPART || s.structureType === STRUCTURE_WALL)
+                    .map(s => s as StructureWall | StructureRampart);
+
+                let lowRamps = rampartsAndWalls.filter(s => s.structureType === STRUCTURE_RAMPART && s.hits < 10000);
+                this.updateLowRampRepair(bestRoom, lowRamps);
             }
 
-            //         let repairBuildings = structures.filter(
-            //             s =>
-            //                 s.hits < s.hitsMax * 0.5 &&
-            //                 s.structureType !== STRUCTURE_RAMPART &&
-            //                 s.structureType !== STRUCTURE_WALL &&
-            //                 s.structureType !== STRUCTURE_CONTROLLER
-            //         );
-            //         this.updateStructureRepair(bestRoom, repairBuildings);
-
-            //         let rampartsAndWalls = structures
-            //             .filter(s => s.structureType === STRUCTURE_RAMPART || s.structureType === STRUCTURE_WALL)
-            //             .map(s => s as StructureWall | StructureRampart);
-
-            //         let lowRamps = rampartsAndWalls.filter(s => s.structureType === STRUCTURE_RAMPART && s.hits < 10000);
-            //         this.updateLowRampRepair(bestRoom, lowRamps);
 
             //         let reinforementTargets = rampartsAndWalls.filter(
             //             r => r.structureType !== STRUCTURE_RAMPART || r.hits > 10000
@@ -148,62 +128,152 @@ class ShardWorkerSystem {
             //     }
             // }
         }
-
-        // private updateCSites(system: RoomWorkSystem, sites: ConstructionSite[]) {
-        //     if(sites.length)
-        //         registerWorkDetail(system.roomName, {
-        //             detailId: "Construct:" + system.roomName,
-        //             detailType: "Construction",
-        //             currentProgress: site.progress,
-        //             targetProgress: site.progressTotal,
-        //             targetId: site.id
-        //         });
-        //     });
-        // }
-
-        // private updateStructureRepair(system: RoomWorkSystem, structures: Structure[]) {
-        //     structures.forEach(structure => {
-        //         registerWorkDetail(system.roomName, {
-        //             detailId: "Repair:" + structure.id,
-        //             detailType: "Repair",
-        //             destPosition: structure.pos,
-        //             targetId: structure.id
-        //         });
-        //     });
-        // }
-
-        // private updateLowRampRepair(system: RoomWorkSystem, structures: Structure[]) {
-        //     structures.forEach(structure => {
-        //         registerWorkDetail(system.roomName, {
-        //             detailId: "RepairRamp:" + structure.id,
-        //             detailType: "Repair",
-        //             destPosition: structure.pos,
-        //             targetProgress: 15000,
-        //             currentProgress: structure.hits,
-        //             targetId: structure.id,
-        //             targetStructureType: STRUCTURE_RAMPART
-        //         });
-        //     });
-        // }
-
-        // private updateWallReinforcement(
-        //     system: RoomWorkSystem,
-        //     walls: (StructureWall | StructureRampart)[],
-        //     bucket: number
-        // ) {
-        //     let targetHits = (bucket + 1) * 10000 + 5000;
-        //     walls.forEach(wall => {
-        //         registerWorkDetail(system.roomName, {
-        //             detailId: "Reinforce:" + wall.id,
-        //             detailType: "Reinforce",
-        //             destPosition: wall.pos,
-        //             currentProgress: wall.hits,
-        //             targetProgress: targetHits,
-        //             targetId: wall.id
-        //         });
-        //     });
-        // }
     }
+
+    private updateControllerUpgrades(room: Room, upgraderPositions: Coord[]) {
+        let countWorkTargets = 0;
+        let workDetailId = "Upgrade:" + room.controller!.id
+        let existingWorkDetail = getWorkDetailById(room.name, workDetailId)
+        let workTargets: { [targetId: string]: WorkTarget } = existingWorkDetail?.targets ?? {};
+        for (let pos of upgraderPositions ?? []) {
+            let targetId = `${pos.x}:${pos.y}:${!room.controller!.id}`
+            workTargets[targetId] = {
+                currentProgress: room.controller!.progress,
+                gameObjectId: room.controller!.id,
+                gameObjectType: STRUCTURE_CONTROLLER,
+                packedPosition: packPos(roomPos(pos, room.name)),
+                targetId: targetId,
+                targetProgress: workTargets[targetId]?.targetProgress ?? Math.min(room.controller!.progressTotal, room.controller!.progress + 1000)
+            }
+            countWorkTargets++;
+        }
+
+        if (countWorkTargets) {
+            if(!existingWorkDetail) {
+                registerWorkDetail(room.name, {
+                    detailId: "Upgrade:" + room.controller!.id,
+                    maxCreeps: countWorkTargets,
+                    maxWorkParts: 0,
+                    parentRoom: room.name,
+                    primaryPool: "Upgraders",
+                    priority: "Normal",
+                    workerPools: ["Upgraders"],
+                    detailType: "Upgrade",
+                    targets: workTargets
+                });
+            }
+        } else {
+            deleteWorkDetail(room.name, workDetailId)
+        }
+    }
+    private updateCSites(system: RoomWorkSystem, sites: ConstructionSite[]) {
+        if (sites.length) {
+            let targets: { [targetId: string]: WorkTarget } = {};
+            for (let site of sites) {
+                let targetId = site.id;
+                targets[targetId] = {
+                    currentProgress: site.progress,
+                    gameObjectId: site.id,
+                    gameObjectType: site.structureType,
+                    packedPosition: packPos(site.pos),
+                    targetId: targetId,
+                    targetProgress: site.progressTotal
+                }
+            }
+            registerWorkDetail(system.roomName, {
+                detailId: "Construct:" + system.roomName,
+                maxCreeps: 10,
+                maxWorkParts: 0,
+                parentRoom: system.roomName,
+                primaryPool: "Workers",
+                priority: "Normal",
+                workerPools: ["Workers", "Upgraders"],
+                detailType: "Construction",
+                targets: targets
+            });
+        }
+    }
+
+
+    private updateStructureRepair(system: RoomWorkSystem, structures: Structure[]) {
+        if (structures.length) {
+            let existingDetail = getWorkDetailById(system.roomName, "RepairStructures")
+            let targets: { [targetId: string]: WorkTarget } = existingDetail?.targets ?? {};
+            for (let structure of structures) {
+                targets[structure.id] = {
+                    currentProgress: structure.hits,
+                    gameObjectId: structure.id,
+                    gameObjectType: structure.structureType,
+                    packedPosition: packPos(structure.pos),
+                    targetId: structure.id,
+                    targetProgress: structure.hitsMax
+                }
+            }
+
+            if (!existingDetail) {
+                registerWorkDetail(system.roomName, {
+                    detailId: "RepairStructures",
+                    detailType: "Repair",
+                    maxCreeps: 0,
+                    maxWorkParts: 0,
+                    parentRoom: "",
+                    primaryPool: "Workers",
+                    priority: "Elevated",
+                    targets: targets,
+                    workerPools: ["Workers", "EmergencyRepairers"]
+                });
+            }
+        }
+    }
+
+    private updateLowRampRepair(system: RoomWorkSystem, structures: Structure[]) {
+        let workDetailId = "HomeRoomLowRampRepair";
+        if (structures.length) {
+            let existingWorkDetail = getWorkDetailById(system.roomName, workDetailId)
+            let targets: { [targetId: string]: WorkTarget } = existingWorkDetail?.targets ?? {};
+            for (let lowRamp of structures) {
+                targets[lowRamp.id] = {
+                    currentProgress: lowRamp.hits,
+                    gameObjectId: lowRamp.id,
+                    gameObjectType: STRUCTURE_RAMPART,
+                    packedPosition: packPos(lowRamp.pos),
+                    targetId: lowRamp.id,
+                    targetProgress: 50000
+                }
+            }
+            if(!existingWorkDetail) {
+                registerWorkDetail(system.roomName, {
+                    detailId: workDetailId,
+                    detailType: "RampartRepair",
+                    maxCreeps: 1,
+                    maxWorkParts: 1,
+                    parentRoom: system.roomName,
+                    primaryPool: "Workers",
+                    priority: "Elevated",
+                    targets: targets,
+                    workerPools: ["Workers", "EmergencyRepairers"]
+                });
+            }
+        }
+    }
+
+// private updateWallReinforcement(
+//     system: RoomWorkSystem,
+//     walls: (StructureWall | StructureRampart)[],
+//     bucket: number
+// ) {
+//     let targetHits = (bucket + 1) * 10000 + 5000;
+//     walls.forEach(wall => {
+//         registerWorkDetail(system.roomName, {
+//             detailId: "Reinforce:" + wall.id,
+//             detailType: "Reinforce",
+//             destPosition: wall.pos,
+//             currentProgress: wall.hits,
+//             targetProgress: targetHits,
+//             targetId: wall.id
+//         });
+//     });
+// }
 }
 
 export let _shardWorkerSystem: ShardWorkerSystem = new ShardWorkerSystem();

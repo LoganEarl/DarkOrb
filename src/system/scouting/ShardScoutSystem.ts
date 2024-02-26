@@ -7,7 +7,7 @@ import {unpackPos} from "utils/Packrat";
 import {hslToHex} from "utils/UtilityFunctions";
 import {getRoomData, getShardData, MAX_SCOUT_DEPTH, saveMapData} from "./ScoutInterface";
 
-const SCOUTS_PER_CLUSTER = 1;
+const SCOUTS_PER_CLUSTER = 3;
 
 class ShardScoutSystem implements MemoryComponent {
     private memory?: ScoutMemory;

@@ -16,7 +16,7 @@ import {haulerLogic} from "./HaulerLogic";
 
 const MAX_HAULERS_PER_ROOM = 25; //Total haulers a single room can have after rcl3
 const MAX_HAULERS_PER_ROOM_LOW_RCL = 60; //Total haulers a single room can have before rcl4
-const HAULER_SAFTEY_MARGIN = 1.2; //How many more haulers we will spawn than we think we need
+const HAULER_SAFETY_MARGIN = 1.2; //How many more haulers we will spawn than we think we need
 
 @profile
 export class RoomHaulerSystem {
@@ -42,13 +42,17 @@ export class RoomHaulerSystem {
         this.targetCarryParts = 0;
         let nodes = getNodes(this.roomName);
         //console.log(`Calculating logistics node creeps`)
+        let sourceCarryParts = 0;
+        let sinkCarryParts =  0;
         for (let node of Object.values(nodes)) {
             const carryParts = Math.ceil(
                 ((node.serviceRoute.pathLength * 2 * Math.abs(node.bodyDrdt ?? node.baseDrdt)) / 50) *
-                HAULER_SAFTEY_MARGIN
+                HAULER_SAFETY_MARGIN
             );
-            this.targetCarryParts += carryParts;
+            if(node.type === "Sink") sinkCarryParts += carryParts;
+            else sourceCarryParts += carryParts;
         }
+        this.targetCarryParts = Math.max(sourceCarryParts, sinkCarryParts);
 
         let existingCreeps = getCreeps(this.handle);
         let spawnStarter = existingCreeps.length === 0;
@@ -69,6 +73,7 @@ export class RoomHaulerSystem {
                 {
                     body: body,
                     handle: this.handle,
+                    subHandle: "StandardCreeps",
                     jobName: "Drudge",
                     quantity: numCreeps,
                     additionalPrespawntime: 20
@@ -79,6 +84,7 @@ export class RoomHaulerSystem {
                 configs.push({
                     body: [CARRY, MOVE],
                     handle: this.handle,
+                    subHandle: "StarterCreep",
                     jobName: "Primordial",
                     quantity: 1,
                     subPriority: 1

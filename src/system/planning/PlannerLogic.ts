@@ -20,6 +20,7 @@ import {EXTENSION_GROUP} from "./stamp/ExtensionPod";
 import {FAST_FILLER_GROUP, FAST_FILLER_SPAWN_COORDS} from "./stamp/FastFiller";
 import {deepCopyGroups, rotateGroup} from "./stamp/StampLogic";
 import {STORAGE_CORE_GROUP} from "./stamp/StorageCore";
+import {distanceTransformDiag} from "../../utils/algorithms/DistanceTransform";
 
 type PlanningState =
     | "New"
@@ -222,15 +223,21 @@ export class RoomPlanner implements PriorityQueueItem {
 
         let maxIndex = -1;
         let maxNeighboors: Coord[] = [];
+        let maxScore = -1;
+        let dtDiag = distanceTransformDiag(new PathFinder.CostMatrix());
         for (let i = 0; i < cPoses.length; i++) {
             let pos = cPoses[i];
             if (this.terrain.get(pos.x, pos.y) !== TERRAIN_MASK_WALL) {
                 let neighboors = findPositionsInsideRect(pos.x - 1, pos.y - 1, pos.x + 1, pos.y + 1).filter(
                     p => this.terrain.get(p.x, p.y) !== TERRAIN_MASK_WALL
                 );
-                if (neighboors.length > maxNeighboors.length) {
+                //Slightly makes areas away from walls preferable. Helps with pathing
+                let score = neighboors.length + dtDiag.get(pos.x, pos.y)/50.0;
+
+                if (score > maxScore) {
                     maxIndex = i;
                     maxNeighboors = neighboors;
+                    maxScore = score;
                 }
             }
         }

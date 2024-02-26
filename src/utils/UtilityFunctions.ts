@@ -340,6 +340,7 @@ export function findPositionsInsideRect(x1: number, y1: number, x2: number, y2: 
     return positions;
 }
 
+
 export function findSortedIndex<T>(search: T, items: T[], compare: (a: T, b: T) => number) {
     for (let i = 0; i < items.length; i++) {
         if (compare(search, items[i]) <= 0) {

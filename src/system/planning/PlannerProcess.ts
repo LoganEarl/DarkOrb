@@ -13,6 +13,7 @@ export class PlannerProcess extends Process {
 
     roomScanner: ScheduledJob = new ScheduledJob(_shardPlannerSystem._rescanRooms, _shardPlannerSystem, 30);
     buildingQueuer: ScheduledJob = new ScheduledJob(_shardPlannerSystem._queueBuildings, _shardPlannerSystem, 10);
+    planningRunner: ScheduledJob = new ScheduledJob(_shardPlannerSystem._continuePlanning, _shardPlannerSystem, 3)
 
     constructor() {
         super("PlannerProcess", 3);
@@ -21,7 +22,7 @@ export class PlannerProcess extends Process {
     run(): void {
         this.roomScanner.run();
         this.buildingQueuer.run();
-        _shardPlannerSystem._continuePlanning();
+        this.planningRunner.run();
 
         if (getFeature(FEATURE_VISUALIZE_PLANS)) {
             let plannedRooms = Object.values(getShardData())

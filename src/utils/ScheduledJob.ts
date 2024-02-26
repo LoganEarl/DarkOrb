@@ -1,5 +1,8 @@
+import {profile} from "./profiler/Profiler";
+
 var nextSeed = 0;
 
+@profile
 export class ScheduledJob {
     private job: () => void;
     private seed: number;

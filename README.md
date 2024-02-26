@@ -6,7 +6,7 @@ There is no brain, only Dark Orb
 
 You will need:
 
--   [Node.JS](https://nodejs.org/en/download) (10.x)
+-   [Node.JS](https://nodejs.org/en/download) (16.x)
 -   A Package Manager ([Yarn](https://yarnpkg.com/en/docs/getting-started) or [npm](https://docs.npmjs.com/getting-started/installing-node))
 -   Rollup CLI (Optional, install via `npm install -g rollup`)
 

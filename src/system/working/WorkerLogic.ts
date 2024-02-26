@@ -13,6 +13,7 @@ import {Log} from "utils/logger/Logger";
 import {Traveler} from "utils/traveler/Traveler";
 import {getMultirooomDistance, minBy} from "utils/UtilityFunctions";
 import {completeWorkTarget} from "./WorkInterface";
+import {profile} from "../../utils/profiler/Profiler";
 
 const CONSTRUCTION_PRIORITIES = [
     STRUCTURE_SPAWN,
@@ -33,6 +34,14 @@ const CONSTRUCTION_PRIORITIES = [
     STRUCTURE_ROAD
 ];
 
+//Work detail types where the creep should do their best to not get in the way of things
+const JOBS_THAT_NEED_TO_MAKE_WAY: DetailType[] = [
+    "Repair",
+    "RampartRepair",
+    "Construction",
+    "Reinforce"
+]
+
 //How ramparts are grouped
 const RAMPART_HP_BUCKET = 20000;
 //How many buckets apart a rampart has to be before we prioritize it regardless of distance
@@ -48,551 +57,632 @@ const BUILD_PRIORITY_COMPARATOR = (a: BuildableStructureConstant, b: BuildableSt
     return aIndex - bIndex;
 };
 
+const TARGET_LOCK_PRUNE_DELAY = 5;
+
 interface TargetLockData {
     targetId: string;
     gameObjectId: string;
     detailId: string;
     mining: boolean;
     restocking: boolean;
+    //Some creeps tend to get in the way. This makes them try to stand somewhere more convenient
+    standPos?: RoomPosition;
     sourcePos?: RoomPosition;
 }
 
-const TARGET_LOCK_PRUNE_DELAY = 5;
-let lastTargetLockPrune = 0;
+@profile
+class WorkerLogic {
+    lastTargetLockPrune = 0;
 //Creep name to target locking data
-let targetLocks: Map<string, TargetLockData> = new Map();
+    targetLocks: Map<string, TargetLockData> = new Map();
 
-function getTargetLock(creep: Creep, detail: WorkDetail): TargetLockData | undefined {
-    //First prune the target locks to prevent memory leakage
-    if (Game.time - TARGET_LOCK_PRUNE_DELAY > lastTargetLockPrune) {
-        let creepNames = Object.values(targetLocks);
-        for (let creepName of creepNames) {
-            if (!Game.creeps[creepName]) targetLocks.delete(creepName);
+
+    getTargetLock(creep: Creep, detail: WorkDetail): TargetLockData | undefined {
+        //First prune the target locks to prevent memory leakage. This removes the locks of dead creeps
+        if (Game.time - TARGET_LOCK_PRUNE_DELAY > this.lastTargetLockPrune) {
+            let creepNames = Object.values(this.targetLocks);
+            for (let creepName of creepNames) {
+                if (!Game.creeps[creepName]) this.targetLocks.delete(creepName);
+            }
+            this.lastTargetLockPrune = Game.time;
         }
-        lastTargetLockPrune = Game.time;
+
+        //Get our target lock. Could be from a different work detail so we need to account for that
+        let targetLock: TargetLockData | undefined = this.targetLocks.get(creep.name);
+
+        //If we are working on a different work detail now, release the target lock
+        if (targetLock?.detailId !== detail.detailId) {
+            targetLock = undefined;
+            this.targetLocks.delete(creep.name);
+        }
+
+        let targetArray = Object.values(detail.targets)
+        //If we don't have a lock, pick one to focus on
+        if (!targetLock && targetArray.length) {
+            let workTarget = targetArray.reduce((prev, cur) =>
+                this.compareWorkTargets(creep.pos, detail, prev, cur)
+            );
+            if (workTarget) {
+                const shouldStandOutOfWay = JOBS_THAT_NEED_TO_MAKE_WAY.includes(detail.detailType)
+                targetLock = {
+                    targetId: workTarget.targetId,
+                    gameObjectId: workTarget.gameObjectId,
+                    detailId: detail.detailId,
+                    mining: false,
+                    restocking: false,
+                    // standPos: shouldStandOutOfWay ?
+                    // this.findGoodStandingPosition(unpackPos(workTarget.packedPosition), 3) : undefined
+                };
+                this.targetLocks.set(creep.name, targetLock);
+            }
+        }
+
+        return targetLock;
     }
 
-    //Get our target lock. Could be from a different work detail so we need to account for that
-    let targetLock: TargetLockData | undefined = targetLocks.get(creep.name);
 
-    //If we are working on a different work detail now, release the target lock
-    if (targetLock?.detailId !== detail.detailId) {
-        targetLock = undefined;
-        targetLocks.delete(creep.name);
-    }
+    _assignWorkDetail(
+        creep: Creep,
+        pool: WorkerPool,
+        details: { [detailId: string]: WorkDetail },
+        assignments: Map<string, string>
+    ): WorkDetail | undefined {
+        let detailArray = Object.values(details)
+        if (!detailArray.length) return undefined;
 
-    //If we don't have a lock, pick one to focus on
-    if (!targetLock) {
-        let workTarget = Object.values(detail.targets).reduce((prev, cur) =>
-            compareWorkTargets(creep.pos, detail, prev, cur)
-        );
-        if (workTarget) {
-            targetLock = {
-                targetId: workTarget.targetId,
-                gameObjectId: workTarget.gameObjectId,
-                detailId: detail.detailId,
-                mining: false,
-                restocking: false
-            };
-            targetLocks.set(creep.name, targetLock);
-        }
-    }
+        //Figure out how many work parts are already assigned to each work detail
+        let workPartsPerDetail = new Map<string, number>();
+        let creepsPerDetail = new Map<string, number>();
+        for (let creepName in assignments) {
+            let assignedDetail = details[assignments.get(creepName) ?? ""];
+            if (assignedDetail) {
+                let workParts = Game.creeps[creepName].getActiveBodyparts(WORK);
+                let detailId = assignedDetail.detailId;
+                if (!workPartsPerDetail.get(detailId)) workPartsPerDetail.set(detailId, workParts);
+                else workPartsPerDetail.set(detailId, workPartsPerDetail.get(detailId)! + workParts);
 
-    return targetLock;
-}
-
-export function _assignWorkDetail(
-    creep: Creep,
-    pool: WorkerPool,
-    details: { [detailId: string]: WorkDetail },
-    assignments: Map<string, string>
-): WorkDetail | undefined {
-    let detailArray = Object.values(details)
-    if (!detailArray.length) return undefined;
-
-    //Figure out how many work parts are already assigned to each work detail
-    let workPartsPerDetail = new Map<string, number>();
-    let creepsPerDetail = new Map<string, number>();
-    for (let creepName in assignments) {
-        let assignedDetail = details[assignments.get(creepName) ?? ""];
-        if (assignedDetail) {
-            let workParts = Game.creeps[creepName].getActiveBodyparts(WORK);
-            let detailId = assignedDetail.detailId;
-            if (!workPartsPerDetail.get(detailId)) workPartsPerDetail.set(detailId, workParts);
-            else workPartsPerDetail.set(detailId, workPartsPerDetail.get(detailId)! + workParts);
-
-            if (!creepsPerDetail.get(detailId)) creepsPerDetail.set(detailId, 1);
-            else creepsPerDetail.set(detailId, creepsPerDetail.get(detailId)! + 1);
-        }
-    }
-
-    //Now find the best work detail for the creep
-    return Object.values(details).reduce((prev, cur) =>
-        compareWorkDetails(pool, workPartsPerDetail, creepsPerDetail, prev, cur)
-    );
-}
-
-function compareWorkDetails(
-    pool: WorkerPool,
-    workPartsPerDetail: Map<string, number>,
-    creepsPerDetail: Map<string, number>,
-    detail1: WorkDetail,
-    detail2: WorkDetail
-): WorkDetail {
-    //Handle critical tasks like emergency repair first
-    if (detail1.priority === "Critical" && detail2.priority !== "Critical") return detail1;
-    if (detail1.priority !== "Critical" && detail2.priority === "Critical") return detail2;
-
-    //Handle elevated vs non-elevated
-    if (detail1.priority === "Elevated" && detail2.priority !== "Elevated") return detail1;
-    if (detail1.priority !== "Elevated" && detail2.priority === "Elevated") return detail2;
-
-    //If we reach here, it meanst that they both have the same priority. This means we should prioritize our own pool first
-    if (detail1.primaryPool === pool && detail2.primaryPool !== pool) return detail1;
-    if (detail1.primaryPool !== pool && detail2.primaryPool === pool) return detail2;
-
-    //They are either both of the primary pool, or both of a secondary one, and both of the same priority.
-    //Go with job satisfaction next.
-    let popSatisfaction1 = (creepsPerDetail.get(detail1.detailId) ?? 0) / detail1.maxCreeps;
-    let popSatisfaction2 = (creepsPerDetail.get(detail2.detailId) ?? 0) / detail2.maxCreeps;
-    let workSatisfaction1 = (workPartsPerDetail.get(detail1.detailId) ?? 0) / detail1.maxWorkParts;
-    let workSatisfaction2 = (workPartsPerDetail.get(detail2.detailId) ?? 0) / detail2.maxWorkParts;
-
-    //Put the creep on the one with lower work satisfaction while respecting population limits
-    if (workSatisfaction1 < workSatisfaction2 && popSatisfaction1 < 1) return detail1;
-    if (workSatisfaction1 > workSatisfaction2 && popSatisfaction2 < 1) return detail2;
-
-    //If we are still tied, just assign to whichever has the most free population.
-    return popSatisfaction1 - popSatisfaction2 <= 0 ? detail1 : detail2;
-}
-
-function compareWorkTargets(
-    workerPos: RoomPosition,
-    detail: WorkDetail,
-    target1: WorkTarget,
-    target2: WorkTarget
-): WorkTarget {
-    if (detail.detailType === "Upgrade") {
-        let creepOnWorkTarget1: Creep | undefined = undefined;
-        let creepOnWorkTarget2: Creep | undefined = undefined;
-
-        for (let entry of Array.from(targetLocks.entries())) {
-            let creepName = entry[0]
-            let targetLock = entry[1]
-            if (target1.targetId === targetLock.targetId) creepOnWorkTarget1 = Game.creeps[creepName];
-            if (target2.targetId === targetLock.targetId) creepOnWorkTarget2 = Game.creeps[creepName];
+                if (!creepsPerDetail.get(detailId)) creepsPerDetail.set(detailId, 1);
+                else creepsPerDetail.set(detailId, creepsPerDetail.get(detailId)! + 1);
+            }
         }
 
-        //Pick empty spots over occupied spots
-        if (creepOnWorkTarget1 === undefined && creepOnWorkTarget2 !== undefined) return target1;
-        if (creepOnWorkTarget1 !== undefined && creepOnWorkTarget2 === undefined) return target2;
-
-        //Pick closer spots over further ones
-        let distance1 = getMultirooomDistance(workerPos, unpackPos(target1.packedPosition))
-        let distance2 = getMultirooomDistance(workerPos, unpackPos(target2.packedPosition))
-        if (distance1 > distance2) return target2;
-        if (distance1 < distance2) return target1;
-
-        //If both occupied, pick spot with older creep
-        if (creepOnWorkTarget1 && creepOnWorkTarget2) {
-            if ((creepOnWorkTarget1!.ticksToLive ?? CREEP_LIFE_TIME) > (creepOnWorkTarget2!.ticksToLive ?? CREEP_LIFE_TIME))
-                return target1;
-            else
-                return target2;
-        }
-
-        //If all else fails, pick an arbitrary deterministic decision maker
-        return target1.targetId.localeCompare(target2.targetId) < 0 ? target1 : target2;
-    } else if (detail.detailType == "Construction" || detail.detailType === "Repair") {
-        //First prioritize with the building priority
-        let comparison = BUILD_PRIORITY_COMPARATOR(
-            target1.gameObjectType as BuildableStructureConstant,
-            target2.gameObjectType as BuildableStructureConstant
-        );
-
-        //If there is a tie here and we are talking about roads, go with distance to the road instead of what comes next
-        if (comparison === 0 && target1.gameObjectType === STRUCTURE_ROAD) {
-            const dist1 = workerPos.getRangeTo(unpackPos(target1.packedPosition));
-            const dist2 = workerPos.getRangeTo(unpackPos(target2.packedPosition));
-            comparison = dist1 - dist2;
-        }
-
-        //Next, prioritize with the progress of the buildings
-        if (comparison === 0) {
-            const completion1 = target1.currentProgress / target1.targetProgress;
-            const completion2 = target2.currentProgress / target2.targetProgress;
-            comparison = completion1 - completion2;
-        }
-
-        //Finally prioritize with the id of the structures. This makes sure that creeps target the same buildings
-        if (comparison === 0) {
-            comparison = target1.gameObjectId.localeCompare(target2.gameObjectId);
-        }
-
-        return comparison <= 0 ? target1 : target2;
-    } else if (detail.detailType === "RampartRepair") {
-        //Prioritize the lowest targets, easy. This will only happen during attacks, so don't worry too much about travel time
-        return target1.currentProgress < target2.currentProgress ? target1 : target2;
-    } else if (detail.detailType === "Reinforce") {
-        //First, bucket by current progress an target progress. Also grab the linear distance for each.
-        const hpBucket1 = Math.floor(target1.currentProgress / RAMPART_HP_BUCKET);
-        const hpBucket2 = Math.floor(target2.currentProgress / RAMPART_HP_BUCKET);
-        const distance1 = workerPos.getRangeTo(unpackPos(target1.packedPosition));
-        const distance2 = workerPos.getRangeTo(unpackPos(target2.packedPosition));
-
-        //If one is more than a bucket or two of progress, go with the lower one
-        if (hpBucket1 - hpBucket2 >= PRIORITY_RAMPART_BUCKET_DIFFERENCE) return target1;
-        if (hpBucket2 - hpBucket1 >= PRIORITY_RAMPART_BUCKET_DIFFERENCE) return target2;
-
-        //If they are both in range 5, go with the lowest progress bucket one
-        if (distance1 < RAMPART_PRIORITIZE_HP_DISTANCE && distance2 < RAMPART_PRIORITIZE_HP_DISTANCE)
-            return hpBucket1 < hpBucket2 ? target1 : target2;
-
-        //If we have gotten this far with a tie, go with the closest one, as they are both about the same.
-        return distance1 < distance2 ? target1 : target2;
-    }
-    Log.e("You must have added an extra work detail type... go update `compareWorkTargets()`");
-    return target1;
-}
-
-//returns true when it completes the assignment
-export function _runCreep(
-    creep: Creep,
-    workDetail: WorkDetail,
-    parentRoomName: string,
-    handle: string,
-    baseAnalyticsCategories: string[],
-    roomData: RoomScoutingInfo
-): boolean {
-    let targetLock = getTargetLock(creep, workDetail);
-    if (!targetLock) return true;
-
-    let workTarget = workDetail.targets[targetLock.targetId];
-    if (!workTarget) {
-        Log.e(
-            `Failed to look up a work target used in a target lock. This should not happen. detail type:${workDetail.detailType} detail id:${workDetail.detailId} target id:${targetLock.targetId}`
+        //Now find the best work detail for the creep
+        return Object.values(details).reduce((prev, cur) =>
+            this.compareWorkDetails(pool, workPartsPerDetail, creepsPerDetail, prev, cur)
         );
     }
 
-    let useHaulers =
-        roomData.ownership?.username === global.PLAYER_USERNAME &&
-        ["Claimed", "Reserved", "Economic"].includes(roomData.ownership.ownershipType ?? "Unclaimed");
-    let canMine = roomData.miningInfo?.sources?.length ?? 0 > 0;
-    let storage = getMainStorage(parentRoomName);
 
-    let estimatedDrdt = 0;
-    let analyticsCategories = baseAnalyticsCategories.slice();
-    let done = false;
-    let energySpent = 0;
+    compareWorkDetails(
+        pool: WorkerPool,
+        workPartsPerDetail: Map<string, number>,
+        creepsPerDetail: Map<string, number>,
+        detail1: WorkDetail,
+        detail2: WorkDetail
+    ): WorkDetail {
+        //Handle critical tasks like emergency repair first. This trumps worker pool settings
+        if (detail1.priority === "Critical" && detail2.priority !== "Critical") return detail1;
+        if (detail1.priority !== "Critical" && detail2.priority === "Critical") return detail2;
 
-    //Build and repair have an almost identical control loop. We do them the same way
-    if (workDetail.detailType === "Construction" || workDetail.detailType === "Repair") {
-        //If we are not close to the target or standing in a bad place, move
-        let targetPos = unpackPos(workTarget.packedPosition);
-        navigateToTarget(creep, targetPos, 3);
+        //As long as there aren't critical jobs lined up, respect pool settings and match by primary
+        if (detail1.primaryPool === pool && detail2.primaryPool !== pool) return detail1;
+        if (detail1.primaryPool !== pool && detail2.primaryPool === pool) return detail2;
 
-        if (Game.rooms[targetPos.roomName]) {
-            let target: ConstructionSite | Structure<BuildableStructureConstant> | null = Game.getObjectById(
-                targetLock.gameObjectId
+        //If two jobs are of the primary pool choose elevated jobs over standard ones
+        if (detail1.priority === "Elevated" && detail2.priority !== "Elevated") return detail1;
+        if (detail1.priority !== "Elevated" && detail2.priority === "Elevated") return detail2;
+
+        //They are either both of the primary pool, or both of a secondary one, and both of the same priority.
+        //Go with job satisfaction next.
+        let popSatisfaction1 = (creepsPerDetail.get(detail1.detailId) ?? 0) / detail1.maxCreeps;
+        let popSatisfaction2 = (creepsPerDetail.get(detail2.detailId) ?? 0) / detail2.maxCreeps;
+        let workSatisfaction1 = (workPartsPerDetail.get(detail1.detailId) ?? 0) / detail1.maxWorkParts;
+        let workSatisfaction2 = (workPartsPerDetail.get(detail2.detailId) ?? 0) / detail2.maxWorkParts;
+
+        //Put the creep on the one with lower work satisfaction while respecting population limits
+        if (workSatisfaction1 < workSatisfaction2 && popSatisfaction1 < 1) return detail1;
+        if (workSatisfaction1 > workSatisfaction2 && popSatisfaction2 < 1) return detail2;
+
+        //If we are still tied, just assign to whichever has the most free population.
+        return popSatisfaction1 - popSatisfaction2 <= 0 ? detail1 : detail2;
+    }
+
+
+    compareWorkTargets(
+        workerPos: RoomPosition,
+        detail: WorkDetail,
+        target1: WorkTarget,
+        target2: WorkTarget
+    ): WorkTarget {
+        if (detail.detailType === "Upgrade") {
+            let creepOnWorkTarget1: Creep | undefined = undefined;
+            let creepOnWorkTarget2: Creep | undefined = undefined;
+
+            for (let entry of Array.from(this.targetLocks.entries())) {
+                let creepName = entry[0]
+                let targetLock = entry[1]
+                if (target1.targetId === targetLock.targetId) creepOnWorkTarget1 = Game.creeps[creepName];
+                if (target2.targetId === targetLock.targetId) creepOnWorkTarget2 = Game.creeps[creepName];
+            }
+
+            //Pick empty spots over occupied spots
+            if (creepOnWorkTarget1 === undefined && creepOnWorkTarget2 !== undefined) return target1;
+            if (creepOnWorkTarget1 !== undefined && creepOnWorkTarget2 === undefined) return target2;
+
+            //Pick closer spots over further ones
+            let distance1 = getMultirooomDistance(workerPos, unpackPos(target1.packedPosition))
+            let distance2 = getMultirooomDistance(workerPos, unpackPos(target2.packedPosition))
+            if (distance1 > distance2) return target2;
+            if (distance1 < distance2) return target1;
+
+            //If both occupied, pick spot with older creep
+            if (creepOnWorkTarget1 && creepOnWorkTarget2) {
+                if ((creepOnWorkTarget1!.ticksToLive ?? CREEP_LIFE_TIME) > (creepOnWorkTarget2!.ticksToLive ?? CREEP_LIFE_TIME))
+                    return target1;
+                else
+                    return target2;
+            }
+
+            //If all else fails, pick an arbitrary deterministic decision maker
+            return target1.targetId.localeCompare(target2.targetId) < 0 ? target1 : target2;
+        } else if (detail.detailType == "Construction" || detail.detailType === "Repair") {
+            //First prioritize with the building priority
+            let comparison = BUILD_PRIORITY_COMPARATOR(
+                target1.gameObjectType as BuildableStructureConstant,
+                target2.gameObjectType as BuildableStructureConstant
             );
 
-            //If we do not see our target and are working on a ramp cSite, look for a new ramp on the square and target it
-            if (!target && workTarget.gameObjectType === STRUCTURE_RAMPART) {
-                let builtRampart = targetPos.lookForStructure(STRUCTURE_RAMPART) as StructureRampart | undefined;
-                if (builtRampart && builtRampart.hits < RAMPART_HP_BUCKET) target = builtRampart;
-                else if (!builtRampart) done = true;
+            //If there is a tie here and we are talking about roads, go with distance to the road instead of what comes next
+            if (comparison === 0 && target1.gameObjectType === STRUCTURE_ROAD) {
+                const dist1 = workerPos.getRangeTo(unpackPos(target1.packedPosition));
+                const dist2 = workerPos.getRangeTo(unpackPos(target2.packedPosition));
+                comparison = dist1 - dist2;
             }
 
-            //If we see our target, do the thing. Build until we finish it or run out of energy.
-            if (target) {
-                //If we are close to the target, go ahead and work on it
-                if (creep.pos.getRangeTo(targetPos) <= 3 && creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                    analyticsCategories.push(ANALYTICS_CONSTRUCTION, ANALYTICS_ARTIFICER);
-                    if (target instanceof ConstructionSite) {
-                        estimatedDrdt = creep.getActiveBodyparts(WORK) * BUILD_POWER;
-                        if (creep.build(target) === OK) energySpent = estimatedDrdt;
-                        workTarget.currentProgress = target.progress;
-                    } else {
-                        estimatedDrdt = creep.getActiveBodyparts(WORK) * REPAIR_COST * REPAIR_POWER;
-                        if (creep.repair(target) === OK) energySpent = estimatedDrdt;
-                        workTarget.currentProgress = target.hits;
-                    }
-                }
-            } else {
-                done = true;
+            //Next, prioritize with the progress of the buildings
+            if (comparison === 0) {
+                const completion1 = target1.currentProgress / target1.targetProgress;
+                const completion2 = target2.currentProgress / target2.targetProgress;
+                comparison = completion2 - completion1;
             }
+
+            //Finally prioritize with the id of the structures. This makes sure that creeps target the same buildings
+            if (comparison === 0) {
+                comparison = target1.gameObjectId.localeCompare(target2.gameObjectId);
+            }
+
+            return comparison <= 0 ? target1 : target2;
+        } else if (detail.detailType === "RampartRepair") {
+            //Prioritize the lowest targets, easy. This will only happen during attacks, so don't worry too much about travel time
+            return target1.currentProgress < target2.currentProgress ? target1 : target2;
+        } else if (detail.detailType === "Reinforce") {
+            //First, bucket by current progress an target progress. Also grab the linear distance for each.
+            const hpBucket1 = Math.floor(target1.currentProgress / RAMPART_HP_BUCKET);
+            const hpBucket2 = Math.floor(target2.currentProgress / RAMPART_HP_BUCKET);
+            const distance1 = workerPos.getRangeTo(unpackPos(target1.packedPosition));
+            const distance2 = workerPos.getRangeTo(unpackPos(target2.packedPosition));
+
+            //If one is more than a bucket or two of progress, go with the lower one
+            if (hpBucket1 - hpBucket2 >= PRIORITY_RAMPART_BUCKET_DIFFERENCE) return target1;
+            if (hpBucket2 - hpBucket1 >= PRIORITY_RAMPART_BUCKET_DIFFERENCE) return target2;
+
+            //If they are both in range 5, go with the lowest progress bucket one
+            if (distance1 < RAMPART_PRIORITIZE_HP_DISTANCE && distance2 < RAMPART_PRIORITIZE_HP_DISTANCE)
+                return hpBucket1 < hpBucket2 ? target1 : target2;
+
+            //If we have gotten this far with a tie, go with the closest one, as they are both about the same.
+            return distance1 < distance2 ? target1 : target2;
         }
+        Log.e("You must have added an extra work detail type... go update `compareWorkTargets()`");
+        return target1;
     }
 
-    //If we are supposed to be upgrading, go do that too
-    if (workDetail.detailType === "Upgrade") {
-        let standPos = unpackPos(workTarget.packedPosition);
-        navigateToTarget(creep, standPos, 0);
+    //TODO idk flood fill or sm. I need an efficient way to pick a good square to stand on.
+    //findGoodStandingPosition(target: RoomPosition, range: number): RoomPosition | undefined {
+    //     let positions = findPositionsInsideRect(target.x - range, target.y - range, target.x + range, target.y + range);
+    //     let bestScore = Infinity;
+    //
+    //     for (let pos of positions) {
+    //         //Ignore if it is a wall
+    //         //Add a score for each nearby store structure
+    //         //Add 2 scores if standing on a road
+    //         //If score is 0, quit early and return it
+    //     }
+    //     //TODO remove this
+    //     return undefined;
+    // }
 
-        if (Game.rooms[standPos.roomName]) {
-            let target: StructureController | null = Game.getObjectById(targetLock.gameObjectId);
+    //returns true when it completes the assignment
+    _runCreep(
+        creep: Creep,
+        workDetail: WorkDetail,
+        parentRoomName: string,
+        handle: string,
+        baseAnalyticsCategories: string[],
+        roomData: RoomScoutingInfo
+    ): boolean {
+        let targetLock = this.getTargetLock(creep, workDetail);
+        if (!targetLock) return true;
 
-            if (target) {
-                estimatedDrdt = creep.getActiveBodyparts(WORK) * UPGRADE_CONTROLLER_POWER;
-                if (creep.pos.getRangeTo(target.pos) <= 3 && creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                    analyticsCategories.push(ANALYTICS_PRIEST, ANALYTICS_UPGRADE);
-                    if (creep.upgradeController(target) === OK) energySpent = estimatedDrdt;
-                    workTarget.currentProgress = target.progress;
-                    if (workTarget.targetProgress <= workTarget.currentProgress) {
-                        done = true;
-                    }
+        let workTarget = workDetail.targets[targetLock.targetId];
+        if (!workTarget) {
+            //If we can't find the target lock, that means that it was probably completed by another creep.
+            //Clear it out and try again. If it fails again though... log about it I guess
+            this.targetLocks.delete(creep.name)
+            targetLock = this.getTargetLock(creep, workDetail)
+            if (!targetLock) return true;
+            workTarget = workDetail.targets[targetLock.targetId]
+            if (!workTarget) {
+                Log.e(`Failed to look up a work target twice in a row. ${targetLock.targetId}`);
+            }
+        }
+
+        let useHaulers =
+            roomData.ownership?.username === global.PLAYER_USERNAME &&
+            ["Claimed", "Reserved", "Economic"].includes(roomData.ownership.ownershipType ?? "Unclaimed");
+        let canMine = roomData.miningInfo?.sources?.length ?? 0 > 0;
+        let storage = getMainStorage(parentRoomName);
+
+        let estimatedDrdt = 0;
+        let preventRestock = false;
+        let analyticsCategories = baseAnalyticsCategories.slice();
+        let done = false;
+        let energySpent = 0;
+
+        //Build and repair have an almost identical control loop. We do them the same way
+        if (workDetail.detailType === "Construction" || workDetail.detailType === "Repair" || workDetail.detailType === "RampartRepair") {
+            //If we are not close to the target or standing in a bad place, move
+            let targetPos = unpackPos(workTarget.packedPosition);
+            this.navigateToTarget(creep, targetPos, 3);
+
+            if (Game.rooms[targetPos.roomName]) {
+                let target: ConstructionSite | Structure<BuildableStructureConstant> | null = Game.getObjectById(
+                    targetLock.gameObjectId
+                );
+
+                //If we do not see our target and are working on a ramp cSite, look for a new ramp on the square and target it
+                if (!target && workTarget.gameObjectType === STRUCTURE_RAMPART) {
+                    let builtRampart = targetPos.lookForStructure(STRUCTURE_RAMPART) as StructureRampart | undefined;
+                    if (builtRampart && builtRampart.hits < RAMPART_HP_BUCKET) target = builtRampart;
+                    else if (!builtRampart) done = true;
                 }
 
-                //TODO do this in such a way that we never drop energy on the ground during death
-                if (creep.store.getFreeCapacity(RESOURCE_ENERGY) < estimatedDrdt * 2) {
+                //If we see our target, do the thing. Build until we finish it or run out of energy.
+                if (target) {
+                    //If we are close to the target, go ahead and work on it
+                    if (creep.pos.getRangeTo(targetPos) <= 3 && creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                        analyticsCategories.push(ANALYTICS_CONSTRUCTION, ANALYTICS_ARTIFICER);
+                        if (target instanceof ConstructionSite) {
+                            estimatedDrdt = creep.getActiveBodyparts(WORK) * BUILD_POWER;
+                            if (creep.build(target) === OK) energySpent = estimatedDrdt;
+                            workTarget.currentProgress = target.progress;
+                        } else {
+                            estimatedDrdt = creep.getActiveBodyparts(WORK) * REPAIR_COST * REPAIR_POWER;
+                            if (creep.repair(target) === OK) energySpent = estimatedDrdt;
+                            workTarget.currentProgress = target.hits;
+                        }
+                    }
+                } else {
+                    done = true;
+                }
+            }
+        }
+
+        //If we are supposed to be upgrading, go do that too
+        if (workDetail.detailType === "Upgrade") {
+            let standPos = unpackPos(workTarget.packedPosition);
+            this.navigateToTarget(creep, standPos, 0);
+
+            if (Game.rooms[standPos.roomName]) {
+                let target: StructureController | null = Game.getObjectById(targetLock.gameObjectId);
+
+                if (target) {
+                    if (creep.pos.getRangeTo(target.pos) > 3)
+                        preventRestock = true;
+                    else {
+                        Traveler.reservePosition(creep.pos);
+                        if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                            estimatedDrdt = creep.getActiveBodyparts(WORK) * UPGRADE_CONTROLLER_POWER;
+                            analyticsCategories.push(ANALYTICS_PRIEST, ANALYTICS_UPGRADE);
+                            if (creep.upgradeController(target) === OK) energySpent = estimatedDrdt;
+                            workTarget.currentProgress = target.progress;
+                            if (workTarget.targetProgress <= workTarget.currentProgress) {
+                                creep.queueSay("🎉")
+                                done = true;
+                            } else {
+                                creep.queueSay("⚫")
+                            }
+                        } else {
+                            creep.sayWaiting();
+                            //Let them be a bit cheeky
+                            if (_.random(0, 20) === 0) creep.swear();
+                        }
+                    }
+
+                    //TODO do this in such a way that we never drop energy on the ground during death
                     //If we are low energy and their is a container with E nearby, take from it.
                     let refillContainer: StructureContainer | null = creep.pos
                         .findInRange(FIND_STRUCTURES, 1)
                         .filter(s => s.structureType === STRUCTURE_CONTAINER)
                         .map(s => s as StructureContainer)?.[0];
 
-                    if (refillContainer && refillContainer.store.getUsedCapacity(RESOURCE_ENERGY) > 3)
-                        creep.withdraw(refillContainer, RESOURCE_ENERGY);
+                    if (refillContainer) {
+                        //We will use the container instead of creating a node
+                        preventRestock = true;
+                        if (creep.store.getUsedCapacity(RESOURCE_ENERGY) < 20) {
+                            creep.withdraw(refillContainer, RESOURCE_ENERGY);
+                        }
+                    }
                 }
             }
         }
-    }
 
-    //If we are supposed to be reinforcing, go do that
-    if (workDetail.detailType === "Reinforce") {
-        let targetPos = unpackPos(workTarget.packedPosition);
-        navigateToTarget(creep, targetPos, 0);
+        //If we are supposed to be reinforcing, go do that
+        if (workDetail.detailType === "Reinforce") {
+            let targetPos = unpackPos(workTarget.packedPosition);
+            this.navigateToTarget(creep, targetPos, 0);
 
-        if (Game.rooms[targetPos.roomName]) {
-            let target: Structure<BuildableStructureConstant> | null = Game.getObjectById(
-                workTarget.gameObjectId
-            ) as Structure<BuildableStructureConstant> | null;
+            if (Game.rooms[targetPos.roomName]) {
+                let target: Structure<BuildableStructureConstant> | null = Game.getObjectById(
+                    workTarget.gameObjectId
+                ) as Structure<BuildableStructureConstant> | null;
 
-            if (target) {
-                estimatedDrdt = creep.getActiveBodyparts(WORK) * REPAIR_COST * REPAIR_POWER;
-                if (creep.pos.getRangeTo(targetPos) <= 3 && creep.store.getUsedCapacity(RESOURCE_ENERGY)) {
-                    analyticsCategories.push(ANALYTICS_REINFORCE, ANALYTICS_ARTIFICER);
-                    if (creep.repair(target) === OK) energySpent = estimatedDrdt;
-                    workTarget.currentProgress = target.hits;
-                }
-            }
-        }
-    }
-
-    //If we should be doing rampart repair, go do that
-    //TODO actuall do this part... probably when we need to defend or something
-
-    //If we spent energy this tick, post an analytics event
-    if (energySpent > 0) {
-        postAnalyticsEvent(parentRoomName, energySpent * -1, ...analyticsCategories);
-    }
-
-    //If our current work target is finished up, find a new target/work detail
-    if (workTarget.currentProgress >= workTarget.targetProgress) done = true;
-
-    //If we don't have any energy, decide to either wait or go grab more
-    if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-        //If we are in a remote mining room or an owned room, just wait for haulers
-        if (useHaulers) {
-            //Just sit there and wait for a hauler
-            updateNode(creep, estimatedDrdt, parentRoomName, handle, analyticsCategories);
-        } else if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
-            if (canMine) {
-                //We won't get serviced where we are. Just get the energy ourselves
-                targetLock.mining = true;
-                unregisterNode(parentRoomName, handle, creep.name);
-            } else if (storage) {
-                //We move toward the storage to go get more energy, but also register a node so that we might get topped off before we go the whole way
-                targetLock.restocking = true;
-                updateNode(creep, estimatedDrdt, parentRoomName, handle, analyticsCategories);
-            }
-        }
-    }
-
-    //If our target lock says we are mining or restocking, go do that
-    if (targetLock.mining && canMine) {
-        if (creep.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
-            targetLock.mining = false;
-        } else {
-            //Pick a source to harvest from
-            if (!targetLock.sourcePos && creep.pos.roomName === roomData.roomName) {
-                let sourcePositions = roomData.miningInfo?.sources.map(s => unpackPos(s.packedPosition)) ?? [];
-                let closest = minBy(sourcePositions, p => creep.pos.getRangeTo(p));
-                if (closest) targetLock.sourcePos = closest;
-            }
-
-            //Harvest the source
-            if (targetLock.sourcePos) {
-                if (creep.pos.isNearTo(targetLock.sourcePos)) {
-                    let source = creep.room.lookForAt(LOOK_SOURCES, targetLock.sourcePos);
-                    if (source?.length) creep.harvest(source[0]);
+                if (target) {
+                    estimatedDrdt = creep.getActiveBodyparts(WORK) * REPAIR_COST * REPAIR_POWER;
+                    if (creep.pos.getRangeTo(targetPos) <= 3 && creep.store.getUsedCapacity(RESOURCE_ENERGY)) {
+                        analyticsCategories.push(ANALYTICS_REINFORCE, ANALYTICS_ARTIFICER);
+                        if (creep.repair(target) === OK) energySpent = estimatedDrdt;
+                        workTarget.currentProgress = target.hits;
+                        creep.queueSay("🏗️")
+                    } else {
+                        creep.queueSay("✈️🏗️")
+                    }
                 } else {
-                    Traveler.travelTo(creep, targetLock.sourcePos);
+                    creep.queueSay("🏗️❓")
+                    done = true;
                 }
-            } else {
-                Log.e(`Creep ${creep.name} in room ${creep.room.name} is set to mine but could not find a source`);
             }
         }
-    }
 
-    // let done = false;
-    // if (creep.pos.roomName !== assignment.destPosition.roomName || creep.pos.getRangeTo(assignment.destPosition) > 3) {
-    //     Traveler.travelTo(creep, assignment.destPosition, { range: 3 });
-    //     creep.queueSay("🚚");
-    //     unregisterNode(parentRoomName, handle, creep.name);
-    // } else if (assignment.detailType === "Construction" && target) {
-    //     Traveler.reservePosition(creep.pos);
+        //If we should be doing rampart repair, go do that
+        //TODO actuall do this part... probably when we need to defend or something
 
-    //     target = target as ConstructionSite;
-    //     if (target.progress <= target.progressTotal && creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-    //         creep.build(target);
-    //         postAnalyticsEvent(
-    //             parentRoomName,
-    //             -1 * creep.getActiveBodyparts(WORK) * BUILD_POWER,
-    //             ANALYTICS_ARTIFICER,
-    //             ANALYTICS_CONSTRUCTION
-    //         );
-    //         creep.queueSay("🔨");
-    //     } else if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
-    //         creep.sayWaiting();
-    //     }
-
-    //     updateNode(creep, creep.getBodyPower(WORK, "build", BUILD_POWER), parentRoomName, handle, analyticsCategories);
-    // } else if (assignment.detailType === "Reinforce") {
-    //     Traveler.reservePosition(creep.pos);
-
-    //     if (assignment.currentProgress === undefined || assignment.targetProgress === undefined) {
-    //         Log.e(
-    //             `There is a reinfoce task without progress limits for creep:${creep.name}
-    //             taks:${JSON.stringify(assignment)}`
-    //         );
-    //         done = true;
-    //     } else if (assignment.currentProgress < assignment.targetProgress) {
-    //         if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-    //             creep.queueSay("🏗️");
-    //             creep.repair(target as Structure);
-    //             postAnalyticsEvent(
-    //                 parentRoomName,
-    //                 -1 * creep.getActiveBodyparts(WORK) * BUILD_POWER * REPAIR_COST,
-    //                 ANALYTICS_ARTIFICER,
-    //                 ANALYTICS_REPAIR
-    //             );
-    //         }
-    //         updateNode(
-    //             creep,
-    //             creep.getBodyPower(WORK, "repair", REPAIR_POWER * REPAIR_COST),
-    //             parentRoomName,
-    //             handle,
-    //             analyticsCategories
-    //         );
-    //     } else {
-    //         done = true;
-    //     }
-    // } else if (assignment.detailType === "Repair") {
-    //     Traveler.reservePosition(creep.pos);
-
-    //     target = target as Structure;
-    //     if (target.hits < (assignment.targetProgress ?? target.hitsMax)) {
-    //         if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-    //             creep.queueSay("🔧");
-    //             creep.repair(target);
-    //             postAnalyticsEvent(
-    //                 parentRoomName,
-    //                 -1 * creep.getActiveBodyparts(WORK) * BUILD_POWER * REPAIR_COST,
-    //                 "Artificer"
-    //             );
-    //         }
-    //         updateNode(
-    //             creep,
-    //             creep.getBodyPower(WORK, "repair", REPAIR_POWER * REPAIR_COST),
-    //             parentRoomName,
-    //             handle,
-    //             analyticsCategories
-    //         );
-    //     } else {
-    //         done = true;
-    //         unregisterNode(parentRoomName, handle, creep.name);
-    //     }
-    // } else if (assignment.detailType === "Upgrade") {
-    //     Traveler.reservePosition(creep.pos);
-
-    //     target = target as StructureController;
-    //     if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-    //         creep.upgradeController(target);
-    //         creep.queueSay("⚫");
-    //         postAnalyticsEvent(
-    //             parentRoomName,
-    //             -1 * creep.getActiveBodyparts(WORK) * UPGRADE_CONTROLLER_POWER,
-    //             ANALYTICS_ARTIFICER,
-    //             ANALYTICS_UPGRADE
-    //         );
-    //     } else {
-    //         creep.sayWaiting();
-    //     }
-
-    //     //If we are only supposed to upgrade it a certain amount, trigger the job to be done at some point
-    //     if (
-    //         assignment.currentProgress != undefined &&
-    //         assignment.targetProgress != undefined &&
-    //         assignment.currentProgress >= assignment.targetProgress
-    //     ) {
-    //         done = true;
-    //         unregisterNode(parentRoomName, handle, creep.name);
-    //     } else {
-    //         updateNode(
-    //             creep,
-    //             creep.getBodyPower(WORK, "upgradeController", UPGRADE_CONTROLLER_POWER),
-    //             parentRoomName,
-    //             handle,
-    //             analyticsCategories
-    //         );
-    //     }
-    // }
-
-    if (done) completeWorkTarget(parentRoomName, workDetail.detailId, targetLock.targetId);
-
-    return done;
-}
-
-function navigateToTarget(creep: Creep, targetPos: RoomPosition, desiredRange: number) {
-    //If we are outside the desired range, go there
-    if (creep.pos.roomName !== targetPos.roomName || creep.pos.getRangeTo(targetPos) > desiredRange) {
-        Traveler.travelTo(creep, targetPos);
-    }
-
-    // TODO If we are standing on an edge tile or a road, and we are inside the desired range, path to it a bit more
-}
-
-function updateNode(creep: Creep, drdt: number, parentRoomName: string, handle: string, analyticsCategories: string[]) {
-    let node = getNode(parentRoomName, creep.name);
-    if (node) {
-        node.baseDrdt = drdt;
-        node.level = creep.store.getUsedCapacity(RESOURCE_ENERGY);
-        node.maxLevel = creep.store.getCapacity(RESOURCE_ENERGY);
-    } else {
-        let mainStoragePos = getMainStorage(parentRoomName)?.pos ?? getRallyPosition(parentRoomName);
-        let pathLength = 20;
-        let pathCost = 40;
-        if (mainStoragePos && mainStoragePos.roomName !== parentRoomName) {
-            pathLength = getMultirooomDistance(creep.pos, mainStoragePos) * 1.5;
-            pathCost = pathLength * 2;
+        //If we spent energy this tick, post an analytics event
+        if (energySpent > 0) {
+            postAnalyticsEvent(parentRoomName, energySpent * -1, ...analyticsCategories);
         }
 
-        registerNode(parentRoomName, handle, {
-            nodeId: creep.name,
-            targetId: creep.name,
-            level: creep.store.getUsedCapacity(RESOURCE_ENERGY),
-            maxLevel: creep.store.getCapacity(RESOURCE_ENERGY),
-            resource: RESOURCE_ENERGY,
-            type: "Sink",
-            analyticsCategories: analyticsCategories,
-            baseDrdt: drdt,
-            bodyDrdt: 1, //Reduce amount of stuff we try to create for workers. They don't add much system load
-            serviceRoute: {
-                pathLength: pathLength,
-                pathCost: pathCost
-            },
-            lastKnownPosition: creep.pos
-        });
+        //If our current work target is finished up, find a new target/work detail
+        if (workTarget.currentProgress >= workTarget.targetProgress) done = true;
+
+        //If we don't have any energy, decide to either wait or go grab more
+        if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0 && !preventRestock) {
+            //If we are in a remote mining room or an owned room, just wait for haulers
+            if (useHaulers) {
+                //Just sit there and wait for a hauler
+                this.updateCreepNode(creep, estimatedDrdt, parentRoomName, handle, analyticsCategories);
+            } else if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
+                if (canMine) {
+                    //We won't get serviced where we are. Just get the energy ourselves
+                    targetLock.mining = true;
+                    unregisterNode(parentRoomName, handle, creep.name);
+                } else if (storage) {
+                    //We move toward the storage to go get more energy, but also register a node so that we might get topped off before we go the whole way
+                    targetLock.restocking = true;
+                    this.updateCreepNode(creep, estimatedDrdt, parentRoomName, handle, analyticsCategories);
+                }
+            }
+        } else {
+            unregisterNode(parentRoomName, handle, creep.name);
+        }
+
+        //If our target lock says we are mining or restocking, go do that
+        if (targetLock.mining && canMine) {
+            if (creep.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+                targetLock.mining = false;
+            } else {
+                //Pick a source to harvest from
+                if (!targetLock.sourcePos && creep.pos.roomName === roomData.roomName) {
+                    let sourcePositions = roomData.miningInfo?.sources.map(s => unpackPos(s.packedPosition)) ?? [];
+                    let closest = minBy(sourcePositions, p => creep.pos.getRangeTo(p));
+                    if (closest) targetLock.sourcePos = closest;
+                }
+
+                //Harvest the source
+                if (targetLock.sourcePos) {
+                    if (creep.pos.isNearTo(targetLock.sourcePos)) {
+                        let source = creep.room.lookForAt(LOOK_SOURCES, targetLock.sourcePos);
+                        if (source?.length) creep.harvest(source[0]);
+                    } else {
+                        Traveler.travelTo(creep, targetLock.sourcePos);
+                    }
+                } else {
+                    Log.e(`Creep ${creep.name} in room ${creep.room.name} is set to mine but could not find a source`);
+                }
+            }
+        }
+
+        // let done = false;
+        // if (creep.pos.roomName !== assignment.destPosition.roomName || creep.pos.getRangeTo(assignment.destPosition) > 3) {
+        //     Traveler.travelTo(creep, assignment.destPosition, { range: 3 });
+        //     creep.queueSay("🚚");
+        //     unregisterNode(parentRoomName, handle, creep.name);
+        // } else if (assignment.detailType === "Construction" && target) {
+        //     Traveler.reservePosition(creep.pos);
+
+        //     target = target as ConstructionSite;
+        //     if (target.progress <= target.progressTotal && creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+        //         creep.build(target);
+        //         postAnalyticsEvent(
+        //             parentRoomName,
+        //             -1 * creep.getActiveBodyparts(WORK) * BUILD_POWER,
+        //             ANALYTICS_ARTIFICER,
+        //             ANALYTICS_CONSTRUCTION
+        //         );
+        //         creep.queueSay("🔨");
+        //     } else if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
+        //         creep.sayWaiting();
+        //     }
+
+        //     updateNode(creep, creep.getBodyPower(WORK, "build", BUILD_POWER), parentRoomName, handle, analyticsCategories);
+        // } else if (assignment.detailType === "Reinforce") {
+        //     Traveler.reservePosition(creep.pos);
+
+        //     if (assignment.currentProgress === undefined || assignment.targetProgress === undefined) {
+        //         Log.e(
+        //             `There is a reinfoce task without progress limits for creep:${creep.name}
+        //             taks:${JSON.stringify(assignment)}`
+        //         );
+        //         done = true;
+        //     } else if (assignment.currentProgress < assignment.targetProgress) {
+        //         if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+        //             creep.queueSay("🏗️");
+        //             creep.repair(target as Structure);
+        //             postAnalyticsEvent(
+        //                 parentRoomName,
+        //                 -1 * creep.getActiveBodyparts(WORK) * BUILD_POWER * REPAIR_COST,
+        //                 ANALYTICS_ARTIFICER,
+        //                 ANALYTICS_REPAIR
+        //             );
+        //         }
+        //         updateNode(
+        //             creep,
+        //             creep.getBodyPower(WORK, "repair", REPAIR_POWER * REPAIR_COST),
+        //             parentRoomName,
+        //             handle,
+        //             analyticsCategories
+        //         );
+        //     } else {
+        //         done = true;
+        //     }
+        // } else if (assignment.detailType === "Repair") {
+        //     Traveler.reservePosition(creep.pos);
+
+        //     target = target as Structure;
+        //     if (target.hits < (assignment.targetProgress ?? target.hitsMax)) {
+        //         if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+        //             creep.queueSay("🔧");
+        //             creep.repair(target);
+        //             postAnalyticsEvent(
+        //                 parentRoomName,
+        //                 -1 * creep.getActiveBodyparts(WORK) * BUILD_POWER * REPAIR_COST,
+        //                 "Artificer"
+        //             );
+        //         }
+        //         updateNode(
+        //             creep,
+        //             creep.getBodyPower(WORK, "repair", REPAIR_POWER * REPAIR_COST),
+        //             parentRoomName,
+        //             handle,
+        //             analyticsCategories
+        //         );
+        //     } else {
+        //         done = true;
+        //         unregisterNode(parentRoomName, handle, creep.name);
+        //     }
+        // } else if (assignment.detailType === "Upgrade") {
+        //     Traveler.reservePosition(creep.pos);
+
+        //     target = target as StructureController;
+        //     if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+        //         creep.upgradeController(target);
+        //         creep.queueSay("⚫");
+        //         postAnalyticsEvent(
+        //             parentRoomName,
+        //             -1 * creep.getActiveBodyparts(WORK) * UPGRADE_CONTROLLER_POWER,
+        //             ANALYTICS_ARTIFICER,
+        //             ANALYTICS_UPGRADE
+        //         );
+        //     } else {
+        //         creep.sayWaiting();
+        //     }
+
+        //     //If we are only supposed to upgrade it a certain amount, trigger the job to be done at some point
+        //     if (
+        //         assignment.currentProgress != undefined &&
+        //         assignment.targetProgress != undefined &&
+        //         assignment.currentProgress >= assignment.targetProgress
+        //     ) {
+        //         done = true;
+        //         unregisterNode(parentRoomName, handle, creep.name);
+        //     } else {
+        //         updateNode(
+        //             creep,
+        //             creep.getBodyPower(WORK, "upgradeController", UPGRADE_CONTROLLER_POWER),
+        //             parentRoomName,
+        //             handle,
+        //             analyticsCategories
+        //         );
+        //     }
+        // }
+
+        if (done) {
+            completeWorkTarget(parentRoomName, workDetail.detailId, targetLock.targetId);
+            this.targetLocks.delete(creep.name);
+        }
+
+        return done;
+    }
+
+    navigateToTarget(creep: Creep, targetPos: RoomPosition, desiredRange: number) {
+        //If we are outside the desired range, go there
+        if (creep.pos.roomName !== targetPos.roomName || creep.pos.getRangeTo(targetPos) > desiredRange) {
+            Traveler.travelTo(creep, targetPos);
+        }
+
+        // TODO If we are standing on an edge tile or a road, and we are inside the desired range, path to it a bit more
+    }
+
+    updateUpgraderStorageNode(parentRoomName: string, upgraderContainer: StructureContainer, drdt: number) {
+        let node = getNode(parentRoomName, "upgraderStorage")
+        if (node) {
+            node.baseDrdt = drdt;
+            node.level = upgraderContainer.store.getUsedCapacity(RESOURCE_ENERGY);
+            node.maxLevel = upgraderContainer.store.getCapacity(RESOURCE_ENERGY);
+        } else {
+
+        }
+    }
+
+    updateCreepNode(creep: Creep, drdt: number, parentRoomName: string, handle: string, analyticsCategories: string[]) {
+        this.updateNode(creep.name, creep.name, creep.store, creep.pos, drdt, parentRoomName, handle, analyticsCategories);
+    }
+
+    updateNode(nodeName: string, targetId: string, store: StoreDefinition, pos: RoomPosition,
+               drdt: number, parentRoomName: string, handle: string, analyticsCategories: string[]) {
+        let node = getNode(parentRoomName, nodeName);
+        if (node) {
+            node.baseDrdt = drdt;
+            node.level = store.getUsedCapacity(RESOURCE_ENERGY);
+            node.maxLevel = store.getCapacity(RESOURCE_ENERGY);
+            node.lastKnownPosition = pos;
+        } else {
+            let mainStoragePos = getMainStorage(parentRoomName)?.pos ?? getRallyPosition(parentRoomName);
+            let pathLength = 20;
+            let pathCost = 40;
+            if (mainStoragePos && mainStoragePos.roomName !== parentRoomName) {
+                pathLength = getMultirooomDistance(pos, mainStoragePos) * 1.5;
+                pathCost = pathLength * 2;
+            }
+
+            registerNode(parentRoomName, handle, {
+                nodeId: nodeName,
+                targetId: targetId,
+                level: store.getUsedCapacity(RESOURCE_ENERGY),
+                maxLevel: store.getCapacity(RESOURCE_ENERGY),
+                resource: RESOURCE_ENERGY,
+                type: "Sink",
+                analyticsCategories: analyticsCategories,
+                baseDrdt: drdt,
+                bodyDrdt: 1, //Reduce amount of stuff we try to create for workers. They don't add much system load
+                serviceRoute: {
+                    pathLength: pathLength,
+                    pathCost: pathCost
+                },
+                lastKnownPosition: pos
+            });
+        }
     }
 }
+
+export const workerLogic = new WorkerLogic();

@@ -37,6 +37,10 @@ export function getWorkDetailsOfType(roomName: string, type: DetailType): WorkDe
     return Object.values(memory.details[roomName] ?? {}).filter(d => d.detailType === type);
 }
 
+export function getWorkDetailById(roomName: string, detailId: string): WorkDetail | undefined {
+    return memory.details[roomName]?.[detailId];
+}
+
 export function deleteWorkDetail(roomName: string, detailId: string) {
     memory.loadMemory();
     if (memory.details[roomName]?.[detailId]) delete memory.details[roomName]?.[detailId];
@@ -45,7 +49,13 @@ export function deleteWorkDetail(roomName: string, detailId: string) {
 
 export function completeWorkTarget(roomName: string, detailId: string, targetId: string) {
     memory.loadMemory();
-    if (memory.details[roomName]?.[detailId]?.targets[targetId])
+    if (memory.details[roomName]?.[detailId]?.targets[targetId]) {
+        //Delete the given target
         delete memory.details[roomName][detailId].targets[targetId];
+        //This completes the entire work detail if all the targets are gone
+        if (Object.values(memory.details[roomName][detailId].targets).length === 0) {
+            delete memory.details[roomName][detailId];
+        }
+    }
     updateMemory(memory);
 }

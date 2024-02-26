@@ -5,6 +5,7 @@
 
 import {Log} from "utils/logger/Logger";
 import {drawCircledItem} from "utils/UtilityFunctions";
+import {profile} from "../profiler/Profiler";
 
 declare global {
     interface CreepMemory {
@@ -27,6 +28,7 @@ interface Reservation {
     ttl: number;
 }
 
+@profile
 export class Traveler {
     private static structureMatrixCache: { [roomName: string]: CostMatrix } = {};
     private static creepMatrixCache: { [roomName: string]: CostMatrix } = {};

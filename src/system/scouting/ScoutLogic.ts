@@ -10,6 +10,7 @@ import {
     manhattanDistance,
     roomNameFromCoord
 } from "utils/UtilityFunctions";
+import {min} from "lodash";
 
 const MINING_DATA_MIN_TTL = 100;
 const MINING_DATA_MAX_TTL = 5000;
@@ -19,6 +20,9 @@ const OWNERSHIP_DATA_MAX_TTL = 5000;
 
 const THREAT_DATA_MIN_TTL = 3;
 const THREAT_DATA_MAX_TTL = 5000;
+
+const THREAT_DATA_MIN_TTL_OWNED_ROOM = 3;
+const THREAT_DATA_MAX_TTL_OWNED_ROOM = 100;
 
 const TERRITORY_DATA_MIN_TTL = 1500;
 const TERRITORY_DATA_MAX_TTL = 5000;
@@ -62,6 +66,7 @@ function evaluateSources(sources: [Source, ...Source[]]): [SourceInfo, ...Source
     // Log.d("Free spaces by source:" + JSON.stringify(freeSpacesBySource));
 
     //Add free spaces one at a time to each source. This solves for cases where they have overlaping spots
+    //By design, must be deterministic
     let packedUsedSpots: string[] = [];
     let maxFreeSpaces = _.max(freeSpacesBySource, spaces => spaces.length)?.length ?? 0;
     for (let spaceIndex = 0; spaceIndex < maxFreeSpaces; spaceIndex++) {
@@ -166,13 +171,20 @@ function evaluateOwnership(room: Room): [RoomThreatInfo | undefined, RoomOwnersh
             creep => (peacefullByPlayer[creep.owner.username] = (peacefullByPlayer[creep.owner.username] ?? 0) + 1)
         );
 
+        let minTtl = THREAT_DATA_MIN_TTL;
+        let maxTtl = THREAT_DATA_MAX_TTL;
+        if(ownershipInfo?.username === global.PLAYER_USERNAME) {
+            minTtl = THREAT_DATA_MIN_TTL_OWNED_ROOM;
+            maxTtl = THREAT_DATA_MAX_TTL_OWNED_ROOM;
+        }
+
         threatInfo = {
             numCombatants: allDangerous.length,
             numNonhostile: allPeaceful.length,
             threatsByPlayer: threatsByPlayer,
             lastUpdate: Game.time,
-            minNextUpdate: Game.time + THREAT_DATA_MIN_TTL,
-            maxNextUpdate: Game.time + THREAT_DATA_MAX_TTL
+            minNextUpdate: Game.time + minTtl,
+            maxNextUpdate: Game.time + maxTtl
         };
 
         //If we didn't get ownership info from reservation info, use the creep info instead
@@ -447,8 +459,8 @@ export function _canBeUpdated(data: RoomScoutingInfo): boolean {
 }
 
 function shouldSendScout(roomName: string, data: RoomScoutingInfo, alreadyAssigned: string[]): boolean {
-    if (!data) return true;
     if (alreadyAssigned.includes(roomName)) return false;
+    if (!data) return true;
     let outdatedPathing = isPastMaxTTL(data.pathingInfo);
     let outdatedHazard = isPastMaxTTL(data.hazardInfo);
     let outdatadMining = data.miningInfo && isPastMaxTTL(data.miningInfo);

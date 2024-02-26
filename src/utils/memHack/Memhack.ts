@@ -31,10 +31,10 @@ export function memhack(fn: () => void) {
 
         //Yes, this does mean we are choosing not to save the memory 9 of 10 ticks
         // if (Game.time % 10 === 0) {
-        RawMemory.set(JSON.stringify(Memory));
-        //     // RawMemory._parsed = Memory;
+        // RawMemory.set(JSON.stringify(Memory));
+            RawMemory._parsed = Memory;
         // } else {
-        //     // delete RawMemory._parsed;
+            // delete RawMemory._parsed;
         // }
 
         // Log.d(`Used before tick ${cpu} After:${Game.cpu.getUsed()} Bucket:${Game.cpu.bucket}`);

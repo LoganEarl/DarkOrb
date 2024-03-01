@@ -172,6 +172,10 @@ class WorkerLogic {
         if (detail1.priority === "Elevated" && detail2.priority !== "Elevated") return detail1;
         if (detail1.priority !== "Elevated" && detail2.priority === "Elevated") return detail2;
 
+        //Prefer normal priority items over low priority ones
+        if (detail1.priority === "Normal" && detail2.priority !== "Normal") return detail1;
+        if (detail1.priority !== "Normal" && detail2.priority === "Normal") return detail2;
+
         //They are either both of the primary pool, or both of a secondary one, and both of the same priority.
         //Go with job satisfaction next.
         let popSatisfaction1 = (creepsPerDetail.get(detail1.detailId) ?? 0) / detail1.maxCreeps;
@@ -313,7 +317,9 @@ class WorkerLogic {
             if (!targetLock) return true;
             workTarget = workDetail.targets[targetLock.targetId]
             if (!workTarget) {
-                Log.e(`Failed to look up a work target twice in a row. ${targetLock.targetId}`);
+                Log.e(`Failed to look up a work target twice in a row. Manually completing it. ${workDetail.detailId}`);
+                completeWorkTarget(parentRoomName, workDetail.detailId, targetLock.targetId);
+                return true;
             }
         }
 

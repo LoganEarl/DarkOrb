@@ -45,6 +45,12 @@ export class RoomWorkSystem {
     _visualize() {
         if (Game.rooms[this.roomName]) {
             Object.values(getWorkDetails(this.roomName)).forEach(detail => {
+                let priorityColors: {[priority: string]: string} = {
+                    "Low" : "blue",
+                    "Normal": "green",
+                    "Elevated": "yellow",
+                    "Critical": "red"
+                }
                 Object.values(detail.targets).forEach(target => {
                     let destPosition = unpackPos(target.packedPosition)
                     new RoomVisual(destPosition.roomName).rect(
@@ -54,7 +60,7 @@ export class RoomWorkSystem {
                         1,
                         {
                             fill: "transparent",
-                            stroke: "yellow"
+                            stroke: priorityColors[detail.priority]
                         }
                     );
                 })

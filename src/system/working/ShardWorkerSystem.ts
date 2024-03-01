@@ -91,18 +91,18 @@ class ShardWorkerSystem {
                     .filter(s => s.structureType === STRUCTURE_RAMPART || s.structureType === STRUCTURE_WALL)
                     .map(s => s as StructureWall | StructureRampart);
 
-                let lowRamps = rampartsAndWalls.filter(s => s.structureType === STRUCTURE_RAMPART && s.hits < 10000);
+                let lowRamps = rampartsAndWalls.filter(s => s.structureType === STRUCTURE_RAMPART && s.hits < RAMP_BUCKET_BUFFER);
                 this.updateLowRampRepair(bestRoom, lowRamps);
 
 
                 let reinforcementTargets = rampartsAndWalls.filter(
-                    r => r.structureType !== STRUCTURE_RAMPART || r.hits > 10000
+                    r => r.structureType !== STRUCTURE_RAMPART || r.hits > RAMP_BUCKET_SIZE
                 );
                 let lowestWallBucket: (StructureWall | StructureRampart)[] = [];
                 let minBucket: number | undefined;
 
                 reinforcementTargets.forEach(r => {
-                    let bucket = Math.floor(r.hits / 10000);
+                    let bucket = Math.floor(r.hits / RAMP_BUCKET_SIZE);
                     if (minBucket === undefined || minBucket > bucket) {
                         minBucket = bucket;
                         lowestWallBucket = [r as StructureWall | StructureRampart];
@@ -122,13 +122,17 @@ class ShardWorkerSystem {
         let workTargets: { [targetId: string]: WorkTarget } = existingWorkDetail?.targets ?? {};
         for (let pos of upgraderPositions ?? []) {
             let targetId = `${pos.x}:${pos.y}:${!room.controller!.id}`
-            workTargets[targetId] = {
-                currentProgress: room.controller!.progress,
-                gameObjectId: room.controller!.id,
-                gameObjectType: STRUCTURE_CONTROLLER,
-                packedPosition: packPos(roomPos(pos, room.name)),
-                targetId: targetId,
-                targetProgress: workTargets[targetId]?.targetProgress ?? Math.min(room.controller!.progressTotal, room.controller!.progress + 1000)
+            if(workTargets[targetId]) {
+                workTargets[targetId].currentProgress = room.controller!.progress
+            } else {
+                workTargets[targetId] = {
+                    currentProgress: room.controller!.progress,
+                    gameObjectId: room.controller!.id,
+                    gameObjectType: STRUCTURE_CONTROLLER,
+                    packedPosition: packPos(roomPos(pos, room.name)),
+                    targetId: targetId,
+                    targetProgress: workTargets[targetId]?.targetProgress ?? Math.min(room.controller!.progressTotal, room.controller!.progress + 1000)
+                }
             }
             countWorkTargets++;
         }
@@ -186,8 +190,8 @@ class ShardWorkerSystem {
 
     private updateStructureRepair(system: RoomWorkSystem, structures: Structure[]) {
         let workDetailId = "RepairStructures" + system.roomName
+        let existingDetail = getWorkDetailById(system.roomName, workDetailId )
         if (structures.length) {
-            let existingDetail = getWorkDetailById(system.roomName, workDetailId )
             let targets: { [targetId: string]: WorkTarget } = existingDetail?.targets ?? {};
             for (let structure of structures) {
                 targets[structure.id] = {
@@ -213,7 +217,7 @@ class ShardWorkerSystem {
                     workerPools: ["Workers", "EmergencyRepairers"]
                 });
             }
-        } else {
+        } else if (Object.values(existingDetail?.targets ?? {}).length === 0) {
             deleteWorkDetail(system.roomName, workDetailId)
         }
     }
@@ -269,7 +273,7 @@ class ShardWorkerSystem {
                     gameObjectId: wall.id,
                     gameObjectType: wall.structureType,
                     packedPosition: packPos(wall.pos),
-                    targetId: wall.id,
+                    targetId: targetId,
                     targetProgress: targetHits
 
                 }
@@ -283,7 +287,7 @@ class ShardWorkerSystem {
                     maxWorkParts: 0,
                     parentRoom: system.roomName,
                     primaryPool: "Workers",
-                    priority: "Normal",
+                    priority: "Low",
                     targets: targets,
                     workerPools: ["Workers", "Upgraders", "EmergencyRepairers"]
                 });

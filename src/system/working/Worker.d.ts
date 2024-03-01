@@ -30,6 +30,8 @@ type DetailType =
 type WorkerPool = "Workers" | "Upgraders" | "EmergencyRepairers";
 
 type WorkDetailPriority =
+    //Creeps won't cross pool boundaries for these, and they will not seek these out unless all other are taken care of
+    "Low"
 //Normal tasks. Creeps won't cross pool boundaries for these unless they have nothing else in their own pool.
 //Examples include building a road and upgrading a controller that has plenty left on the downgrade timer
     | "Normal"

@@ -1,7 +1,7 @@
 import {Log} from "utils/logger/Logger";
 import {RoomWorkSystem} from "./RoomWorkerSystem";
 import {getRoomData} from "../scouting/ScoutInterface";
-import {deleteWorkDetail, getWorkDetailById, registerWorkDetail} from "./WorkInterface";
+import {deleteWorkDetail, getWorkDetailById, registerWorkDetail} from "./WorkerInterface";
 import {registerResetFunction} from "../../utils/SystemResetter";
 import {roomPos} from "../../utils/UtilityFunctions";
 import {packPos} from "../../utils/Packrat";

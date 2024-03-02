@@ -11,7 +11,7 @@ import {
     ANALYTICS_SPAWNING
 } from "system/storage/AnalyticsConstants";
 import {getEnergyPerTick, getMainStorage} from "system/storage/StorageInterface";
-import {getWorkDetails} from "./WorkInterface";
+import {getWorkDetails} from "./WorkerInterface";
 import {workerLogic} from "./WorkerLogic";
 import {findStructure} from "../../utils/StructureFindCache";
 import {drawBar, roomPos} from "../../utils/UtilityFunctions";

@@ -53,7 +53,7 @@ export class RoomSpawnSystem {
                         type: "Sink",
                         analyticsCategories: [],
                         lastKnownPosition: fillable.pos,
-                        priorityScalar: 50,
+                        priorityScalar: 500,
                         disableLimitedGrab: true,
                         serviceRoute: {
                             pathLength: dist,

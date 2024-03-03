@@ -91,7 +91,8 @@ class ShardWorkerSystem {
                     .filter(s => s.structureType === STRUCTURE_RAMPART || s.structureType === STRUCTURE_WALL)
                     .map(s => s as StructureWall | StructureRampart);
 
-                let lowRamps = rampartsAndWalls.filter(s => s.structureType === STRUCTURE_RAMPART && s.hits < RAMP_BUCKET_BUFFER);
+                let lowRamps = rampartsAndWalls
+                    .filter(s => s.structureType === STRUCTURE_RAMPART && s.hits < RAMP_BUCKET_BUFFER);
                 this.updateLowRampRepair(bestRoom, lowRamps);
 
 
@@ -224,8 +225,8 @@ class ShardWorkerSystem {
 
     private updateLowRampRepair(system: RoomWorkSystem, structures: Structure[]) {
         let workDetailId = "HomeRoomLowRampRepair";
+        let existingWorkDetail = getWorkDetailById(system.roomName, workDetailId)
         if (structures.length) {
-            let existingWorkDetail = getWorkDetailById(system.roomName, workDetailId)
             let targets: { [targetId: string]: WorkTarget } = existingWorkDetail?.targets ?? {};
             for (let lowRamp of structures) {
                 targets[lowRamp.id] = {
@@ -250,7 +251,7 @@ class ShardWorkerSystem {
                     workerPools: ["Workers", "EmergencyRepairers"]
                 });
             }
-        } else {
+        } else if (Object.values(existingWorkDetail?.targets ?? {}).length === 0){
             deleteWorkDetail(system.roomName, workDetailId);
         }
     }

@@ -22,6 +22,9 @@ interface Creep {
     sayWaiting(): void;
 
     swear(): void;
+
+    //Will roll from 0 to odds. If game.time % odds === 0, will swear.
+    randomSwear(odds: number): void;
 }
 
 interface StructureExtension {

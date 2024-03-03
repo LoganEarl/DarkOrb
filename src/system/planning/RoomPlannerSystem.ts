@@ -9,6 +9,7 @@ export class RoomPlannerSystem {
         this.roomName = roomName;
     }
 
+
     _queueJobs(remainingSites: number) {
         let plan = getRoomData(this.roomName)?.roomPlan;
         let room = Game.rooms[this.roomName];
@@ -95,6 +96,7 @@ export class RoomPlannerSystem {
     ) {
         if (remainingSites === 0) return 0;
 
+
         let toBuild = group.group[rcl].buildings;
         let groupSize = toBuild.length;
         let placed = 0;
@@ -103,6 +105,14 @@ export class RoomPlannerSystem {
             for (let x = 0; x < groupSize; x++) {
                 let xPos = x + group.dx;
 
+                let buildableOneTile = toBuild[y]?.[x] ?? [];
+                //Only one csite per tile, even if you can have >1 structure per tile. Place non-roads first
+                buildableOneTile.sort((a,b) => {
+                    if(a === b) return 0
+                    if(a === STRUCTURE_ROAD) return 1
+                    if(b === STRUCTURE_ROAD) return -1
+                    return 0;
+                })
                 for (let buildable of toBuild[y]?.[x] ?? []) {
                     if (remainingSites - placed <= 0) return placed;
 
@@ -114,7 +124,7 @@ export class RoomPlannerSystem {
                             structures[yPos][xPos].push(buildable);
                             placed++;
                             remainingBuildings[buildable]--;
-                            break;
+                            break; //Don't keep looping
                         } else if (result !== ERR_INVALID_TARGET) {
                             Log.w(
                                 `Failed to place a construction site for ${buildable} at x:${xPos} y:${yPos} r:${room.name} with code ${result}`

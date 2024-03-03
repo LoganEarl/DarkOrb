@@ -6,7 +6,7 @@ import {
 } from "system/hauling/HaulerInterface";
 import {getRoomData, scoutRoom} from "system/scouting/ScoutInterface";
 import {getCreeps, registerCreepConfig, unregisterHandle} from "system/spawning/SpawnInterface";
-import {getMainStorage} from "system/storage/StorageInterface";
+import {getMainStorage, postAnalyticsEvent} from "system/storage/StorageInterface";
 import {Log} from "utils/logger/Logger";
 import {MemoryComponent, updateMemory} from "utils/MemoryWriter";
 import {packPos, unpackPos, unpackPosList} from "utils/Packrat";
@@ -14,6 +14,7 @@ import {profile} from "utils/profiler/Profiler";
 import {Traveler} from "utils/traveler/Traveler";
 import {getMultirooomDistance, samePos} from "utils/UtilityFunctions";
 import {minerLogic} from "./MinerLogic";
+import {registerMilitaryOperation} from "../military/MilitaryInterface";
 
 /*
     We don't want to do too much here. Calcuate the mining path, figure out our creep configs, and know how to run the logic
@@ -135,6 +136,14 @@ export class SourceMinerSystem implements MemoryComponent {
             if (mapData.ownership.ownershipType === "Reserved") this.addStopReason("ForeignReservation");
             else this.clearStopReason("ForeignReservation");
         }
+        //If the ownership data shows unclaimed or it is claimed by us, clear stop reasons
+        else if (mapData?.ownership && (
+            mapData.ownership.ownershipType === "Unclaimed" ||
+            mapData.ownership.username === global.PLAYER_USERNAME
+        )) {
+            this.clearStopReason("ForeignReservation");
+            this.clearStopReason("ForeignOwnership");
+        }
 
         let handle = this.handle;
         if (this.memory!.state !== "Active") {
@@ -178,10 +187,10 @@ export class SourceMinerSystem implements MemoryComponent {
 
     _start() {
         this.loadMemory();
+        this.clearStopReason("Mandated");
         if (this.memory!.state === "New") {
             Log.i(`Started mining operation ${this.parentRoomName}->${this.roomName}:${this.sourceId}`);
             this.memory!.state = "Active";
-            this.clearStopReason("Mandated");
             updateMemory(this);
         }
     }
@@ -192,7 +201,8 @@ export class SourceMinerSystem implements MemoryComponent {
     }
 
     _runCreeps() {
-        if ((getRoomData(this.roomName)?.hazardInfo?.numCombatants ?? 0) > 0) this.addStopReason("Attacked");
+        let roomData = getRoomData(this.roomName);
+        if ((roomData?.hazardInfo?.numCombatants ?? 0) > 0) this.addStopReason("Attacked");
         else this.clearStopReason("Attacked");
 
         this.loadMemory();
@@ -204,45 +214,50 @@ export class SourceMinerSystem implements MemoryComponent {
                     if (!Game.creeps[name]) delete this.creepAssignments[name];
                 });
 
-                for (let creep of creeps) {
-                    scoutRoom(creep.room);
+                if(!creeps.length) {
+                    postAnalyticsEvent(this.parentRoomName, 0, this.handle)
+                } else {
+                    for (let creep of creeps) {
+                        scoutRoom(creep.room);
 
-                    let threats = (getRoomData(creep.room.name)?.hazardInfo?.numCombatants ?? 0) > 0;
-                    if (threats) this.addStopReason("Attacked");
+                        let threats = (getRoomData(creep.room.name)?.hazardInfo?.numCombatants ?? 0) > 0;
+                        if (threats) this.addStopReason("Attacked");
 
-                    if (this.miningStandSpaces.length < creeps.length && creep.memory.jobName === "Primordial") {
-                        creep.suicide();
-                        delete this.creepAssignments[creep.name];
-                    } else {
-                        if (!this.creepAssignments[creep.name]) {
-                            let populationSize = Math.max(
-                                _.sum(this.configs, c => c.quantity),
-                                creeps.length
-                            );
-
-                            this.creepAssignments[creep.name] = minerLogic._assignMiningSpace(
-                                creep,
-                                this.miningStandSpaces,
-                                this.sourceId,
-                                this.creepAssignments,
-                                populationSize
-                            );
-                        }
-                        let assignment = this.creepAssignments[creep.name];
-                        let primary = samePos(this.miningStandSpaces[0], assignment.placeToStand);
-                        // Log.d(`${creep.name} running with data ${primary}`);
-                        if (this.isSource) {
-                            minerLogic._runSourceMiner(creep, this.parentRoomName, this.handle, assignment, primary);
-                            this.updateSourceLogisticsNodes(creep, assignment);
+                        if (this.miningStandSpaces.length < creeps.length && creep.memory.jobName === "Primordial") {
+                            creep.suicide();
+                            delete this.creepAssignments[creep.name];
                         } else {
-                            //TODO Run mineral miner
+                            if (!this.creepAssignments[creep.name]) {
+                                let populationSize = Math.max(
+                                    _.sum(this.configs, c => c.quantity),
+                                    creeps.length
+                                );
+
+                                this.creepAssignments[creep.name] = minerLogic._assignMiningSpace(
+                                    creep,
+                                    this.miningStandSpaces,
+                                    this.sourceId,
+                                    this.creepAssignments,
+                                    populationSize
+                                );
+                            }
+                            let assignment = this.creepAssignments[creep.name];
+                            let primary = samePos(this.miningStandSpaces[0], assignment.placeToStand);
+                            // Log.d(`${creep.name} running with data ${primary}`);
+                            if (this.isSource) {
+                                minerLogic._runSourceMiner(creep, this.parentRoomName, this.handle, assignment, primary);
+                                this.updateSourceLogisticsNodes(creep, assignment);
+                            } else {
+                                //TODO Run mineral miner
+                            }
                         }
                     }
                 }
             } else {
                 unregisterNodes(this.parentRoomName, this.handle);
+                postAnalyticsEvent(this.parentRoomName, 0, this.handle)
                 for (let creep of creeps) {
-                    if (_.random(0, 6) === 0) creep.swear();
+                    creep.randomSwear(8)
                     let packedRally = getRoomData(this.parentRoomName)?.pathingInfo?.packedRallyPos;
                     if (packedRally !== undefined) Traveler.travelTo(creep, unpackPos(packedRally));
                 }
@@ -275,6 +290,7 @@ export class SourceMinerSystem implements MemoryComponent {
 
     private addStopReason(reason: MinerStopReason) {
         this.loadMemory();
+        //If we were already stopped, go ahead and add the new stop reason ontop of the old one
         if (this.memory!.state === "Stopped" && !this.memory!.stopReasons.includes(reason)) {
             this.memory!.stopReasons.push(reason);
             updateMemory(this);
@@ -282,7 +298,19 @@ export class SourceMinerSystem implements MemoryComponent {
                 `Adding ${reason} to the list of reasons why mining operation ${this.parentRoomName}->${this.roomName}:${this.sourceId} is stopped`
             );
         }
+        //If we weren't already stopped, stop us
         if (this.memory!.state !== "Stopped" && !this.memory!.stopReasons.includes(reason)) {
+            //When an otherwise active mining job is attacked, make the military fix it
+            if(this.memory!.state === "Active" && reason === "Attacked") {
+                Log.i(`Mining system has registered a military operation to clear room:${this.roomName}`)
+                registerMilitaryOperation(this.parentRoomName, {
+                    failureCriteria: [], //TODO add budget to this
+                    objectives: ["KillEnemyCreeps"],
+                    operationId: this.roomName + ":Guard",
+                    successCriteria: ["ObjectivesCompleted"],
+                    packedTargetPosition: packPos(this.miningStandSpaces[0])
+                })
+            }
             this.memory!.stopReasons.push(reason);
             this.memory!.state = "Stopped";
             updateMemory(this);

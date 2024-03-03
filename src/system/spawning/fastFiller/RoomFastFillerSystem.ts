@@ -173,7 +173,7 @@ export class RoomFastFillerSystem {
                 type: "Sink",
                 analyticsCategories: [],
                 lastKnownPosition: container.pos,
-                priorityScalar: 50,
+                priorityScalar: 2,
                 disableLimitedGrab: true,
                 serviceRoute: {
                     pathLength: dist,

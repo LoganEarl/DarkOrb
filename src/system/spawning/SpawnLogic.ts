@@ -11,8 +11,8 @@ const defaultPriorities = [
     "Summoner", //Fast filler
     "Drudge", //Hauler
     "Exhumer", //Miner
-    "Priest", //Upgrader
     "Artificer", //Worker
+    "Priest", //Upgrader
     "Sludger" //Mineral miner
 ];
 

@@ -8,11 +8,11 @@ import {
     ANALYTICS_UPGRADE
 } from "system/storage/AnalyticsConstants";
 import {getMainStorage, postAnalyticsEvent} from "system/storage/StorageInterface";
-import {unpackPos} from "utils/Packrat";
+import {packPos, unpackPos} from "utils/Packrat";
 import {Log} from "utils/logger/Logger";
 import {Traveler} from "utils/traveler/Traveler";
 import {getMultirooomDistance, minBy} from "utils/UtilityFunctions";
-import {completeWorkTarget} from "./WorkInterface";
+import {completeWorkTarget} from "./WorkerInterface";
 import {profile} from "../../utils/profiler/Profiler";
 
 const CONSTRUCTION_PRIORITIES = [
@@ -362,11 +362,20 @@ class WorkerLogic {
                             estimatedDrdt = creep.getActiveBodyparts(WORK) * BUILD_POWER;
                             if (creep.build(target) === OK) energySpent = estimatedDrdt;
                             workTarget.currentProgress = target.progress;
+                            creep.queueSay("🔨")
                         } else {
+                            creep.queueSay("🔧")
                             estimatedDrdt = creep.getActiveBodyparts(WORK) * REPAIR_COST * REPAIR_POWER;
                             if (creep.repair(target) === OK) energySpent = estimatedDrdt;
                             workTarget.currentProgress = target.hits;
+
+                            //If we finished repairing our current target and there are other low structures nearby,
+                            // switch our target to them
+                            if (target.hits === target.hitsMax) this.retargetOnNearbyRoadRepairs(creep, workTarget, targetLock)
                         }
+                    } else if (creep.pos.getRangeTo(targetPos) <= 3) {
+                        creep.sayWaiting()
+                        creep.randomSwear(20)
                     }
                 } else {
                     done = true;
@@ -401,7 +410,7 @@ class WorkerLogic {
                         } else {
                             creep.sayWaiting();
                             //Let them be a bit cheeky
-                            if (_.random(0, 20) === 0) creep.swear();
+                            creep.randomSwear(20);
                         }
                     }
 
@@ -435,13 +444,14 @@ class WorkerLogic {
 
                 if (target) {
                     estimatedDrdt = creep.getActiveBodyparts(WORK) * REPAIR_COST * REPAIR_POWER;
+                    creep.queueSay("🏗️")
                     if (creep.pos.getRangeTo(targetPos) <= 3 && creep.store.getUsedCapacity(RESOURCE_ENERGY)) {
                         analyticsCategories.push(ANALYTICS_REINFORCE, ANALYTICS_ARTIFICER);
                         if (creep.repair(target) === OK) energySpent = estimatedDrdt;
                         workTarget.currentProgress = target.hits;
-                        creep.queueSay("🏗️")
-                    } else {
-                        creep.queueSay("✈️🏗️")
+                    } else if (creep.pos.getRangeTo(targetPos) <= 3) {
+                        creep.randomSwear(15);
+                        creep.sayWaiting();
                     }
                 } else {
                     creep.queueSay("🏗️❓")
@@ -453,13 +463,6 @@ class WorkerLogic {
         //If we should be doing rampart repair, go do that
         //TODO actuall do this part... probably when we need to defend or something
 
-        //If we spent energy this tick, post an analytics event
-        if (energySpent > 0) {
-            postAnalyticsEvent(parentRoomName, energySpent * -1, ...analyticsCategories);
-        }
-
-        //If our current work target is finished up, find a new target/work detail
-        if (workTarget.currentProgress >= workTarget.targetProgress) done = true;
 
         //If we don't have any energy, decide to either wait or go grab more
         if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0 && !preventRestock) {
@@ -499,8 +502,10 @@ class WorkerLogic {
                     if (creep.pos.isNearTo(targetLock.sourcePos)) {
                         let source = creep.room.lookForAt(LOOK_SOURCES, targetLock.sourcePos);
                         if (source?.length) creep.harvest(source[0]);
+                        creep.queueSay("⛏️")
                     } else {
                         Traveler.travelTo(creep, targetLock.sourcePos);
+                        creep.queueSay("✈️⛏️")
                     }
                 } else {
                     Log.e(`Creep ${creep.name} in room ${creep.room.name} is set to mine but could not find a source`);
@@ -508,121 +513,16 @@ class WorkerLogic {
             }
         }
 
-        // let done = false;
-        // if (creep.pos.roomName !== assignment.destPosition.roomName || creep.pos.getRangeTo(assignment.destPosition) > 3) {
-        //     Traveler.travelTo(creep, assignment.destPosition, { range: 3 });
-        //     creep.queueSay("🚚");
-        //     unregisterNode(parentRoomName, handle, creep.name);
-        // } else if (assignment.detailType === "Construction" && target) {
-        //     Traveler.reservePosition(creep.pos);
+        //If we spent energy this tick, post an analytics event
+        if (energySpent > 0) {
+            postAnalyticsEvent(parentRoomName, energySpent * -1, ...analyticsCategories);
+        }
 
-        //     target = target as ConstructionSite;
-        //     if (target.progress <= target.progressTotal && creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-        //         creep.build(target);
-        //         postAnalyticsEvent(
-        //             parentRoomName,
-        //             -1 * creep.getActiveBodyparts(WORK) * BUILD_POWER,
-        //             ANALYTICS_ARTIFICER,
-        //             ANALYTICS_CONSTRUCTION
-        //         );
-        //         creep.queueSay("🔨");
-        //     } else if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
-        //         creep.sayWaiting();
-        //     }
-
-        //     updateNode(creep, creep.getBodyPower(WORK, "build", BUILD_POWER), parentRoomName, handle, analyticsCategories);
-        // } else if (assignment.detailType === "Reinforce") {
-        //     Traveler.reservePosition(creep.pos);
-
-        //     if (assignment.currentProgress === undefined || assignment.targetProgress === undefined) {
-        //         Log.e(
-        //             `There is a reinfoce task without progress limits for creep:${creep.name}
-        //             taks:${JSON.stringify(assignment)}`
-        //         );
-        //         done = true;
-        //     } else if (assignment.currentProgress < assignment.targetProgress) {
-        //         if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-        //             creep.queueSay("🏗️");
-        //             creep.repair(target as Structure);
-        //             postAnalyticsEvent(
-        //                 parentRoomName,
-        //                 -1 * creep.getActiveBodyparts(WORK) * BUILD_POWER * REPAIR_COST,
-        //                 ANALYTICS_ARTIFICER,
-        //                 ANALYTICS_REPAIR
-        //             );
-        //         }
-        //         updateNode(
-        //             creep,
-        //             creep.getBodyPower(WORK, "repair", REPAIR_POWER * REPAIR_COST),
-        //             parentRoomName,
-        //             handle,
-        //             analyticsCategories
-        //         );
-        //     } else {
-        //         done = true;
-        //     }
-        // } else if (assignment.detailType === "Repair") {
-        //     Traveler.reservePosition(creep.pos);
-
-        //     target = target as Structure;
-        //     if (target.hits < (assignment.targetProgress ?? target.hitsMax)) {
-        //         if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-        //             creep.queueSay("🔧");
-        //             creep.repair(target);
-        //             postAnalyticsEvent(
-        //                 parentRoomName,
-        //                 -1 * creep.getActiveBodyparts(WORK) * BUILD_POWER * REPAIR_COST,
-        //                 "Artificer"
-        //             );
-        //         }
-        //         updateNode(
-        //             creep,
-        //             creep.getBodyPower(WORK, "repair", REPAIR_POWER * REPAIR_COST),
-        //             parentRoomName,
-        //             handle,
-        //             analyticsCategories
-        //         );
-        //     } else {
-        //         done = true;
-        //         unregisterNode(parentRoomName, handle, creep.name);
-        //     }
-        // } else if (assignment.detailType === "Upgrade") {
-        //     Traveler.reservePosition(creep.pos);
-
-        //     target = target as StructureController;
-        //     if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-        //         creep.upgradeController(target);
-        //         creep.queueSay("⚫");
-        //         postAnalyticsEvent(
-        //             parentRoomName,
-        //             -1 * creep.getActiveBodyparts(WORK) * UPGRADE_CONTROLLER_POWER,
-        //             ANALYTICS_ARTIFICER,
-        //             ANALYTICS_UPGRADE
-        //         );
-        //     } else {
-        //         creep.sayWaiting();
-        //     }
-
-        //     //If we are only supposed to upgrade it a certain amount, trigger the job to be done at some point
-        //     if (
-        //         assignment.currentProgress != undefined &&
-        //         assignment.targetProgress != undefined &&
-        //         assignment.currentProgress >= assignment.targetProgress
-        //     ) {
-        //         done = true;
-        //         unregisterNode(parentRoomName, handle, creep.name);
-        //     } else {
-        //         updateNode(
-        //             creep,
-        //             creep.getBodyPower(WORK, "upgradeController", UPGRADE_CONTROLLER_POWER),
-        //             parentRoomName,
-        //             handle,
-        //             analyticsCategories
-        //         );
-        //     }
-        // }
+        //If our current work target is finished up, find a new target/work detail
+        if (workTarget.currentProgress >= workTarget.targetProgress) done = true;
 
         if (done) {
+            creep.queueSay("🎉")
             completeWorkTarget(parentRoomName, workDetail.detailId, targetLock.targetId);
             this.targetLocks.delete(creep.name);
         }
@@ -634,19 +534,28 @@ class WorkerLogic {
         //If we are outside the desired range, go there
         if (creep.pos.roomName !== targetPos.roomName || creep.pos.getRangeTo(targetPos) > desiredRange) {
             Traveler.travelTo(creep, targetPos);
+            creep.queueSay("✈️")
+        } else {
+            Traveler.reservePosition(creep.pos);
         }
 
         // TODO If we are standing on an edge tile or a road, and we are inside the desired range, path to it a bit more
     }
 
-    updateUpgraderStorageNode(parentRoomName: string, upgraderContainer: StructureContainer, drdt: number) {
-        let node = getNode(parentRoomName, "upgraderStorage")
-        if (node) {
-            node.baseDrdt = drdt;
-            node.level = upgraderContainer.store.getUsedCapacity(RESOURCE_ENERGY);
-            node.maxLevel = upgraderContainer.store.getCapacity(RESOURCE_ENERGY);
-        } else {
-
+    //This is a wacky function that will change a repair work target to point to something else nearby
+    //This is useful when our creep finishes topping off a road or something, and wants to top off nearby roads while in the area
+    retargetOnNearbyRoadRepairs(creep: Creep, workTarget: WorkTarget, targetLock: TargetLockData) {
+        if (workTarget.gameObjectType === STRUCTURE_ROAD) {
+            let lowRoadNearby = (creep.pos.findInRange(FIND_STRUCTURES, 3) ?? [])
+                .find(s => s.structureType === STRUCTURE_ROAD && s.hits < s.hitsMax)
+            if (lowRoadNearby) {
+                workTarget.gameObjectId = lowRoadNearby.id
+                workTarget.packedPosition = packPos(lowRoadNearby.pos)
+                workTarget.currentProgress = lowRoadNearby.hits
+                workTarget.targetProgress = lowRoadNearby.hitsMax
+                targetLock.gameObjectId = lowRoadNearby.id
+                creep.queueSay("➕")
+            }
         }
     }
 

@@ -4,6 +4,7 @@ import {profile} from "utils/profiler/Profiler";
 import {drawBar} from "utils/UtilityFunctions";
 import {SourceMinerSystem} from "./SourceMinerSystem";
 import {minerLogic} from "./MinerLogic";
+import {Log} from "../../utils/logger/Logger";
 
 //TODO Hardcoded for now. Replace when I have spawn loading controls
 const MAX_MINING_OPERATIONS = 6;
@@ -45,7 +46,13 @@ export class RoomMinerSystem {
     }
 
     _reloadActiveMiningJobs() {
-        let jobs = Object.values(this.sourceMinerSystems).sort((a, b) => a.pathLength - b.pathLength);
+        let jobs = Object.values(this.sourceMinerSystems)
+            .sort((a, b) => {
+                let result = a.pathLength - b.pathLength;
+                if(result === 0) result = a.handle.localeCompare(b.handle)
+                return result
+            });
+        Log.d(`Reloading active mining jobs in room:${this.roomName}. Jobs:${jobs.length}`)
         for (let i = 0; i < jobs.length; i++) {
             if (i < MAX_MINING_OPERATIONS) {
                 jobs[i]._start();

@@ -27,6 +27,10 @@ Creep.prototype.swear = function (): void {
     this.queueSay(SWEARS[_.random(0, SWEARS.length - 1, false)]);
 };
 
+Creep.prototype.randomSwear = function (odds: number): void {
+    if (_.random(0, odds) === 0) this.swear();
+}
+
 const WAITING = ["🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚", "🕛"];
 Creep.prototype.sayWaiting = function (): void {
     this.queueSay(WAITING[Game.time % WAITING.length]);

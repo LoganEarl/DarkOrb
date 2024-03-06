@@ -41,6 +41,7 @@ export class ShardMinerSystem {
     public _repartitionMiningRooms() {
         Log.d("Repartitioning mining rooms");
         //Get the sources in range to each spawn room
+        //Note, this can put a single source under multiple rooms. We will prune this later
         let sourceInfosPerSpawnRoom: { [spawnRoomName: string]: SourceInfo[] } = {};
         this.roomMinerSystems.forEach(system => {
             let spawnRoom = system.roomName;
@@ -85,6 +86,9 @@ export class ShardMinerSystem {
             });
             assignedSources[sourceId]._registerSource(sourceId as Id<Source>, getRoomData(sourceRoomNames[sourceId])!);
         });
+
+        //Cuts down on the number of jobs we have to process
+        this.roomMinerSystems.forEach(s => s._pruneMiningJobs())
     }
 
     _reloadActiveMiningJobs() {

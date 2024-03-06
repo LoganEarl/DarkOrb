@@ -23,10 +23,10 @@ import {registerMilitaryOperation} from "../military/MilitaryInterface";
 @profile
 export class SourceMinerSystem implements MemoryComponent {
     roomName: string;
+    sourceId: Id<Source | Mineral>;
 
     private memory?: SourceMinerMemory;
     private parentRoomName: string;
-    private sourceId: Id<Source | Mineral>;
     private isSource: boolean;
     private miningStandSpaces: RoomPosition[] = [];
     private creepAssignments: { [creepName: string]: MinerAssignment } = {};
@@ -201,12 +201,16 @@ export class SourceMinerSystem implements MemoryComponent {
     }
 
     _runCreeps() {
+        this.loadMemory();
+        let creeps = getCreeps(this.handle);
+
+        //Saves running this function on mining jobs that never get run
+        if (creeps.length === 0 && this.memory!.state !== "Active" && Game.time % 50 !== 26) return
+
         let roomData = getRoomData(this.roomName);
         if ((roomData?.hazardInfo?.numCombatants ?? 0) > 0) this.addStopReason("Attacked");
         else this.clearStopReason("Attacked");
 
-        this.loadMemory();
-        let creeps = getCreeps(this.handle);
         if (creeps.length) {
             if (this.memory!.state === "Active") {
                 let creepNames = Object.keys(this.creepAssignments);
@@ -214,42 +218,38 @@ export class SourceMinerSystem implements MemoryComponent {
                     if (!Game.creeps[name]) delete this.creepAssignments[name];
                 });
 
-                if(!creeps.length) {
-                    postAnalyticsEvent(this.parentRoomName, 0, this.handle)
-                } else {
-                    for (let creep of creeps) {
-                        scoutRoom(creep.room);
+                for (let creep of creeps) {
+                    scoutRoom(creep.room);
 
-                        let threats = (getRoomData(creep.room.name)?.hazardInfo?.numCombatants ?? 0) > 0;
-                        if (threats) this.addStopReason("Attacked");
+                    let threats = (getRoomData(creep.room.name)?.hazardInfo?.numCombatants ?? 0) > 0;
+                    if (threats) this.addStopReason("Attacked");
 
-                        if (this.miningStandSpaces.length < creeps.length && creep.memory.jobName === "Primordial") {
-                            creep.suicide();
-                            delete this.creepAssignments[creep.name];
+                    if (this.miningStandSpaces.length < creeps.length && creep.memory.jobName === "Primordial") {
+                        creep.suicide();
+                        delete this.creepAssignments[creep.name];
+                    } else {
+                        if (!this.creepAssignments[creep.name]) {
+                            let populationSize = Math.max(
+                                _.sum(this.configs, c => c.quantity),
+                                creeps.length
+                            );
+
+                            this.creepAssignments[creep.name] = minerLogic._assignMiningSpace(
+                                creep,
+                                this.miningStandSpaces,
+                                this.sourceId,
+                                this.creepAssignments,
+                                populationSize
+                            );
+                        }
+                        let assignment = this.creepAssignments[creep.name];
+                        let primary = samePos(this.miningStandSpaces[0], assignment.placeToStand);
+                        // Log.d(`${creep.name} running with data ${primary}`);
+                        if (this.isSource) {
+                            minerLogic._runSourceMiner(creep, this.parentRoomName, this.handle, assignment, primary);
+                            this.updateSourceLogisticsNodes(creep, assignment);
                         } else {
-                            if (!this.creepAssignments[creep.name]) {
-                                let populationSize = Math.max(
-                                    _.sum(this.configs, c => c.quantity),
-                                    creeps.length
-                                );
-
-                                this.creepAssignments[creep.name] = minerLogic._assignMiningSpace(
-                                    creep,
-                                    this.miningStandSpaces,
-                                    this.sourceId,
-                                    this.creepAssignments,
-                                    populationSize
-                                );
-                            }
-                            let assignment = this.creepAssignments[creep.name];
-                            let primary = samePos(this.miningStandSpaces[0], assignment.placeToStand);
-                            // Log.d(`${creep.name} running with data ${primary}`);
-                            if (this.isSource) {
-                                minerLogic._runSourceMiner(creep, this.parentRoomName, this.handle, assignment, primary);
-                                this.updateSourceLogisticsNodes(creep, assignment);
-                            } else {
-                                //TODO Run mineral miner
-                            }
+                            //TODO Run mineral miner
                         }
                     }
                 }
@@ -262,6 +262,8 @@ export class SourceMinerSystem implements MemoryComponent {
                     if (packedRally !== undefined) Traveler.travelTo(creep, unpackPos(packedRally));
                 }
             }
+        } else {
+            postAnalyticsEvent(this.parentRoomName, 0, this.handle)
         }
     }
 
@@ -301,7 +303,7 @@ export class SourceMinerSystem implements MemoryComponent {
         //If we weren't already stopped, stop us
         if (this.memory!.state !== "Stopped" && !this.memory!.stopReasons.includes(reason)) {
             //When an otherwise active mining job is attacked, make the military fix it
-            if(this.memory!.state === "Active" && reason === "Attacked") {
+            if (this.memory!.state === "Active" && reason === "Attacked") {
                 Log.i(`Mining system has registered a military operation to clear room:${this.roomName}`)
                 registerMilitaryOperation(this.parentRoomName, {
                     failureCriteria: [], //TODO add budget to this

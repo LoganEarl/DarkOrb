@@ -82,7 +82,7 @@ export class RoomHaulerSystem {
 
             if (spawnStarter) {
                 configs.push({
-                    body: [CARRY, MOVE],
+                    body: [CARRY, CARRY, MOVE, MOVE],
                     handle: this.handle,
                     subHandle: "StarterCreep",
                     jobName: "Primordial",

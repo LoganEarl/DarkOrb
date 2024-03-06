@@ -20,6 +20,7 @@ import {WorkerProcess} from "system/working/WorkerProcess";
 import "./utils/visual/RoomVisual.js";
 import {PlannerProcess as PlannerProcess} from "system/planning/PlannerProcess";
 import {memhack} from "utils/memHack/Memhack";
+import {MilitaryProcess} from "./system/military/MilitaryProcess";
 
 let deferedInit = false;
 let globalRefresh = true;
@@ -52,6 +53,7 @@ function init() {
     //===================================================================Initialize Processes
 
     global.runner = new ProcessRunner();
+    global.runner.addProcess(new MilitaryProcess());
     global.runner.addProcess(new SpawnProcess());
     global.runner.addProcess(new ScoutProcess());
     global.runner.addProcess(new StorageProcess());

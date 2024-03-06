@@ -15,7 +15,9 @@ import {
     _haveSufficientCapacity,
     _priorityComparator
 } from "./SpawnLogic";
+import {profile} from "../../utils/profiler/Profiler";
 
+@profile
 export class RoomSpawnSystem {
     public roomName: string;
 
@@ -31,6 +33,7 @@ export class RoomSpawnSystem {
                 .filter(s => s.structureType === STRUCTURE_SPAWN || s.structureType === STRUCTURE_EXTENSION)
                 .map(s => s as StructureSpawn | StructureExtension);
 
+            //TODO don't make requests for fast fillable extensions?
             for (let fillable of fillables) {
                 let nodeId = "extension:" + fillable.id;
                 let node = getNode(this.roomName, nodeId);
@@ -53,7 +56,7 @@ export class RoomSpawnSystem {
                         type: "Sink",
                         analyticsCategories: [],
                         lastKnownPosition: fillable.pos,
-                        priorityScalar: 500,
+                        priorityScalar: 50,
                         disableLimitedGrab: true,
                         serviceRoute: {
                             pathLength: dist,

@@ -18,6 +18,7 @@ interface FillRecord {
     maxCapacity: number;
 }
 
+//TODO this is all expensive to run apparently. Optimize it
 export function runFillersForPosition(fillers: Creep[], position: FillerPosition, fillRecords: FillRecords) {
     let youngestFiller: Creep | undefined;
     if (fillers.length == 1) youngestFiller = fillers[0];

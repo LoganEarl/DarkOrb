@@ -6,11 +6,10 @@ import {packPos} from "utils/Packrat";
 import {ROOMTYPE_CORE, ROOMTYPE_SOURCEKEEPER, Traveler} from "utils/traveler/Traveler";
 import {samePos} from "utils/UtilityFunctions";
 import {profile} from "../../utils/profiler/Profiler";
-import {Log} from "../../utils/logger/Logger";
 
 @profile
 class MinerLogic {
-    _calcualteMiningPath(start: RoomPosition, end: RoomPosition): PathFinderPath {
+    _calculateMiningPath(start: RoomPosition, end: RoomPosition): PathFinderPath {
         //Remember, this is for determining how hard the path is curently. This is NOT for plotting a road
         return Traveler.findTravelPath(start, end, {
             plainCost: 2,
@@ -20,16 +19,15 @@ class MinerLogic {
         });
     }
 
-//Reloads our pathCost and pathLength fields. Also detects when the mining path becomes blocked off
-
+    //Reloads our pathCost and pathLength fields. Also detects when the mining path becomes blocked off
     _findPathToFreeSpace(freeSpaces: RoomPosition[], storagePos: RoomPosition): PathFinderPath | undefined {
         if (freeSpaces.length > 1) {
             //Plains will cost 2 and roads 1.
-            let path = this._calcualteMiningPath(storagePos, freeSpaces[0]);
+            let path = this._calculateMiningPath(storagePos, freeSpaces[0]);
             return !path.incomplete ? path : undefined;
         } else if (freeSpaces.length === 1) {
             let pathsBySpace: { [packedSpace: string]: PathFinderPath } = {};
-            freeSpaces.forEach(space => (pathsBySpace[packPos(space)] = this._calcualteMiningPath(storagePos, space)));
+            freeSpaces.forEach(space => (pathsBySpace[packPos(space)] = this._calculateMiningPath(storagePos, space)));
 
             //Filter out blocked spaces
             freeSpaces = freeSpaces.filter(space => !pathsBySpace[packPos(space)].incomplete);
@@ -124,8 +122,7 @@ class MinerLogic {
         };
     }
 
-//Recursivly traverses scouting data, finds all sources in the given range (in rooms) to the source room
-
+    //Recursively traverses scouting data, finds all sources in the given range (in rooms) to the source room
     _findAllSourcesInRange(
         sourceRoom: RoomScoutingInfo | undefined,
         range: number,

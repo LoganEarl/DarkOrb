@@ -12,9 +12,9 @@ export class MinerProcess extends Process {
     private first = true;
 
     roomScanner: ScheduledJob = new ScheduledJob(_shardMinerSystem._rescanRooms, _shardMinerSystem, 10);
-    minePartitioner: ScheduledJob = new ScheduledJob(_shardMinerSystem._repartitionMiningRooms, _shardMinerSystem, 100);
+    minePartitioner: ScheduledJob = new ScheduledJob(_shardMinerSystem._repartitionMiningRooms, _shardMinerSystem, 500);
     configReloader: ScheduledJob = new ScheduledJob(_shardMinerSystem._reloadAllConfigs, _shardMinerSystem, 50);
-    pathReloader: ScheduledJob = new ScheduledJob(_shardMinerSystem._reloadAllPaths, _shardMinerSystem, 100);
+    pathReloader: ScheduledJob = new ScheduledJob(_shardMinerSystem._reloadAllPaths, _shardMinerSystem, 200);
     jobReloader: ScheduledJob = new ScheduledJob(_shardMinerSystem._reloadActiveMiningJobs, _shardMinerSystem, 50);
 
     constructor() {

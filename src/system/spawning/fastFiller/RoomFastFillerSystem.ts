@@ -149,14 +149,11 @@ export class RoomFastFillerSystem {
     private updateLogisticsNode(container: StructureContainer) {
         let nodeId = "fillerContainer:" + container.id;
         let node = getNode(this.roomName, nodeId);
+        let priority = container.store.getUsedCapacity(RESOURCE_ENERGY) > 100 ? 2 : 100
         //Update the node
         if (node && container.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
             node.level = container.store.getUsedCapacity(RESOURCE_ENERGY);
-            if (container.store.getUsedCapacity(RESOURCE_ENERGY) > 1000) {
-                node.priorityScalar = 10;
-            } else {
-                node.priorityScalar = 50;
-            }
+            node.priorityScalar = priority
         } else if (node) {
             unregisterNode(this.roomName, this.handle, nodeId);
         }
@@ -173,7 +170,7 @@ export class RoomFastFillerSystem {
                 type: "Sink",
                 analyticsCategories: [],
                 lastKnownPosition: container.pos,
-                priorityScalar: 2,
+                priorityScalar: priority,
                 disableLimitedGrab: true,
                 serviceRoute: {
                     pathLength: dist,

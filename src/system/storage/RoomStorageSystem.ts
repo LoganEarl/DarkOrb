@@ -1,6 +1,7 @@
 import {MemoryComponent, updateMemory} from "utils/MemoryWriter";
 import {findStructure} from "utils/StructureFindCache";
 import {clamp, drawBar, exponentialMovingAverage} from "utils/UtilityFunctions";
+import {minerLogic} from "../mining/MinerLogic";
 
 const VISUAL_START_HEIGHT = 5;
 const ANALYTICS_WINDOW = 1500;
@@ -12,6 +13,9 @@ export class RoomStorageSystem implements MemoryComponent {
     public roomName: string;
 
     private memory?: StorageMemory;
+
+    private cachedMainStorage: MainStorage | undefined;
+    private lastMainStorageLookupTime: number = -1;
 
     constructor(room: Room) {
         this.roomName = room.name;
@@ -103,6 +107,11 @@ export class RoomStorageSystem implements MemoryComponent {
     }
 
     public _getMainStorage(): MainStorage | undefined {
+        if(Game.time === this.lastMainStorageLookupTime) {
+            return this.cachedMainStorage;
+        }
+
+
         let room = Game.rooms[this.roomName];
         if (room) {
             let spawns = findStructure(room, FIND_MY_SPAWNS);
@@ -130,10 +139,14 @@ export class RoomStorageSystem implements MemoryComponent {
                 });
 
                 //take any storage structure we can find
-                return storage ?? terminal ?? spawn;
+                this.lastMainStorageLookupTime = Game.time;
+                this.cachedMainStorage = storage ?? terminal ?? spawn;
+                return this.cachedMainStorage;
             }
         }
-        return undefined;
+
+        this.cachedMainStorage = undefined;
+        return this.cachedMainStorage;
     }
 
     private newAnalytics(category: string): AnalyticEntry {

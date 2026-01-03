@@ -1,7 +1,6 @@
-import {MemoryComponent, updateMemory} from "utils/MemoryWriter";
-import {findStructure} from "utils/StructureFindCache";
-import {clamp, drawBar, exponentialMovingAverage} from "utils/UtilityFunctions";
-import {minerLogic} from "../mining/MinerLogic";
+import { MemoryComponent, updateMemory } from "utils/MemoryWriter";
+import { findStructure } from "utils/StructureFindCache";
+import { clamp, drawBar, exponentialMovingAverage } from "utils/UtilityFunctions";
 
 const VISUAL_START_HEIGHT = 5;
 const ANALYTICS_WINDOW = 1500;
@@ -107,7 +106,7 @@ export class RoomStorageSystem implements MemoryComponent {
     }
 
     public _getMainStorage(): MainStorage | undefined {
-        if(Game.time === this.lastMainStorageLookupTime) {
+        if (Game.time === this.lastMainStorageLookupTime) {
             return this.cachedMainStorage;
         }
 

@@ -1,4 +1,4 @@
-import {PriorityQueueItem} from "utils/PriorityQueue";
+import { PriorityQueueItem } from "utils/PriorityQueue";
 
 export abstract class Process implements PriorityQueueItem {
     public priority: number;
@@ -54,7 +54,7 @@ export abstract class Process implements PriorityQueueItem {
     onCancel?(): void;
 
     public averageCpuUsage(): number {
-        var sum = this.cpuHistory.reduce(function (sum, value) {
+        var sum = this.cpuHistory.reduce(function(sum, value) {
             return sum + value;
         }, 0);
 

@@ -1,4 +1,4 @@
-import {getRoomData} from "system/scouting/ScoutInterface";
+import { getRoomData } from "system/scouting/ScoutInterface";
 import {
     getCreeps,
     maximizeBodyForTargetParts,
@@ -10,14 +10,22 @@ import {
     ANALYTICS_GOSS_INCOME,
     ANALYTICS_SPAWNING
 } from "system/storage/AnalyticsConstants";
-import {getEnergyPerTick, getMainStorage} from "system/storage/StorageInterface";
-import {getWorkDetails} from "./WorkerInterface";
-import {workerLogic} from "./WorkerLogic";
-import {findStructure} from "../../utils/StructureFindCache";
-import {drawBar, roomPos} from "../../utils/UtilityFunctions";
-import {unpackPos} from "../../utils/Packrat";
-import {getNode, registerNode} from "../hauling/HaulerInterface";
-import {Traveler} from "../../utils/traveler/Traveler";
+import { getEnergyPerTick, getMainStorage } from "system/storage/StorageInterface";
+import { getWorkDetails } from "./WorkerInterface";
+import { workerLogic } from "./WorkerLogic";
+import { findStructure } from "../../utils/StructureFindCache";
+import { drawBar, roomPos } from "../../utils/UtilityFunctions";
+import { unpackPos } from "../../utils/Packrat";
+import { getNode, registerNode } from "../hauling/HaulerInterface";
+import { Traveler } from "../../utils/traveler/Traveler";
+
+//Building takes 5x energy per work part. Given that, if there is a lot of building to do we need to scale back our work body parts
+//Otherwise we will crash our eco by overdrawing
+const CONSTRUCTION_PROGRESS_REQUIRED_FOR_REDUCED_WORK = 5000
+
+//If we go above this amount, we will double our worker output. Below, and we will halve it to save E
+const DOUBLE_EXPENDATURE_ENERGY_THRESHOLD = 100000
+const HALF_EXPENDATURE_ENERGY_THRESHOLD = 10000
 
 export class RoomWorkSystem {
     public roomName: string;
@@ -46,8 +54,8 @@ export class RoomWorkSystem {
     _visualize() {
         if (Game.rooms[this.roomName]) {
             Object.values(getWorkDetails(this.roomName)).forEach(detail => {
-                let priorityColors: {[priority: string]: string} = {
-                    "Low" : "blue",
+                let priorityColors: { [priority: string]: string } = {
+                    "Low": "blue",
                     "Normal": "green",
                     "Elevated": "yellow",
                     "Critical": "red"
@@ -114,14 +122,14 @@ export class RoomWorkSystem {
             if (upgradeContainer) {
                 let existingNode = getNode(this.roomName, "UpgradeContainer")
                 //The mod thing makes sure we re-measure the path cost every once in a while
-                if(existingNode && Game.time % 150 != 43) {
+                if (existingNode && Game.time % 150 != 43) {
                     existingNode.level = upgradeContainer.store.getUsedCapacity(RESOURCE_ENERGY)
                     existingNode.baseDrdt = this.targetUpgradeParts * UPGRADE_CONTROLLER_POWER
                 } else {
                     let pathCost = 40;
                     let pathLength = 20;
                     let storage = getMainStorage(this.roomName)
-                    if(storage) {
+                    if (storage) {
                         let pathInfo = Traveler.findTravelPath(storage, Game.rooms[this.roomName].controller!, {
                             plainCost: 2,
                             range: 1,
@@ -140,7 +148,7 @@ export class RoomWorkSystem {
                         maxLevel: upgradeContainer.store.getCapacity(RESOURCE_ENERGY),
                         nodeId: "UpgradeContainer",
                         resource: RESOURCE_ENERGY,
-                        serviceRoute: {pathCost: pathCost, pathLength: pathLength},
+                        serviceRoute: { pathCost: pathCost, pathLength: pathLength },
                         targetId: upgradeContainer.id,
                         type: "Sink"
                     })
@@ -180,9 +188,12 @@ export class RoomWorkSystem {
 
         //TODO temporary measure to burn off excesses
         let storage = getMainStorage(this.roomName);
-        let highCapacity = (storage?.store.getUsedCapacity(RESOURCE_ENERGY) ?? 0) > 50000;
+        let highCapacity = (storage?.store.getUsedCapacity(RESOURCE_ENERGY) ?? 0) > DOUBLE_EXPENDATURE_ENERGY_THRESHOLD;
+        let lowCapacity = (storage?.store.getUsedCapacity(RESOURCE_ENERGY) ?? 0) < HALF_EXPENDATURE_ENERGY_THRESHOLD;
         if (highCapacity) {
             availableEnergy *= 2;
+        } else if (lowCapacity) {
+            availableEnergy *= 0.5;
         }
 
         let energyBudgetPerWorkerPool: Map<WorkerPool, number> = new Map();
@@ -215,7 +226,15 @@ export class RoomWorkSystem {
         //If we need workers, queue them up
         let workEnergy = energyBudgetPerWorkerPool.get("Workers");
         if (workEnergy) {
-            this.targetWorkParts = Math.ceil(workEnergy / BUILD_POWER);
+            let constructionSites = Game.rooms[this.roomName]
+                ?.find(FIND_CONSTRUCTION_SITES)
+            let remainingConstructionProgress = (constructionSites && constructionSites.length > 0) ?
+                constructionSites.map(site => site.progressTotal - site.progress)
+                    .reduceRight((prev, cur) => prev + cur) : 0
+            let energyPerWorkPart = remainingConstructionProgress > CONSTRUCTION_PROGRESS_REQUIRED_FOR_REDUCED_WORK ? BUILD_POWER : 1
+
+
+            this.targetWorkParts = Math.ceil(workEnergy / energyPerWorkPart);
             //TODO make a new version of this that makes all the creeps the same size
             let bodies = maximizeBodyForTargetParts(
                 [WORK, CARRY, CARRY, MOVE, MOVE],

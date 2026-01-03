@@ -273,6 +273,22 @@ export function maxBy<T>(objects: T[], iteratee: (obj: T) => number | false): T 
     return maxObj;
 }
 
+export function groupBy<T>(objects: T[], keyGetter: ((obj: T) => string)): Map<string, T> {
+    let map: Map<string, T> = new Map()
+    for(let o of objects) {
+        map.set(keyGetter(o), o);
+    }
+    return map;
+}
+
+export function removeItem<T>(objects: T[], toRemove: T) {
+    let index = objects.indexOf(toRemove);
+    if(index !== -1) {
+        objects.splice(index, 1);
+    }
+    return objects
+}
+
 export function logHeapStats(): void {
     if (typeof Game.cpu.getHeapStatistics === "function") {
         const heapStats = Game.cpu.getHeapStatistics();

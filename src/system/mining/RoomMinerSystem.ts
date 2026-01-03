@@ -1,11 +1,11 @@
-import {getMainStorage} from "system/storage/StorageInterface";
-import {unpackPosList} from "utils/Packrat";
-import {profile} from "utils/profiler/Profiler";
-import {drawBar, maxBy} from "utils/UtilityFunctions";
-import {SourceMinerSystem} from "./SourceMinerSystem";
-import {minerLogic} from "./MinerLogic";
-import {Log} from "../../utils/logger/Logger";
-import {getRoomData} from "../scouting/ScoutInterface";
+import { getMainStorage } from "system/storage/StorageInterface";
+import { unpackPosList } from "utils/Packrat";
+import { profile } from "utils/profiler/Profiler";
+import { drawBar, maxBy } from "utils/UtilityFunctions";
+import { SourceMinerSystem } from "./SourceMinerSystem";
+import { minerLogic } from "./MinerLogic";
+import { Log } from "../../utils/logger/Logger";
+import { getRoomData } from "../scouting/ScoutInterface";
 
 //TODO Hardcoded for now. Replace when I have spawn loading controls
 const MAX_REGISTERED_OPERATIONS = 12;

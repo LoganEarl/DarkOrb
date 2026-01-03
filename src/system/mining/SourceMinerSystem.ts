@@ -1,20 +1,21 @@
 import {
     getNode,
+    getNodesByProvider,
     registerNode,
     unregisterNode,
     unregisterNodes
 } from "system/hauling/HaulerInterface";
-import {getRoomData, scoutRoom} from "system/scouting/ScoutInterface";
-import {getCreeps, registerCreepConfig, unregisterHandle} from "system/spawning/SpawnInterface";
-import {getMainStorage, postAnalyticsEvent} from "system/storage/StorageInterface";
-import {Log} from "utils/logger/Logger";
-import {MemoryComponent, updateMemory} from "utils/MemoryWriter";
-import {packPos, unpackPos, unpackPosList} from "utils/Packrat";
-import {profile} from "utils/profiler/Profiler";
-import {Traveler} from "utils/traveler/Traveler";
-import {getMultirooomDistance, samePos} from "utils/UtilityFunctions";
-import {minerLogic} from "./MinerLogic";
-import {registerMilitaryOperation} from "../military/MilitaryInterface";
+import { getRoomData, scoutRoom } from "system/scouting/ScoutInterface";
+import { getCreeps, registerCreepConfig, unregisterHandle } from "system/spawning/SpawnInterface";
+import { getMainStorage, postAnalyticsEvent } from "system/storage/StorageInterface";
+import { Log } from "utils/logger/Logger";
+import { MemoryComponent, updateMemory } from "utils/MemoryWriter";
+import { packPos, unpackPos, unpackPosList } from "utils/Packrat";
+import { profile } from "utils/profiler/Profiler";
+import { Traveler } from "utils/traveler/Traveler";
+import { getMultirooomDistance, samePos } from "utils/UtilityFunctions";
+import { minerLogic } from "./MinerLogic";
+import { MILITARY_PRIORITY_HIGH, registerMilitaryOperation } from "../military/MilitaryInterface";
 
 /*
     We don't want to do too much here. Calcuate the mining path, figure out our creep configs, and know how to run the logic
@@ -61,7 +62,7 @@ export class SourceMinerSystem implements MemoryComponent {
                 let color = "#ffffff";
                 if (state === "Active") color = "#00ff44";
                 else if (state === "Stopped") color = "#ff0044";
-                Game.map.visual.line(mainStorage.pos, this.miningStandSpaces[0], {color: color});
+                Game.map.visual.line(mainStorage.pos, this.miningStandSpaces[0], { color: color });
             }
         }
     }
@@ -198,6 +199,7 @@ export class SourceMinerSystem implements MemoryComponent {
     _stop() {
         this.loadMemory();
         this.addStopReason("Mandated");
+        unregisterNodes(this.roomName, this.handle);
     }
 
     _runCreeps() {
@@ -210,6 +212,11 @@ export class SourceMinerSystem implements MemoryComponent {
         let roomData = getRoomData(this.roomName);
         if ((roomData?.hazardInfo?.numCombatants ?? 0) > 0) this.addStopReason("Attacked");
         else this.clearStopReason("Attacked");
+
+        //Need to figure out a good way to clear out logistics nodes when a creep dies... this is hacky
+        if (Game.time % 100 === 0) {
+            unregisterNodes(this.parentRoomName, this.handle);
+        }
 
         if (creeps.length) {
             if (this.memory!.state === "Active") {
@@ -246,8 +253,9 @@ export class SourceMinerSystem implements MemoryComponent {
                         let primary = samePos(this.miningStandSpaces[0], assignment.placeToStand);
                         // Log.d(`${creep.name} running with data ${primary}`);
                         if (this.isSource) {
-                            minerLogic._runSourceMiner(creep, this.parentRoomName, this.handle, assignment, primary);
-                            this.updateSourceLogisticsNodes(creep, assignment);
+                            //TODO we need to properly register when we are repairing our container. When we are, we shouldn't say our node is filling up
+                            let state = minerLogic._runSourceMiner(creep, this.parentRoomName, this.handle, assignment, primary);
+                            this.updateSourceLogisticsNodes(creep, assignment, state);
                         } else {
                             //TODO Run mineral miner
                         }
@@ -263,6 +271,10 @@ export class SourceMinerSystem implements MemoryComponent {
                 }
             }
         } else {
+            //Set the drdt to 0 when we don't have any creeps
+            getNodesByProvider(this.parentRoomName, this.handle).forEach(node => {
+                node.baseDrdt = 0
+            })
             postAnalyticsEvent(this.parentRoomName, 0, this.handle)
         }
     }
@@ -280,7 +292,7 @@ export class SourceMinerSystem implements MemoryComponent {
             } else {
                 Log.i(
                     `Mining operation ${this.parentRoomName}->${this.roomName}:${
-                        this.sourceId
+                    this.sourceId
                     } has been cleared of stop reason:${reason} remaining reasons:${JSON.stringify(
                         this.memory!.stopReasons
                     )}`
@@ -304,13 +316,22 @@ export class SourceMinerSystem implements MemoryComponent {
         if (this.memory!.state !== "Stopped" && !this.memory!.stopReasons.includes(reason)) {
             //When an otherwise active mining job is attacked, make the military fix it
             if (this.memory!.state === "Active" && reason === "Attacked") {
+                let roomData = getRoomData(this.roomName)
+                //Use this to modulate the priority depending on how many rooms away the mining job is
+                let roomsAway = roomData!.territoryInfo!.claims
+                    .find(c => c.roomName === this.parentRoomName)?.range ?? 99
+                //This puts it at high priority unless it is a remote,
+                // at which point priority drops depending on how far away it is
+                let priority = MILITARY_PRIORITY_HIGH - roomsAway
+
                 Log.i(`Mining system has registered a military operation to clear room:${this.roomName}`)
                 registerMilitaryOperation(this.parentRoomName, {
-                    failureCriteria: [], //TODO add budget to this
+                    failureConditions: [], //TODO add budget to this
                     objectives: ["KillEnemyCreeps"],
                     operationId: this.roomName + ":Guard",
-                    successCriteria: ["ObjectivesCompleted"],
-                    packedTargetPosition: packPos(this.miningStandSpaces[0])
+                    successConditions: ["ObjectivesCompleted"],
+                    packedTargetPosition: packPos(this.miningStandSpaces[0]),
+                    priority: priority
                 })
             }
             this.memory!.stopReasons.push(reason);
@@ -356,7 +377,7 @@ export class SourceMinerSystem implements MemoryComponent {
     }
 
     //TODO mineral support here
-    private updateSourceLogisticsNodes(creep: Creep, assignment: MinerAssignment) {
+    private updateSourceLogisticsNodes(creep: Creep, assignment: MinerAssignment, behaviour: MinerCurrentBehavior) {
         if (creep.pos.getRangeTo(assignment.placeToStand) != 0) {
             return;
         }
@@ -364,7 +385,9 @@ export class SourceMinerSystem implements MemoryComponent {
         this.loadMemory();
         let pathLength = this.memory!.pathLength;
         let pathCost = this.memory!.pathCost;
-        let drdt = creep.getBodyPower(WORK, "harvest", HARVEST_POWER) - (creep.getActiveBodyparts(CARRY) ? 0 : 1);
+        let drdt = 0
+
+        if (behaviour === "Mining") drdt = creep.getBodyPower(WORK, "harvest", HARVEST_POWER) - (creep.getActiveBodyparts(CARRY) ? 0 : 1);
 
         let containerKey = RESOURCE_ENERGY + ":" + packPos(creep.pos) + ":c"
         let container = assignment.depositContainer ? Game.getObjectById(assignment.depositContainer) : undefined;
@@ -399,7 +422,7 @@ export class SourceMinerSystem implements MemoryComponent {
     }
 
     private updateSingleNode(nodeId: string, id: string, level: number, maxLevel: number,
-                             pos: RoomPosition, pathCost: number, pathLength: number, drdt: number
+        pos: RoomPosition, pathCost: number, pathLength: number, drdt: number
     ) {
         let existingNode = getNode(this.parentRoomName, nodeId);
         if (existingNode) {
@@ -409,6 +432,7 @@ export class SourceMinerSystem implements MemoryComponent {
             existingNode.lastKnownPosition = pos;
             existingNode.serviceRoute.pathLength = pathLength;
             existingNode.serviceRoute.pathCost = pathCost;
+            existingNode.baseDrdt = drdt;
         } else {
             registerNode(this.parentRoomName, this.handle, {
                 nodeId: nodeId,

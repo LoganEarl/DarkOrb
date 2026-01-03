@@ -1,11 +1,12 @@
-import {getRoomData} from "system/scouting/ScoutInterface";
-import {bodyCost, maximizeBody, maximizeBodyForTargetParts} from "system/spawning/SpawnInterface";
-import {ANALYTICS_CONSTRUCTION} from "system/storage/AnalyticsConstants";
-import {postAnalyticsEvent} from "system/storage/StorageInterface";
-import {packPos} from "utils/Packrat";
-import {ROOMTYPE_CORE, ROOMTYPE_SOURCEKEEPER, Traveler} from "utils/traveler/Traveler";
-import {samePos} from "utils/UtilityFunctions";
-import {profile} from "../../utils/profiler/Profiler";
+import { getRoomData } from "system/scouting/ScoutInterface";
+import { bodyCost, maximizeBody, maximizeBodyForTargetParts } from "system/spawning/SpawnInterface";
+import { ANALYTICS_CONSTRUCTION } from "system/storage/AnalyticsConstants";
+import { postAnalyticsEvent } from "system/storage/StorageInterface";
+import { packPos } from "utils/Packrat";
+import { ROOMTYPE_CORE, ROOMTYPE_SOURCEKEEPER, Traveler } from "utils/traveler/Traveler";
+import { samePos } from "utils/UtilityFunctions";
+import { profile } from "../../utils/profiler/Profiler";
+
 
 @profile
 class MinerLogic {
@@ -215,72 +216,84 @@ class MinerLogic {
 
     _runSourceMiner(
         creep: Creep, parentRoomName: string, handle: string, assignment: MinerAssignment, primaryMiner: boolean
-    ) {
+    ): MinerCurrentBehavior {
         if (!samePos(creep.pos, assignment.placeToStand)) {
             Traveler.travelTo(creep, assignment.placeToStand);
-        } else {
-            Traveler.reservePosition(creep.pos);
+            return "Traveling";
+        }
 
-            //Start building container
-            if (
-                primaryMiner &&
-                !assignment.constructionProject &&
-                !assignment.depositContainer &&
-                creep.getActiveBodyparts(CARRY) > 0
-            ) {
-                let cSite = creep.pos
-                    .lookFor(LOOK_CONSTRUCTION_SITES)
-                    .filter(c => c.my && c.structureType === STRUCTURE_CONTAINER);
-                if (cSite.length) {
-                    assignment.constructionProject = cSite[0].id;
-                } else {
-                    creep.room.createConstructionSite(creep.pos, STRUCTURE_CONTAINER);
-                }
-            }
+        Traveler.reservePosition(creep.pos);
+        var behaviour: MinerCurrentBehavior = "Mining"
 
-            let container: StructureContainer | null = null;
-            if (primaryMiner && creep.getActiveBodyparts(CARRY) > 0) {
-                if (assignment.constructionProject && creep.store.getUsedCapacity(RESOURCE_ENERGY) >= 30) {
-                    let project = Game.getObjectById(assignment.constructionProject);
-                    if (project) {
-                        creep.queueSay("🔨");
-                        creep.build(project);
-                        postAnalyticsEvent(
-                            parentRoomName,
-                            creep.getBodyPower(WORK, "build", BUILD_POWER) * -1,
-                            handle,
-                            ANALYTICS_CONSTRUCTION
-                        );
-                        let piles = creep.pos.lookFor(LOOK_ENERGY);
-                        if (piles.length) creep.pickup(piles[0]);
-                    } else {
-                        assignment.constructionProject = undefined;
-                    }
-                }
-
-                if (assignment.depositContainer) {
-                    container = Game.getObjectById(assignment.depositContainer);
-                    if (container && creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                        if (container.hits < container.hitsMax) {
-                            creep.queueSay("🔧");
-                            creep.repair(container) === OK;
-                            return;
-                        }
-                    }
-                }
-
-                if (assignment.depositLink) {
-                    let link = Game.getObjectById(assignment.depositLink);
-                    if (link && creep.store.getUsedCapacity(RESOURCE_ENERGY) >= 30) creep.transfer(link, RESOURCE_ENERGY);
-                }
-            }
-
-            let source = Game.getObjectById(assignment.mineId) as Source;
-            if (source.energy > 0) {
-                postAnalyticsEvent(parentRoomName, creep.getBodyPower(WORK, "harvest", HARVEST_POWER), handle);
-                creep.harvest(source);
+        //Place csite for container if we can
+        if (
+            primaryMiner &&
+            !assignment.constructionProject &&
+            !assignment.depositContainer &&
+            creep.getActiveBodyparts(CARRY) > 0
+        ) {
+            let cSite = creep.pos
+                .lookFor(LOOK_CONSTRUCTION_SITES)
+                .filter(c => c.my && c.structureType === STRUCTURE_CONTAINER);
+            if (cSite.length) {
+                assignment.constructionProject = cSite[0].id;
+            } else {
+                creep.room.createConstructionSite(creep.pos, STRUCTURE_CONTAINER);
             }
         }
+
+        let container: StructureContainer | null = null;
+        if (primaryMiner && creep.getActiveBodyparts(CARRY) > 0) {
+            if (assignment.constructionProject && creep.store.getUsedCapacity(RESOURCE_ENERGY) >= 30) {
+                let project = Game.getObjectById(assignment.constructionProject);
+                if (project) {
+                    creep.queueSay("🔨");
+                    creep.build(project);
+                    postAnalyticsEvent(
+                        parentRoomName,
+                        creep.getBodyPower(WORK, "build", BUILD_POWER) * -1,
+                        handle,
+                        ANALYTICS_CONSTRUCTION
+                    );
+                    let piles = creep.pos.lookFor(LOOK_ENERGY);
+                    if (piles.length) creep.pickup(piles[0]);
+                } else {
+                    assignment.constructionProject = undefined;
+                }
+            } else if (assignment.constructionProject) {
+                behaviour = "Maintaining";
+            }
+
+            if (assignment.depositContainer) {
+                container = Game.getObjectById(assignment.depositContainer);
+                if (container && creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                    if (container.hits < container.hitsMax) {
+                        creep.queueSay("🔧");
+                        creep.repair(container) === OK;
+                        //We have to short circuit early here, otherwise this will conflict with the "harvest" call later
+                        return "Maintaining";
+                    }
+                } else {
+                    if (container && container.hits < container.hitsMax) {
+                        behaviour = "Maintaining";
+                    }
+                }
+            }
+
+            if (assignment.depositLink) {
+                let link = Game.getObjectById(assignment.depositLink);
+                if (link && creep.store.getUsedCapacity(RESOURCE_ENERGY) >= 30) creep.transfer(link, RESOURCE_ENERGY);
+            }
+        }
+
+        let source = Game.getObjectById(assignment.mineId) as Source;
+        if (source.energy > 0) {
+            postAnalyticsEvent(parentRoomName, creep.getBodyPower(WORK, "harvest", HARVEST_POWER), handle);
+            creep.harvest(source);
+        } else if (behaviour === "Mining") {
+            behaviour = "Waiting"
+        }
+        return behaviour;
     }
 }
 

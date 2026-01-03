@@ -1,4 +1,4 @@
-import {registerResetFunction} from "utils/SystemResetter";
+import { registerResetFunction } from "utils/SystemResetter";
 
 interface NodeCollection {
     nodeIdsByProvider: { [providerId: string]: Set<string> };
@@ -11,6 +11,19 @@ registerResetFunction(() => (nodesByRoomName = {}));
 
 export function getNodes(roomName: string): { [id: string]: LogisticsNode } {
     return nodesByRoomName[roomName]?.logisticsNodes ?? {};
+}
+
+export function getNodesByProvider(roomName: string, providerId: string): LogisticsNode[] {
+    let nodeIds = nodesByRoomName?.[roomName].nodeIdsByProvider[providerId];
+    let nodes: LogisticsNode[] = []
+    if (nodeIds) {
+        nodeIds.forEach(id => {
+            let node = nodesByRoomName[roomName].logisticsNodes[id];
+            if (node)
+                nodes.push(node)
+        })
+    }
+    return nodes
 }
 
 export function registerNode(roomName: string, providerId: string, node: LogisticsNode) {

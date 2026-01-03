@@ -8,6 +8,7 @@ const DEFAULT_SORTER: BodySorter = function (a: BodyPartConstant, b: BodyPartCon
 const defaultPriorities = [
     "Primordial", //Initial fast startup creeps
     "Summoner", //Fast filler
+    "Zealot", //Combat
     "Drudge", //Hauler
     "Exhumer", //Miner
     "Aspect", //Scout

@@ -1,5 +1,6 @@
 interface Structure {
     isWalkable: boolean;
+    isActive: () => boolean;
 }
 
 interface StructureContainer {

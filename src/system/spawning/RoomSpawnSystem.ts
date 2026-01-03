@@ -30,7 +30,7 @@ export class RoomSpawnSystem {
         let storage = getMainStorage(this.roomName);
         if (room && storage) {
             let fillables = findStructure(room, FIND_MY_STRUCTURES)
-                .filter(s => s.structureType === STRUCTURE_SPAWN || s.structureType === STRUCTURE_EXTENSION)
+                .filter(s => (s.structureType === STRUCTURE_SPAWN || s.structureType === STRUCTURE_EXTENSION) && s.isActive())
                 .map(s => s as StructureSpawn | StructureExtension);
 
             //TODO don't make requests for fast fillable extensions?
@@ -74,7 +74,7 @@ export class RoomSpawnSystem {
         if (room) {
             let readySpawns: StructureSpawn[] = findStructure(room, FIND_MY_SPAWNS)
                 .map(s => s as StructureSpawn)
-                .filter(s => !s.spawning);
+                .filter(s => !s.spawning && s.isActive());
             let readyToSpawn: CreepConfig[] = Object.values(_getConfigs(this.roomName))
                 .reduce((acc, val) => acc.concat(val), [])
                 .filter(c => _configShouldBeSpawned(c) && _haveSufficientCapacity(room, c));
@@ -114,7 +114,7 @@ export class RoomSpawnSystem {
                                 `Failed to spawn creep with status: ${result} roomName:${this.roomName} spawnId: ${spawn.id} handle:${next.handle}`
                             );
                         }
-                    } else if (result == ERR_NOT_ENOUGH_ENERGY) {
+                    } else if (result == ERR_NOT_ENOUGH_ENERGY || result == ERR_RCL_NOT_ENOUGH) {
                         //not worried in this case. This will happen fairly often and isn't a problem
                     } else {
                         Log.e(

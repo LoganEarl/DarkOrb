@@ -6,11 +6,22 @@ interface SpawnRoom {
     energyCapacity: number;
 }
 
+type JobName =
+    | "Primordial" //Initial fast startup creeps
+    | "Summoner" //Fast filler
+    | "Drudge" //Hauler
+    | "Exhumer" //Miner
+    | "Aspect" //Scout
+    | "Artificer" //Worker
+    | "Priest" //Upgrader
+    | "Sludger" //Mineral miner
+    | "Zealot" //Military
+
 interface CreepConfig {
     body: BodyPartConstant[];
     handle: string; //Id used to look up the creeps
     subHandle?: string; //Need this when we have multiple configs defined under the same handle. This is what the spawning engine uses to tell them apart
-    jobName: string; //The name of the creep's job. Used in prioritization and is added to name
+    jobName: JobName; //The name of the creep's job. Used in prioritization and is added to name
     quantity: number; //How many of this creep to maintain. Note, this does not garuntee only one creep will be alive at a time
     //To do that, disable all prespawning as well
 

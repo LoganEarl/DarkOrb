@@ -17,6 +17,7 @@ class CreepManifest implements MemoryComponent {
     }
 
     //Get all living creeps under the handle
+    //TODO need some sort of name-based caching
     _getCreeps(handle: string, subHandle?: string): Creep[] {
         this.loadMemory();
 

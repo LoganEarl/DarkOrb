@@ -1,22 +1,24 @@
-import {getRallyPosition, scoutRoom} from "system/scouting/ScoutInterface";
+import { getRallyPosition, scoutRoom } from "system/scouting/ScoutInterface";
 import {
     getCreeps,
     maximizeBody,
     registerCreepConfig,
     unregisterHandle
 } from "system/spawning/SpawnInterface";
-import {getMainStorage} from "system/storage/StorageInterface";
-import {FEATURE_VISUALIZE_HAULING} from "utils/featureToggles/FeatureToggleConstants";
-import {shouldVisualize} from "utils/featureToggles/FeatureToggles";
-import {profile} from "utils/profiler/Profiler";
-import {Traveler} from "utils/traveler/Traveler";
-import {clamp, drawBar, drawCircledItem} from "utils/UtilityFunctions";
-import {getNode, getNodes} from "./HaulerInterface";
-import {haulerLogic} from "./HaulerLogic";
+import { getMainStorage } from "system/storage/StorageInterface";
+import { FEATURE_VISUALIZE_HAULING } from "utils/featureToggles/FeatureToggleConstants";
+import { shouldVisualize } from "utils/featureToggles/FeatureToggles";
+import { profile } from "utils/profiler/Profiler";
+import { Traveler } from "utils/traveler/Traveler";
+import { clamp, drawBar, drawCircledItem } from "utils/UtilityFunctions";
+import { getNode, getNodes } from "./HaulerInterface";
+import { haulerLogic } from "./HaulerLogic";
 
 const MAX_HAULERS_PER_ROOM = 25; //Total haulers a single room can have after rcl3
 const MAX_HAULERS_PER_ROOM_LOW_RCL = 60; //Total haulers a single room can have before rcl4
 const HAULER_SAFETY_MARGIN = 1.2; //How many more haulers we will spawn than we think we need
+
+const CPU_HUNGRY_MODE = false;
 
 @profile
 export class RoomHaulerSystem {
@@ -43,13 +45,13 @@ export class RoomHaulerSystem {
         let nodes = getNodes(this.roomName);
         //console.log(`Calculating logistics node creeps`)
         let sourceCarryParts = 0;
-        let sinkCarryParts =  0;
+        let sinkCarryParts = 0;
         for (let node of Object.values(nodes)) {
             const carryParts = Math.ceil(
                 ((node.serviceRoute.pathLength * 2 * Math.abs(node.bodyDrdt ?? node.baseDrdt)) / 50) *
                 HAULER_SAFETY_MARGIN
             );
-            if(node.type === "Sink") sinkCarryParts += carryParts;
+            if (node.type === "Sink") sinkCarryParts += carryParts;
             else sourceCarryParts += carryParts;
         }
         this.targetCarryParts = Math.max(sourceCarryParts, sinkCarryParts);
@@ -116,7 +118,8 @@ export class RoomHaulerSystem {
                     this.haulerAssignments,
                     this.nodeAssignments,
                     nodes,
-                    storage
+                    storage,
+                    CPU_HUNGRY_MODE
                 );
             }
 
@@ -140,38 +143,41 @@ export class RoomHaulerSystem {
             } else {
                 let rally = getRallyPosition(this.roomName);
                 if (rally) {
-                    Traveler.travelTo(creep, rally, {range: 3});
+                    Traveler.travelTo(creep, rally, { range: 3 });
                 }
                 creep.sayWaiting();
             }
         }
 
-        //So there is not a 1 tick wait between job assignments
-        for (let haulerName in toRunAgain) {
-            const hauler = Game.creeps[haulerName];
-            const lastResults = toRunAgain[haulerName];
-            let pairing: LogisticsPairing | null = this.haulerAssignments[haulerName];
-            if (!pairing) {
-                pairing = haulerLogic.assignJobForHauler(
-                    hauler,
-                    this.haulerAssignments,
-                    this.nodeAssignments,
-                    nodes,
-                    storage,
-                    lastResults
-                );
-            }
-            if (pairing) {
-                let node = getNode(this.roomName, pairing.nodeId);
-                haulerLogic.runHauler(
-                    hauler,
-                    pairing,
-                    node!,
-                    storage!,
-                    this.roomName,
-                    [this.handle, "Drudge"],
-                    lastResults
-                );
+        if (CPU_HUNGRY_MODE) {
+            //So there is not a 1 tick wait between job assignments
+            for (let haulerName in toRunAgain) {
+                const hauler = Game.creeps[haulerName];
+                const lastResults = toRunAgain[haulerName];
+                let pairing: LogisticsPairing | null = this.haulerAssignments[haulerName];
+                if (!pairing) {
+                    pairing = haulerLogic.assignJobForHauler(
+                        hauler,
+                        this.haulerAssignments,
+                        this.nodeAssignments,
+                        nodes,
+                        storage,
+                        CPU_HUNGRY_MODE,
+                        lastResults
+                    );
+                }
+                if (pairing) {
+                    let node = getNode(this.roomName, pairing.nodeId);
+                    haulerLogic.runHauler(
+                        hauler,
+                        pairing,
+                        node!,
+                        storage!,
+                        this.roomName,
+                        [this.handle, "Drudge"],
+                        lastResults
+                    );
+                }
             }
         }
     }

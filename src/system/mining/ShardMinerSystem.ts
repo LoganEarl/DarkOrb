@@ -1,10 +1,10 @@
-import {getRoomData} from "system/scouting/ScoutInterface";
-import {Log} from "utils/logger/Logger";
-import {unpackPos} from "utils/Packrat";
-import {profile} from "utils/profiler/Profiler";
-import {registerResetFunction} from "utils/SystemResetter";
-import {RoomMinerSystem} from "./RoomMinerSystem";
-import {minerLogic} from "./MinerLogic";
+import { getRoomData } from "system/scouting/ScoutInterface";
+import { Log } from "utils/logger/Logger";
+import { unpackPos } from "utils/Packrat";
+import { profile } from "utils/profiler/Profiler";
+import { registerResetFunction } from "utils/SystemResetter";
+import { RoomMinerSystem } from "./RoomMinerSystem";
+import { minerLogic } from "./MinerLogic";
 
 @profile
 export class ShardMinerSystem {
@@ -27,7 +27,7 @@ export class ShardMinerSystem {
                 .map(spawn => spawn.pos.roomName)
         );
         ownedRooms.forEach(roomName => {
-            let associatedSystem= this.roomMinerSystems.find(s => s.roomName === roomName)
+            let associatedSystem = this.roomMinerSystems.find(s => s.roomName === roomName)
             if (!associatedSystem) {
                 Log.i(`Detected miner system in ${roomName}, starting mining`);
                 this.roomMinerSystems.push(new RoomMinerSystem(roomName));

@@ -25,6 +25,7 @@ export class RoomWorkSystem {
     private creepAssignments: Map<string, string> = new Map();
     private targetWorkParts: number = 0;
     private targetUpgradeParts: number = 0;
+    private currentUpgradeParts: number = 0;
 
     constructor(roomName: string) {
         this.roomName = roomName;
@@ -239,6 +240,7 @@ export class RoomWorkSystem {
         }
 
         let upgradeEnergy = energyBudgetPerWorkerPool.get("Upgraders");
+        this.currentUpgradeParts = _.sum(getCreeps(this.workHandle), c => _.sum(c.body, p => (p.type === WORK ? 1 : 0)));
         if (upgradeEnergy) {
             this.targetUpgradeParts = Math.ceil(upgradeEnergy / UPGRADE_CONTROLLER_POWER);
             let bodies = maximizeBodyForTargetParts(

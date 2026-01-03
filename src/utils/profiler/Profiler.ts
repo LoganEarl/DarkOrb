@@ -133,7 +133,7 @@ export function profile(
 }
 
 function isEnabled(): boolean {
-    return Memory.profiler!.start !== undefined;
+    return Memory.profiler?.start !== undefined;
 }
 
 function record(key: string | symbol, time: number) {

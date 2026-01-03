@@ -1,3 +1,5 @@
+import {Log} from "../utils/logger/Logger";
+
 Object.defineProperty(Structure.prototype, "isWalkable", {
     get() {
         return (
@@ -8,6 +10,14 @@ Object.defineProperty(Structure.prototype, "isWalkable", {
     },
     configurable: true
 });
+
+let isActive = Structure.prototype.isActive;
+OwnedStructure.prototype.isActive = function () {
+    if (this.room.memory && this.room.memory.maxRcl && this.room.memory.maxRcl == (this.room.controller!.level || 0)) {
+        return true;
+    }
+    return isActive.call(this);
+}
 
 // Container prototypes ================================================================================================
 
@@ -184,3 +194,5 @@ Object.defineProperty(Tombstone.prototype, "energy", {
     },
     configurable: true
 });
+
+

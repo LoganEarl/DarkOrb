@@ -22,6 +22,7 @@ const CONSTRUCTION_PRIORITIES = [
     STRUCTURE_RAMPART,
     STRUCTURE_TOWER,
     STRUCTURE_TERMINAL,
+    STRUCTURE_CONTAINER,
     STRUCTURE_LAB,
     STRUCTURE_LINK,
     STRUCTURE_FACTORY,
@@ -29,7 +30,6 @@ const CONSTRUCTION_PRIORITIES = [
     STRUCTURE_NUKER,
     STRUCTURE_OBSERVER,
     STRUCTURE_EXTRACTOR,
-    STRUCTURE_CONTAINER,
     STRUCTURE_WALL,
     STRUCTURE_ROAD
 ];
@@ -404,6 +404,11 @@ class WorkerLogic {
                             if (workTarget.targetProgress <= workTarget.currentProgress) {
                                 creep.queueSay("🎉")
                                 done = true;
+                                let maxRcl = creep.room.memory?.maxRcl ?? 0
+                                if(maxRcl < target.level) {
+                                    if(!creep.room.memory) creep.room.memory = {}
+                                    creep.room.memory.maxRcl = target.level
+                                }
                             } else {
                                 creep.queueSay("⚫")
                             }

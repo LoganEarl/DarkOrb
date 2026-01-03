@@ -3,6 +3,7 @@ import {ProcessRunner} from "core/ProcessRunner";
 // memory extension samples
 declare global {
     interface RoomMemory {
+        maxRcl?: number
     }
 
     interface Memory {

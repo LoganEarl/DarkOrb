@@ -1,4 +1,4 @@
-import {PriorityQueueItem} from "utils/PriorityQueue";
+import { PriorityQueueItem } from "utils/PriorityQueue";
 
 declare global {
     type LogisticsNodeType = "Source" | "Sink"; //Source means we are sourcing energy. I.e. take the energy away from here. Sink means we want energy and are spending it
@@ -25,6 +25,7 @@ declare global {
         disableLimitedGrab?: boolean; //By default, will only grab enough to service the node on SINKs. true = disabled
         baseDrdt: number; //How quickly the resource level changes over time. Beware, can be +/-. Used in conjunction with service route to determine number of carry parts
         bodyDrdt?: number; //How much resource should be moved per tick. Replaces baseDrdt for the purposes of creep quotas.
+        invalidateAfter?: number; //Game tick where this should be deleted. Useful as a dead-man switch for nodes with tough edge-cases
         //Use for temporary jobs that are low priority such as scoreing and looting
         serviceRoute: {
             //The path info for going from this request to the main storage

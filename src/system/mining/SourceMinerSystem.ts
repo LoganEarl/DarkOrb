@@ -2,8 +2,6 @@ import {
     getNode,
     getNodesByProvider,
     registerNode,
-    unregisterNode,
-    unregisterNodes
 } from "system/hauling/HaulerInterface";
 import { getRoomData, scoutRoom } from "system/scouting/ScoutInterface";
 import { getCreeps, registerCreepConfig, unregisterHandle } from "system/spawning/SpawnInterface";
@@ -199,7 +197,6 @@ export class SourceMinerSystem implements MemoryComponent {
     _stop() {
         this.loadMemory();
         this.addStopReason("Mandated");
-        unregisterNodes(this.roomName, this.handle);
     }
 
     _runCreeps() {
@@ -212,11 +209,6 @@ export class SourceMinerSystem implements MemoryComponent {
         let roomData = getRoomData(this.roomName);
         if ((roomData?.hazardInfo?.numCombatants ?? 0) > 0) this.addStopReason("Attacked");
         else this.clearStopReason("Attacked");
-
-        //Need to figure out a good way to clear out logistics nodes when a creep dies... this is hacky
-        if (Game.time % 100 === 0) {
-            unregisterNodes(this.parentRoomName, this.handle);
-        }
 
         if (creeps.length) {
             if (this.memory!.state === "Active") {
@@ -262,7 +254,6 @@ export class SourceMinerSystem implements MemoryComponent {
                     }
                 }
             } else {
-                unregisterNodes(this.parentRoomName, this.handle);
                 postAnalyticsEvent(this.parentRoomName, 0, this.handle)
                 for (let creep of creeps) {
                     creep.randomSwear(8)
@@ -401,8 +392,6 @@ export class SourceMinerSystem implements MemoryComponent {
                 pathLength,
                 drdt
             );
-        } else {
-            unregisterNode(this.parentRoomName, this.handle, containerKey);
         }
 
         let pileKey = RESOURCE_ENERGY + ":" + packPos(creep.pos) + ":p"
@@ -416,14 +405,13 @@ export class SourceMinerSystem implements MemoryComponent {
                 10000, //Just a big number
                 pile.pos,
                 pathCost, pathLength, drdt);
-        } else {
-            unregisterNode(this.parentRoomName, this.handle, pileKey);
         }
     }
 
     private updateSingleNode(nodeId: string, id: string, level: number, maxLevel: number,
         pos: RoomPosition, pathCost: number, pathLength: number, drdt: number
     ) {
+        //Use low-ttl self-expiring nodes. Edge cases are too annoying otherwise
         let existingNode = getNode(this.parentRoomName, nodeId);
         if (existingNode) {
             existingNode.targetId = id;
@@ -433,6 +421,7 @@ export class SourceMinerSystem implements MemoryComponent {
             existingNode.serviceRoute.pathLength = pathLength;
             existingNode.serviceRoute.pathCost = pathCost;
             existingNode.baseDrdt = drdt;
+            existingNode.invalidateAfter = Game.time + 2;
         } else {
             registerNode(this.parentRoomName, this.handle, {
                 nodeId: nodeId,
@@ -444,6 +433,7 @@ export class SourceMinerSystem implements MemoryComponent {
                 type: "Source",
                 analyticsCategories: [this.handle, "Exhumer"],
                 lastKnownPosition: pos,
+                invalidateAfter: Game.time + 2,
                 serviceRoute: {
                     pathLength: pathLength,
                     pathCost: pathCost

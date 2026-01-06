@@ -1,5 +1,5 @@
-import {getNode, registerNode, unregisterNode} from "system/hauling/HaulerInterface";
-import {getRallyPosition} from "system/scouting/ScoutInterface";
+import { getNode, registerNode, unregisterNode } from "system/hauling/HaulerInterface";
+import { getRallyPosition } from "system/scouting/ScoutInterface";
 import {
     ANALYTICS_ARTIFICER,
     ANALYTICS_CONSTRUCTION,
@@ -7,13 +7,13 @@ import {
     ANALYTICS_REINFORCE,
     ANALYTICS_UPGRADE
 } from "system/storage/AnalyticsConstants";
-import {getMainStorage, postAnalyticsEvent} from "system/storage/StorageInterface";
-import {packPos, unpackPos} from "utils/Packrat";
-import {Log} from "utils/logger/Logger";
-import {Traveler} from "utils/traveler/Traveler";
-import {getMultirooomDistance, minBy} from "utils/UtilityFunctions";
-import {completeWorkTarget} from "./WorkerInterface";
-import {profile} from "../../utils/profiler/Profiler";
+import { getMainStorage, postAnalyticsEvent } from "system/storage/StorageInterface";
+import { packPos, unpackPos } from "utils/Packrat";
+import { Log } from "utils/logger/Logger";
+import { Traveler } from "utils/traveler/Traveler";
+import { getMultirooomDistance, minBy } from "utils/UtilityFunctions";
+import { completeWorkTarget } from "./WorkerInterface";
+import { profile } from "../../utils/profiler/Profiler";
 
 const CONSTRUCTION_PRIORITIES = [
     STRUCTURE_SPAWN,
@@ -73,7 +73,7 @@ interface TargetLockData {
 @profile
 class WorkerLogic {
     lastTargetLockPrune = 0;
-//Creep name to target locking data
+    //Creep name to target locking data
     targetLocks: Map<string, TargetLockData> = new Map();
 
 
@@ -405,8 +405,8 @@ class WorkerLogic {
                                 creep.queueSay("🎉")
                                 done = true;
                                 let maxRcl = creep.room.memory?.maxRcl ?? 0
-                                if(maxRcl < target.level) {
-                                    if(!creep.room.memory) creep.room.memory = {}
+                                if (maxRcl < target.level) {
+                                    if (!creep.room.memory) creep.room.memory = {}
                                     creep.room.memory.maxRcl = target.level
                                 }
                             } else {
@@ -569,13 +569,14 @@ class WorkerLogic {
     }
 
     updateNode(nodeName: string, targetId: string, store: StoreDefinition, pos: RoomPosition,
-               drdt: number, parentRoomName: string, handle: string, analyticsCategories: string[]) {
+        drdt: number, parentRoomName: string, handle: string, analyticsCategories: string[]) {
         let node = getNode(parentRoomName, nodeName);
         if (node) {
             node.baseDrdt = drdt;
             node.level = store.getUsedCapacity(RESOURCE_ENERGY);
             node.maxLevel = store.getCapacity(RESOURCE_ENERGY);
             node.lastKnownPosition = pos;
+            node.invalidateAfter = Game.time + 5
         } else {
             let mainStoragePos = getMainStorage(parentRoomName)?.pos ?? getRallyPosition(parentRoomName);
             let pathLength = 20;
@@ -595,6 +596,7 @@ class WorkerLogic {
                 analyticsCategories: analyticsCategories,
                 baseDrdt: drdt,
                 bodyDrdt: 1, //Reduce amount of stuff we try to create for workers. They don't add much system load
+                invalidateAfter: Game.time + 5,
                 serviceRoute: {
                     pathLength: pathLength,
                     pathCost: pathCost

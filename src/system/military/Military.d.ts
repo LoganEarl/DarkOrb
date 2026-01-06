@@ -122,6 +122,7 @@ interface ActiveMilitaryUnit {
     musterState: ActiveMilitaryUnitMusterState
     unitType: MilitaryUnitType
     unitId: string
+    assignedOperationId?: string
 }
 
 //Holds state information for a military unit that is actively being used.

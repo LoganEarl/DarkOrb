@@ -195,24 +195,30 @@ class MinerLogic {
             assignment.placeToStand = min < 999 ? possibleSpaces[minIndex] : possibleSpaces[0];
         }
 
-        if (Game.rooms[possibleSpaces[0].roomName]) {
-            const structures = assignment.placeToStand.findInRange(FIND_STRUCTURES, 1);
-            const sites = assignment.placeToStand.findInRange(FIND_CONSTRUCTION_SITES, 1);
-            const links: StructureLink[] = structures
-                .filter(s => s.structureType === STRUCTURE_LINK)
-                .map(s => s as StructureLink);
-            const containers: StructureContainer[] = structures
-                .filter(s => s.structureType === STRUCTURE_CONTAINER)
-                .map(s => s as StructureContainer);
+        this._addStructuresIfMissing(assignment);
 
-            assignment.constructionProject = sites[0]?.id;
-            assignment.depositContainer = containers[0]?.id;
-            assignment.depositLink = links[0]?.id;
-        }
 
         return assignment;
     }
 
+    _addStructuresIfMissing(assignment: MinerAssignment) {
+        if (Game.rooms[assignment.placeToStand.roomName]) {
+            if (!assignment.depositLink && !assignment.depositContainer && !assignment.constructionProject) {
+                const structures = assignment.placeToStand.findInRange(FIND_STRUCTURES, 1);
+                const sites = assignment.placeToStand.findInRange(FIND_CONSTRUCTION_SITES, 1);
+                const links: StructureLink[] = structures
+                    .filter(s => s.structureType === STRUCTURE_LINK)
+                    .map(s => s as StructureLink);
+                const containers: StructureContainer[] = structures
+                    .filter(s => s.structureType === STRUCTURE_CONTAINER)
+                    .map(s => s as StructureContainer);
+
+                assignment.constructionProject = sites[0]?.id;
+                assignment.depositContainer = containers[0]?.id;
+                assignment.depositLink = links[0]?.id;
+            }
+        }
+    }
 
     _runSourceMiner(
         creep: Creep, parentRoomName: string, handle: string, assignment: MinerAssignment, primaryMiner: boolean

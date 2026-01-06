@@ -101,7 +101,7 @@ export class ShardMinerSystem {
     }
 
     _reloadAllPaths() {
-        // Log.d("Reloading paths");
+        Log.d("Reloading all mining paths");
         this.roomMinerSystems.forEach(s => s._reloadAllPathInfo());
     }
 

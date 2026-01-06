@@ -13,6 +13,7 @@ import { Traveler } from "utils/traveler/Traveler";
 import { clamp, drawBar, drawCircledItem } from "utils/UtilityFunctions";
 import { getNode, getNodes } from "./HaulerInterface";
 import { haulerLogic } from "./HaulerLogic";
+import { endsWith } from "lodash";
 
 const MAX_HAULERS_PER_ROOM = 25; //Total haulers a single room can have after rcl3
 const MAX_HAULERS_PER_ROOM_LOW_RCL = 60; //Total haulers a single room can have before rcl4
@@ -105,6 +106,7 @@ export class RoomHaulerSystem {
         let nodes = getNodes(this.roomName);
 
         let creeps = getCreeps(this.handle);
+        let enhancePerformance = CPU_HUNGRY_MODE || creeps.length < 5
         let toRunAgain: { [creepName: string]: HaulerRunResults } = {};
         for (let creep of creeps) {
             scoutRoom(creep.room);
@@ -119,7 +121,7 @@ export class RoomHaulerSystem {
                     this.nodeAssignments,
                     nodes,
                     storage,
-                    CPU_HUNGRY_MODE
+                    enhancePerformance
                 );
             }
 
@@ -149,7 +151,7 @@ export class RoomHaulerSystem {
             }
         }
 
-        if (CPU_HUNGRY_MODE) {
+        if (enhancePerformance) {
             //So there is not a 1 tick wait between job assignments
             for (let haulerName in toRunAgain) {
                 const hauler = Game.creeps[haulerName];
@@ -162,7 +164,7 @@ export class RoomHaulerSystem {
                         this.nodeAssignments,
                         nodes,
                         storage,
-                        CPU_HUNGRY_MODE,
+                        enhancePerformance,
                         lastResults
                     );
                 }

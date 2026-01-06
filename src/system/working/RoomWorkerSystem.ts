@@ -19,7 +19,6 @@ import { drawBar, roomPos } from "../../utils/UtilityFunctions";
 import { unpackPos } from "../../utils/Packrat";
 import { getNode, registerNode } from "../hauling/HaulerInterface";
 import { Traveler } from "../../utils/traveler/Traveler";
-import { reduceRight } from "lodash";
 
 //Building takes 5x energy per work part. Given that, if there is a lot of building to do we need to scale back our work body parts
 //Otherwise we will crash our eco by overdrawing

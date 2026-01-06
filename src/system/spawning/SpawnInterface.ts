@@ -1,5 +1,5 @@
-import {Log} from "utils/logger/Logger";
-import {_creepManifest} from "./CreepManifest";
+import { Log } from "utils/logger/Logger";
+import { _creepManifest } from "./CreepManifest";
 import {
     _bodyCost,
     _configShouldBeSpawned,

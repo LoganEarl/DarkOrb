@@ -1,10 +1,10 @@
 //Will keep track of room-level military systems
 //Will distribute military operations among room level systems
 
-import {profile} from "../../utils/profiler/Profiler";
-import {RoomMilitarySystem} from "./RoomMilitarySystem";
-import {Log} from "../../utils/logger/Logger";
-import {registerResetFunction} from "../../utils/SystemResetter";
+import { profile } from "../../utils/profiler/Profiler";
+import { RoomMilitarySystem } from "./RoomMilitarySystem";
+import { Log } from "../../utils/logger/Logger";
+import { registerResetFunction } from "../../utils/SystemResetter";
 
 @profile
 export class ShardMilitarySystem {
@@ -20,7 +20,7 @@ export class ShardMilitarySystem {
             }
         });
 
-        //Make sure we have a room miner system per spawn room
+        //Make sure we have a room military system per spawn room
         let ownedRooms = _.unique(
             Object.values(Game.spawns)
                 .filter(spawn => spawn.isActive() && Game.rooms[spawn.pos.roomName])

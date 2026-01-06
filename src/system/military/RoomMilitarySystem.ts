@@ -4,6 +4,7 @@ import { getMilitaryOperations } from "./MilitaryInterface";
 import { groupBy, minBy, removeItem } from "../../utils/UtilityFunctions";
 import { militaryLogic, MilitaryUnitDefinitions } from "./MilitaryLogic";
 import { Log } from "../../utils/logger/Logger";
+import { registerCreepConfig, unregisterHandle } from "system/spawning/SpawnInterface";
 
 const MAX_ACTIVE_MILITARY_OPERATIONS = 1
 
@@ -44,9 +45,11 @@ export class RoomMilitarySystem implements MemoryComponent {
         this.updateActiveOperationUnitSpawning(allOperations, activeOperations)
     }
 
-    private updateActiveOperationState(allOperations: { [operationId: string]: MilitaryOperation },
+    private updateActiveOperationState(
+        allOperations: { [operationId: string]: MilitaryOperation },
         activeOperations: Map<string, ActiveMilitaryOperation>,
-        semiActiveOperations: Map<string, ActiveMilitaryOperation>) {
+        semiActiveOperations: Map<string, ActiveMilitaryOperation>
+    ) {
         //Go over active operations
         for (let activeOperation of activeOperations.values()) {
             let operation = allOperations[activeOperation.militaryOperationId]
@@ -158,49 +161,61 @@ export class RoomMilitarySystem implements MemoryComponent {
             let operation = allOperations[activeOperation.militaryOperationId];
             if (activeOperation.operationState === "WaitingForUnitAssignment") {
                 //TODO assign a unit and toggle over to either "SpawningAndGrouping" or "Attacking" depending on presence of muster creeps
+                // We need to determine if there is a free unit. If no free units, make a new unit. For now, just always make dynamic duos
+                const possibleUnits: ActiveMilitaryUnit[] = this.memory?.activeMilitaryUnits
+                    ?.filter(unit => unit.assignedOperationId === undefined) ?? []
+                //If no units, select a unit type to build
+                //If there is a unit, and the unit type is acceptable, assign it
+
             }
 
             if (activeOperation.operationState === "SpawningAndGrouping" || activeOperation.operationState === "Attacking") {
-                let toRemove: string[] = [];
-                for (let unitId of activeOperation.assignedUnitIds) {
-                    let activeUnit = this.memory?.activeMilitaryUnits?.find(u => u.unitId === unitId)
-                    if (activeUnit) {
-                        let unit = MilitaryUnitDefinitions.get(activeUnit.unitType)!;
-                        if (activeUnit.musterState === "Spawning" || activeUnit.musterState === "Trickling") {
-                            for (let bodyDefinition of unit.creeps) {
-                                //Add the creep config
-                                //TODO finish this
-                                let config: CreepConfig = {
-                                    body: bodyDefinition.body,
-                                    boosts: bodyDefinition.boosts,
-                                    dontPrespawnParts: true,
-                                    handle: "",
-                                    subHandle: "",
-                                    jobName: "Zealot",
-                                    memory: undefined,
-                                    quantity: 0
-
-                                }
-                            }
-                        } else {
-                            //TODO Remove the creep config from the spawn queue
-                        }
-                    } else {
-                        Log.e(`Failed to find active unit definition in operation: ${activeOperation.militaryOperationId} with id ${unitId}`)
-                        toRemove.push(unitId);
-                    }
-                }
-
-                if (toRemove.length) {
-                    for (let unitId of toRemove) removeItem(activeOperation.assignedUnitIds, unitId);
-                    updateMemory(this)
-                }
+                this.spawnOperation(activeOperation)
             }
 
         }
 
-        //If the operation is set to trickle, set the creep config
         //If the operation is set to muster, only set the creep config if we are still in the spawning phase
+    }
+
+    private spawnOperation(activeOperation: ActiveMilitaryOperation) {
+        let toRemove: string[] = [];
+        for (let unitId of activeOperation.assignedUnitIds) {
+            let activeUnit = this.memory?.activeMilitaryUnits?.find(u => u.unitId === unitId)
+            if (activeUnit) {
+                let unit = MilitaryUnitDefinitions.get(activeUnit.unitType)!;
+                const handle = this.getHandleForActiveUnit(unitId);
+                if (activeUnit.musterState === "Spawning" || activeUnit.musterState === "Trickling") {
+                    let configs: CreepConfig[] = []
+                    for (let bodyDefinition of unit.creeps) {
+                        configs.push({
+                            body: bodyDefinition.body,
+                            boosts: bodyDefinition.boosts,
+                            dontPrespawnParts: true,
+                            handle: handle,
+                            jobName: "Zealot",
+                            quantity: 1
+                        });
+                    }
+                    registerCreepConfig(handle, configs, this.roomName)
+                } else {
+                    unregisterHandle(handle, this.roomName)
+                }
+            } else {
+                Log.e(`Failed to find active unit definition in operation: ${activeOperation.militaryOperationId} with id ${unitId}`)
+                toRemove.push(unitId);
+            }
+        }
+
+        if (toRemove.length) {
+            for (let unitId of toRemove) removeItem(activeOperation.assignedUnitIds, unitId);
+            updateMemory(this)
+        }
+    }
+
+    private getHandleForActiveUnit(unitId: string) {
+        //Designed to be idempotent for a given unit. If something goes wrong and we try to double-spawn the same unit, it will only make one
+        return this.roomName + ":unit:" + unitId
     }
 
 

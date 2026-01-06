@@ -1,4 +1,4 @@
-import {profile} from "./profiler/Profiler";
+import { profile } from "./profiler/Profiler";
 
 var nextSeed = 0;
 

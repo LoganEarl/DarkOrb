@@ -228,9 +228,11 @@ export class SourceMinerSystem implements MemoryComponent {
                         delete this.creepAssignments[creep.name];
                     } else {
                         if (!this.creepAssignments[creep.name]) {
+                            //Old creeps lose their place
+                            let healthyCreepCount = creeps.filter(c => (c?.ticksToLive ?? 0) > 150).length
                             let populationSize = Math.max(
                                 _.sum(this.configs, c => c.quantity),
-                                creeps.length
+                                healthyCreepCount
                             );
 
                             this.creepAssignments[creep.name] = minerLogic._assignMiningSpace(
@@ -243,8 +245,8 @@ export class SourceMinerSystem implements MemoryComponent {
                         }
                         let assignment = this.creepAssignments[creep.name];
                         let primary = samePos(this.miningStandSpaces[0], assignment.placeToStand);
-                        // Log.d(`${creep.name} running with data ${primary}`);
                         if (this.isSource) {
+                            minerLogic._addStructuresIfMissing(assignment);
                             //TODO we need to properly register when we are repairing our container. When we are, we shouldn't say our node is filling up
                             let state = minerLogic._runSourceMiner(creep, this.parentRoomName, this.handle, assignment, primary);
                             this.updateSourceLogisticsNodes(creep, assignment, state);
@@ -393,6 +395,7 @@ export class SourceMinerSystem implements MemoryComponent {
                 drdt
             );
         }
+
 
         let pileKey = RESOURCE_ENERGY + ":" + packPos(creep.pos) + ":p"
         const piles = creep.pos.lookFor(LOOK_RESOURCES).filter(pile => pile.resourceType === RESOURCE_ENERGY);

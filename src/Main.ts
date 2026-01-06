@@ -1,26 +1,27 @@
-import {ProcessRunner} from "core/ProcessRunner";
+import { ProcessRunner } from "core/ProcessRunner";
 import * as Profiler from "utils/profiler/Profiler";
-import {sayAll} from "prototypes/Creep";
+import { sayAll } from "prototypes/Creep";
 import "./prototypes/RoomPosition";
 import "./prototypes/Structures";
 import "./prototypes/Creep";
-import {hasRespawned} from "utils/UtilityFunctions";
-import {setFeature, toggleFeature} from "utils/featureToggles/FeatureToggles";
-import {updateAllMemory} from "utils/MemoryWriter";
-import {Log} from "utils/logger/Logger";
-import {SpawnProcess} from "system/spawning/SpawnProcess";
-import {ScoutProcess} from "system/scouting/ScoutProcess";
-import {resetAllSystems} from "utils/SystemResetter";
-import {StorageProcess} from "system/storage/StorageProcess";
-import {MinerProcess} from "system/mining/MinerProcess";
-import {HaulerProcess} from "system/hauling/HaulerProcess";
-import {printSpawnQueues} from "system/spawning/SpawnInterface";
-import {WorkerProcess} from "system/working/WorkerProcess";
+import { hasRespawned } from "utils/UtilityFunctions";
+import { setFeature, toggleFeature } from "utils/featureToggles/FeatureToggles";
+import { updateAllMemory } from "utils/MemoryWriter";
+import { Log } from "utils/logger/Logger";
+import { SpawnProcess } from "system/spawning/SpawnProcess";
+import { ScoutProcess } from "system/scouting/ScoutProcess";
+import { resetAllSystems } from "utils/SystemResetter";
+import { StorageProcess } from "system/storage/StorageProcess";
+import { MinerProcess } from "system/mining/MinerProcess";
+import { HaulerProcess } from "system/hauling/HaulerProcess";
+import { printSpawnQueues } from "system/spawning/SpawnInterface";
+import { WorkerProcess } from "system/working/WorkerProcess";
 
 import "./utils/visual/RoomVisual.js";
-import {PlannerProcess as PlannerProcess} from "system/planning/PlannerProcess";
-import {memhack} from "utils/memHack/Memhack";
-import {MilitaryProcess} from "./system/military/MilitaryProcess";
+import { PlannerProcess as PlannerProcess } from "system/planning/PlannerProcess";
+import { memhack } from "utils/memHack/Memhack";
+import { MilitaryProcess } from "./system/military/MilitaryProcess";
+import { defend } from "QuickAndDirtyTowers";
 
 let deferedInit = false;
 let globalRefresh = true;
@@ -102,8 +103,11 @@ export const loop = memhack(() => {
         }
 
         if (Game.cpu.bucket === 10000 && Game.cpu.generatePixel) {
-            Game.cpu.generatePixel();
+            //Game.cpu.generatePixel();
         }
+
+        //TODO, replace this with actual military systems. They should be in charge of towers
+        defend();
 
         global.runner.runAll();
 
@@ -118,6 +122,8 @@ export const loop = memhack(() => {
                 delete Memory.creeps[name];
             }
         }
+
+        //Log.d(`Used ${Game.cpu.getUsed()} cpu this tick`)
     } catch (e) {
         Log.e("Uncaught error detected", e);
     }

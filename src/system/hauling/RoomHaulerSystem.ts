@@ -1,17 +1,25 @@
 import { getRallyPosition, scoutRoom } from "system/scouting/ScoutInterface";
-import { getCreeps, maximizeBody, registerCreepConfig, unregisterHandle } from "system/spawning/SpawnInterface";
+import {
+    getCreeps,
+    maximizeBody,
+    registerCreepConfig,
+    unregisterHandle
+} from "system/spawning/SpawnInterface";
 import { getMainStorage } from "system/storage/StorageInterface";
 import { FEATURE_VISUALIZE_HAULING } from "utils/featureToggles/FeatureToggleConstants";
-import { getFeature } from "utils/featureToggles/FeatureToggles";
+import { shouldVisualize } from "utils/featureToggles/FeatureToggles";
 import { profile } from "utils/profiler/Profiler";
 import { Traveler } from "utils/traveler/Traveler";
 import { clamp, drawBar, drawCircledItem } from "utils/UtilityFunctions";
-import { getNode, getNodes, unregisterNode } from "./HaulerInterface";
+import { getNode, getNodes } from "./HaulerInterface";
 import { haulerLogic } from "./HaulerLogic";
+import { endsWith } from "lodash";
 
 const MAX_HAULERS_PER_ROOM = 25; //Total haulers a single room can have after rcl3
 const MAX_HAULERS_PER_ROOM_LOW_RCL = 60; //Total haulers a single room can have before rcl4
-const HAULER_SAFTEY_MARGIN = 1.2; //How many more haulers we will spawn than we think we need
+const HAULER_SAFETY_MARGIN = 1.2; //How many more haulers we will spawn than we think we need
+
+const CPU_HUNGRY_MODE = false;
 
 @profile
 export class RoomHaulerSystem {
@@ -37,13 +45,17 @@ export class RoomHaulerSystem {
         this.targetCarryParts = 0;
         let nodes = getNodes(this.roomName);
         //console.log(`Calculating logistics node creeps`)
+        let sourceCarryParts = 0;
+        let sinkCarryParts = 0;
         for (let node of Object.values(nodes)) {
             const carryParts = Math.ceil(
                 ((node.serviceRoute.pathLength * 2 * Math.abs(node.bodyDrdt ?? node.baseDrdt)) / 50) *
-                    HAULER_SAFTEY_MARGIN
+                HAULER_SAFETY_MARGIN
             );
-            this.targetCarryParts += carryParts;
+            if (node.type === "Sink") sinkCarryParts += carryParts;
+            else sourceCarryParts += carryParts;
         }
+        this.targetCarryParts = Math.max(sourceCarryParts, sinkCarryParts);
 
         let existingCreeps = getCreeps(this.handle);
         let spawnStarter = existingCreeps.length === 0;
@@ -64,6 +76,7 @@ export class RoomHaulerSystem {
                 {
                     body: body,
                     handle: this.handle,
+                    subHandle: "StandardCreeps",
                     jobName: "Drudge",
                     quantity: numCreeps,
                     additionalPrespawntime: 20
@@ -72,8 +85,9 @@ export class RoomHaulerSystem {
 
             if (spawnStarter) {
                 configs.push({
-                    body: [CARRY, MOVE],
+                    body: [CARRY, CARRY, MOVE, MOVE],
                     handle: this.handle,
+                    subHandle: "StarterCreep",
                     jobName: "Primordial",
                     quantity: 1,
                     subPriority: 1
@@ -92,6 +106,7 @@ export class RoomHaulerSystem {
         let nodes = getNodes(this.roomName);
 
         let creeps = getCreeps(this.handle);
+        let enhancePerformance = CPU_HUNGRY_MODE || creeps.length < 5
         let toRunAgain: { [creepName: string]: HaulerRunResults } = {};
         for (let creep of creeps) {
             scoutRoom(creep.room);
@@ -105,7 +120,8 @@ export class RoomHaulerSystem {
                     this.haulerAssignments,
                     this.nodeAssignments,
                     nodes,
-                    storage
+                    storage,
+                    enhancePerformance
                 );
             }
 
@@ -135,38 +151,41 @@ export class RoomHaulerSystem {
             }
         }
 
-        //So there is not a 1 tick wait between job assignments
-        for (let haulerName in toRunAgain) {
-            const hauler = Game.creeps[haulerName];
-            const lastResults = toRunAgain[haulerName];
-            let pairing: LogisticsPairing | null = this.haulerAssignments[haulerName];
-            if (!pairing) {
-                pairing = haulerLogic.assignJobForHauler(
-                    hauler,
-                    this.haulerAssignments,
-                    this.nodeAssignments,
-                    nodes,
-                    storage,
-                    lastResults
-                );
-            }
-            if (pairing) {
-                let node = getNode(this.roomName, pairing.nodeId);
-                haulerLogic.runHauler(
-                    hauler,
-                    pairing,
-                    node!,
-                    storage!,
-                    this.roomName,
-                    [this.handle, "Drudge"],
-                    lastResults
-                );
+        if (enhancePerformance) {
+            //So there is not a 1 tick wait between job assignments
+            for (let haulerName in toRunAgain) {
+                const hauler = Game.creeps[haulerName];
+                const lastResults = toRunAgain[haulerName];
+                let pairing: LogisticsPairing | null = this.haulerAssignments[haulerName];
+                if (!pairing) {
+                    pairing = haulerLogic.assignJobForHauler(
+                        hauler,
+                        this.haulerAssignments,
+                        this.nodeAssignments,
+                        nodes,
+                        storage,
+                        enhancePerformance,
+                        lastResults
+                    );
+                }
+                if (pairing) {
+                    let node = getNode(this.roomName, pairing.nodeId);
+                    haulerLogic.runHauler(
+                        hauler,
+                        pairing,
+                        node!,
+                        storage!,
+                        this.roomName,
+                        [this.handle, "Drudge"],
+                        lastResults
+                    );
+                }
             }
         }
     }
 
     public _visualize() {
-        if (!getFeature(FEATURE_VISUALIZE_HAULING)) return;
+        if (!shouldVisualize(FEATURE_VISUALIZE_HAULING)) return;
         let nodes = getNodes(this.roomName);
 
         let visuals: { [roomName: string]: RoomVisual } = {};

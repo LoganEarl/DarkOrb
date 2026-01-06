@@ -1,7 +1,23 @@
 //Credit to Carson Burke. https://github.com/CarsonBurke/Screeps-Tutorials/blob/Master/basePlanningAlgorithms/floodFill.js
 
-import { Traveler } from "utils/traveler/Traveler";
-import { findPositionsInsideRect } from "utils/UtilityFunctions";
+import {Traveler} from "utils/traveler/Traveler";
+import {findPositionsInsideRect} from "utils/UtilityFunctions";
+
+export function getFloodFillCoordsSorted(
+    roomName: string,
+    seeds: Coord[],
+
+) {
+    // Get the terrain
+    const terrain = Game.map.getRoomTerrain(roomName);
+    // Construct a cost matrix for visited tiles and add seeds to it
+    const visitedCM = new PathFinder.CostMatrix();
+
+    //We will always get a matrix here because we have room visibility
+    const blockingStructureMatrix = Traveler.getStructureMatrix(roomName, true, false);
+
+
+}
 
 //Produces a matrix where each slot is the distance from the nearest seed. Spreads out from the seed positions, and does not modify positions not covered by the fill
 export function floodFill(

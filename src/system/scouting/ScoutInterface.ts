@@ -1,11 +1,9 @@
-import { Log } from "utils/logger/Logger";
 import { MemoryComponent, updateMemory } from "utils/MemoryWriter";
 import { unpackPos } from "utils/Packrat";
 import { registerResetFunction } from "utils/SystemResetter";
 import { _canBeUpdated, _scoutRoom } from "./ScoutLogic";
-import { _shardScoutSystem } from "./ShardScoutSystem";
 
-export const MAX_SCOUT_DEPTH = 6;
+export const MAX_SCOUT_DEPTH = 15;
 
 class MapMemory implements MemoryComponent {
     shardMap: ShardMap = {};

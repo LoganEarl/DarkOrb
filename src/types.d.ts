@@ -1,8 +1,10 @@
 // example declaration file - remove these and add your own custom typings
-import { ProcessRunner } from "core/ProcessRunner";
+import {ProcessRunner} from "core/ProcessRunner";
 // memory extension samples
 declare global {
-    interface RoomMemory {}
+    interface RoomMemory {
+        maxRcl?: number
+    }
 
     interface Memory {
         noSeason?: boolean;

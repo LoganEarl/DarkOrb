@@ -1,9 +1,9 @@
-import { getRoomData, saveMapData } from "system/scouting/ScoutInterface";
-import { Log } from "utils/logger/Logger";
-import { profile } from "utils/profiler/Profiler";
-import { registerResetFunction } from "utils/SystemResetter";
-import { _queuedJobs } from "./PlannerInterface";
-import { RoomPlannerSystem } from "./RoomPlannerSystem";
+import {getRoomData, saveMapData} from "system/scouting/ScoutInterface";
+import {Log} from "utils/logger/Logger";
+import {profile} from "utils/profiler/Profiler";
+import {registerResetFunction} from "utils/SystemResetter";
+import {_queuedJobs} from "./PlannerInterface";
+import {RoomPlannerSystem} from "./RoomPlannerSystem";
 
 @profile
 class ShardPlannerSystem {

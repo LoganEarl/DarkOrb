@@ -1,4 +1,4 @@
-import { Log } from "utils/logger/Logger";
+import {Log} from "utils/logger/Logger";
 
 /* tslint:disable:ban-types */
 export function init(): Profiler {
@@ -133,7 +133,7 @@ export function profile(
 }
 
 function isEnabled(): boolean {
-    return Memory.profiler!.start !== undefined;
+    return Memory.profiler?.start !== undefined;
 }
 
 function record(key: string | symbol, time: number) {

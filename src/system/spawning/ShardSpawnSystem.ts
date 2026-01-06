@@ -1,12 +1,14 @@
 //Has room spawn systems by room name
 
-import { getRoomData } from "system/scouting/ScoutInterface";
-import { Log } from "utils/logger/Logger";
-import { registerResetFunction } from "utils/SystemResetter";
-import { RoomFastFillerSystem } from "./fastFiller/RoomFastFillerSystem";
-import { RoomSpawnSystem } from "./RoomSpawnSystem";
-import { _setSpawnRooms } from "./SpawnInterface";
+import {getRoomData} from "system/scouting/ScoutInterface";
+import {Log} from "utils/logger/Logger";
+import {registerResetFunction} from "utils/SystemResetter";
+import {RoomFastFillerSystem} from "./fastFiller/RoomFastFillerSystem";
+import {RoomSpawnSystem} from "./RoomSpawnSystem";
+import {_setSpawnRooms} from "./SpawnInterface";
+import {profile} from "../../utils/profiler/Profiler";
 
+@profile
 class ShardSpawnSystem {
     private roomSpawnSystems: { [roomName: string]: RoomSpawnSystem } = {};
     private fastFillerSystems: { [roomName: string]: RoomFastFillerSystem } = {};

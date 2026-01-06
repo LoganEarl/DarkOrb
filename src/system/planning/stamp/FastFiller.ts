@@ -1,4 +1,4 @@
-import { parseStructures } from "./StampLogic";
+import {parseStructures} from "./StampLogic";
 
 export const FAST_FILLER_JSON: string[] = [
     `{"name":"","shard":"","rcl":1,"buildings":{"spawn":{"pos":[{"x":1,"y":3}]}}}`,
@@ -12,20 +12,20 @@ export const FAST_FILLER_JSON: string[] = [
 
 //relative to the upper left
 export const FAST_FILLER_SPAWN_COORDS: [Coord, Coord] = [
-    { x: 1, y: 3 },
-    { x: 5, y: 3 }
+    {x: 1, y: 3},
+    {x: 5, y: 3}
 ];
 
 export const FAST_FILLER_CONTAINER_COORDS: [Coord, Coord] = [
-    { x: 3, y: 1 },
-    { x: 3, y: 5 }
+    {x: 3, y: 1},
+    {x: 3, y: 5}
 ];
 
 export const FAST_FILLER_STANDING_POSITIONS: [Coord, Coord, Coord, Coord] = [
-    { x: 2, y: 2 },
-    { x: 4, y: 2 },
-    { x: 2, y: 4 },
-    { x: 4, y: 4 }
+    {x: 2, y: 2},
+    {x: 4, y: 2},
+    {x: 2, y: 4},
+    {x: 4, y: 4}
 ];
 
 export const FAST_FILLER_GROUP = parseStructures(FAST_FILLER_JSON);

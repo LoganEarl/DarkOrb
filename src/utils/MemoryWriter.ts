@@ -5,9 +5,10 @@ export interface MemoryComponent {
 class MemoryWriter {
     private components: MemoryComponent[] = [];
 
-    //Call from memory components so that they will get their memory writen in
+    //Call from memory components so that they will get their memory written in
     public updateComponent(component: MemoryComponent) {
-        this.components.push(component);
+        if (this.components.indexOf(component) === -1)
+            this.components.push(component);
     }
 
     //Called by the main loop. This will update all the components at once

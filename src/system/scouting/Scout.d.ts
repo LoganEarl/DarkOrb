@@ -12,6 +12,7 @@ interface TTLData {
     minNextUpdate: number; //The minimum tick number before we will allow rechecking the data
     maxNextUpdate: number; //After this game tick, we will decide to send a scout
 }
+
 interface SourceInfo {
     id: string;
     packedPosition: string;
@@ -48,6 +49,7 @@ interface ThreatInfo {
 interface RoomTerritoryInfo extends TTLData {
     claims: [TerritoryInfo, ...TerritoryInfo[]];
 }
+
 interface TerritoryInfo {
     roomName: string;
     range: number;
@@ -88,6 +90,7 @@ interface ScoutMemory {
     //array of clusters, each cluster is a string[] of room names in the cluster
     clusters: string[][];
 }
+
 interface Memory {
     scoutMemory?: ScoutMemory;
     mapData?: ShardMap;

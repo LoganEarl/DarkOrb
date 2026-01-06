@@ -1,10 +1,13 @@
 # screeps-typescript-profiler
+
 > A light-weight TypeScript profiler for tagging classes and methods
 
 
-This project is made as a lightweight alternative to [screeps-profiler](https://github.com/gdborton/screeps-profiler)
+This project is made as a lightweight alternative
+to [screeps-profiler](https://github.com/gdborton/screeps-profiler)
 
 #### Example Output:
+
 ```
 Profiler.output()
 
@@ -34,7 +37,7 @@ DesirePathProcess:findRoad                       14      0.82ms        0.05     
 
 ## Setup
 
-- Add the `Profiler` folder to your project directory somewhere. 
+- Add the `Profiler` folder to your project directory somewhere.
 
 - Import `Profiler` in your `main.ts`
   ```typescript
@@ -42,7 +45,8 @@ DesirePathProcess:findRoad                       14      0.82ms        0.05     
   import * as Profiler from "./path/to/Profiler";
   ```
 
-- Initialize the profiler in `main.ts` outside your main loop, and assign to `global` under whatever name you want to use as the CLI command
+- Initialize the profiler in `main.ts` outside your main loop, and assign to `global` under whatever
+  name you want to use as the CLI command
 
   ```typescript
   // main.ts
@@ -51,7 +55,9 @@ DesirePathProcess:findRoad                       14      0.82ms        0.05     
   global.Profiler = Profiler.init();
   ```
 
-- In any module you wish to profile, import the decorator, and either tag the class to profile everything, or tag specific class methods.  (Getters and Setters are specifically disabled to not interfere with other commonly used decorators)
+- In any module you wish to profile, import the decorator, and either tag the class to profile
+  everything, or tag specific class methods.  (Getters and Setters are specifically disabled to not
+  interfere with other commonly used decorators)
 
   ```typescript
   // MyClass.ts
@@ -69,8 +75,10 @@ DesirePathProcess:findRoad                       14      0.82ms        0.05     
     public someMethod() { /* */ }
   }
   ```
-  
-- The script also expects a global constant `__PROFILER_ENABLED__` to be set.  This is meant to be configured by build scripts.  If this value is set to `false`, **Profiler** will be completely disabled on the build.
+
+- The script also expects a global constant `__PROFILER_ENABLED__` to be set. This is meant to be
+  configured by build scripts. If this value is set to `false`, **Profiler** will be completely
+  disabled on the build.
 
 ## Usage
 
@@ -78,9 +86,11 @@ DesirePathProcess:findRoad                       14      0.82ms        0.05     
 
 From the command line:
 
-**`Profiler.clear()`** - Clears the profiler data in memory.  Useful after refactoring code. (*NOTE: this doesn't stop the profiler*)
+**`Profiler.clear()`** - Clears the profiler data in memory. Useful after refactoring code. (*NOTE:
+this doesn't stop the profiler*)
 
-> *(The profiler is hardcoded to write data to `Memory.profiler`, so make sure you aren't already using this location)*
+> *(The profiler is hardcoded to write data to `Memory.profiler`, so make sure you aren't already
+using this location)*
 
 **`Profiler.start()`** - Starts the profiler
 

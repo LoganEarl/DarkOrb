@@ -1,13 +1,11 @@
-import { postAnalyticsEvent } from "system/storage/StorageInterface";
 import { FEATURE_VISUALIZE_HAULING } from "utils/featureToggles/FeatureToggleConstants";
-import { getFeature } from "utils/featureToggles/FeatureToggles";
+import { shouldVisualize } from "utils/featureToggles/FeatureToggles";
 import { Log } from "utils/logger/Logger";
-import { PriorityQueue } from "utils/PriorityQueue";
 import { profile } from "utils/profiler/Profiler";
 import { Traveler } from "utils/traveler/Traveler";
-import { clamp, findSortedIndex, insertSorted, insertSortedAndTruncate, maxBy } from "utils/UtilityFunctions";
+import { clamp, findSortedIndex, maxBy } from "utils/UtilityFunctions";
 
-const MAX_ASSIGNMENTS_PER_NODE = 10; //No more than this many creeps assigned to a single node
+const MAX_ASSIGNMENTS_PER_NODE = 3; //No more than this many creeps assigned to a single node
 
 //Have hauler carry out its assignment. Will return true if done with current assignment
 
@@ -60,7 +58,7 @@ class HaulerLogic {
             return runResults;
         }
 
-        if (getFeature(FEATURE_VISUALIZE_HAULING)) {
+        if (shouldVisualize(FEATURE_VISUALIZE_HAULING)) {
             let color = targetNode.type === "Sink" ? "green" : "yellow";
 
             if (creep.room.name === targetPos.roomName) {
@@ -190,6 +188,7 @@ class HaulerLogic {
         nodeAssignments: { [nodeId: string]: LogisticsPairing[] },
         logisticsNodes: { [id: string]: LogisticsNode },
         storage: MainStorage,
+        cpuHungryMode: boolean,
         prevResults?: HaulerRunResults
     ): LogisticsPairing | null {
         let servicableNodes = Object.values(logisticsNodes).filter(node => {
@@ -227,9 +226,11 @@ class HaulerLogic {
 
                 let newIndex = findSortedIndex(bestPairing, assignments, this.pairingComparitor);
 
-                //We are shortcutting several other haulers, make sure they pick a new job
-                for (let i = newIndex; i < assignments.length; i++) {
-                    delete haulerAssignments[assignments[i].haulerName];
+                //We are shortcutting several other haulers, make sure they pick a new job. This is expensive though
+                if (cpuHungryMode) {
+                    for (let i = newIndex; i < assignments.length; i++) {
+                        delete haulerAssignments[assignments[i].haulerName];
+                    }
                 }
                 haulerAssignments[creep.name] = bestPairing;
                 //Add the new best pairing at the sorted index, throwing out everything after
@@ -416,8 +417,9 @@ class HaulerLogic {
             (storage.store.getUsedCapacity(nodeResource) === 0 ||
                 storage.structureType === STRUCTURE_SPAWN ||
                 storage.structureType === STRUCTURE_CONTAINER)
-        )
+        ) {
             canUseServiceRoute = false;
+        }
 
         //All that work for this one little flag...
         let useServiceRoute = canUseServiceRoute && serviceDrdt > directDrdt;

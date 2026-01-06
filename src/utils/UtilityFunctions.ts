@@ -1,5 +1,4 @@
-import { Log } from "./logger/Logger";
-import { findStructure } from "./StructureFindCache";
+import {findStructure} from "./StructureFindCache";
 
 export function hasRespawned() {
     // server reset or sim
@@ -99,6 +98,7 @@ export function orderOf(item: any, array: any[]): number {
 
 let lastDrawTick = 0;
 let drawCounts: { [posTag: string]: number } = {};
+
 export function drawCircledItem(
     pos: RoomPosition,
     color: string,
@@ -223,7 +223,9 @@ export function clamp(value: number, min: number, max: number): number {
 /**
  * Merges a list of store-like objects, summing overlapping keys. Useful for calculating assets from multiple sources
  */
-export function mergeSum(objects: { [key: string]: number | undefined }[]): { [key: string]: number } {
+export function mergeSum(objects: { [key: string]: number | undefined }[]): {
+    [key: string]: number
+} {
     const ret: { [key: string]: number } = {};
     for (const object of objects) {
         for (const key in object) {
@@ -269,6 +271,22 @@ export function maxBy<T>(objects: T[], iteratee: (obj: T) => number | false): T 
         }
     }
     return maxObj;
+}
+
+export function groupBy<T>(objects: T[], keyGetter: ((obj: T) => string)): Map<string, T> {
+    let map: Map<string, T> = new Map()
+    for(let o of objects) {
+        map.set(keyGetter(o), o);
+    }
+    return map;
+}
+
+export function removeItem<T>(objects: T[], toRemove: T) {
+    let index = objects.indexOf(toRemove);
+    if(index !== -1) {
+        objects.splice(index, 1);
+    }
+    return objects
 }
 
 export function logHeapStats(): void {
@@ -331,12 +349,13 @@ export function findPositionsInsideRect(x1: number, y1: number, x2: number, y2: 
             if (x < 0 || x >= 50 || y < 0 || y >= 50) continue;
 
             // Otherwise pass the x and y to positions
-            positions.push({ x, y });
+            positions.push({x, y});
         }
     }
 
     return positions;
 }
+
 
 export function findSortedIndex<T>(search: T, items: T[], compare: (a: T, b: T) => number) {
     for (let i = 0; i < items.length; i++) {

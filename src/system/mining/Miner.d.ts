@@ -10,6 +10,11 @@ type MinerStopReason =
     | "ForeignReservation" //Somebody else reserved the site
     | "NoHomeRoom" //Home room is missing. Mining system should be destroyed with time
     | "Mandated"; //We were told to stop
+type MinerCurrentBehavior =
+    | "Mining"  //Normal mining. Expect full resource output
+    | "Traveling" //On their way to the source
+    | "Maintaining" //Fixing/building the container
+    | "Waiting" //Source is tapped out for now
 
 interface MinerAssignment {
     creepName: string;
@@ -19,6 +24,7 @@ interface MinerAssignment {
     depositLink?: Id<StructureLink>;
     constructionProject?: Id<ConstructionSite>;
 }
+
 interface SourceMinerMemory {
     state: MinerState;
     stopReasons: MinerStopReason[];

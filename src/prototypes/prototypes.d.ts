@@ -1,5 +1,6 @@
 interface Structure {
     isWalkable: boolean;
+    isActive: () => boolean;
 }
 
 interface StructureContainer {
@@ -14,10 +15,17 @@ interface StructureController {
 
 interface Creep {
     getBodyPower(selectedPart: BodyPartConstant, operation: any, basePower: number): number;
+
     getTicksToMove(totalCost: number, numPathSteps: number): number;
+
     queueSay(toSay: string, toAll?: boolean): void;
+
     sayWaiting(): void;
+
     swear(): void;
+
+    //Will roll from 0 to odds. If game.time % odds === 0, will swear.
+    randomSwear(odds: number): void;
 }
 
 interface StructureExtension {

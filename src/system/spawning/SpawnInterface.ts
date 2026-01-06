@@ -1,6 +1,5 @@
 import { Log } from "utils/logger/Logger";
 import { _creepManifest } from "./CreepManifest";
-import { _shardSpawnSystem } from "./ShardSpawnSystem";
 import {
     _bodyCost,
     _configShouldBeSpawned,

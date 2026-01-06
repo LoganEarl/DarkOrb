@@ -1,8 +1,8 @@
-import { Process } from "core/Process";
-import { FEATURE_VISUALIZE_SCOUTING } from "utils/featureToggles/FeatureToggleConstants";
-import { getFeature } from "utils/featureToggles/FeatureToggles";
-import { ScheduledJob } from "utils/ScheduledJob";
-import { _shardScoutSystem } from "./ShardScoutSystem";
+import {Process} from "core/Process";
+import {FEATURE_VISUALIZE_SCOUTING} from "utils/featureToggles/FeatureToggleConstants";
+import {shouldVisualize} from "utils/featureToggles/FeatureToggles";
+import {ScheduledJob} from "utils/ScheduledJob";
+import {_shardScoutSystem} from "./ShardScoutSystem";
 
 //Responsible for triggering spawning code. Single process for the whole empire
 export class ScoutProcess extends Process {
@@ -45,7 +45,7 @@ export class ScoutProcess extends Process {
         }
         _shardScoutSystem._runCreeps();
 
-        if (getFeature(FEATURE_VISUALIZE_SCOUTING)) {
+        if (shouldVisualize(FEATURE_VISUALIZE_SCOUTING)) {
             _shardScoutSystem._visualize();
         }
     }

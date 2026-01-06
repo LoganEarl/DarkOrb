@@ -1,16 +1,16 @@
-import { object } from "lodash";
-import { planRoom } from "system/planning/PlannerInterface";
-import { distanceTransformDiag } from "utils/algorithms/DistanceTransform";
-import { floodFill } from "utils/algorithms/FloodFill";
-import { Log } from "utils/logger/Logger";
-import { packCoord, packCoordList, unpackCoord, packPos, packPosList } from "utils/Packrat";
-import { ROOMTYPE_CONTROLLER, Traveler } from "utils/traveler/Traveler";
+import {planRoom} from "system/planning/PlannerInterface";
+import {distanceTransformDiag} from "utils/algorithms/DistanceTransform";
+import {floodFill} from "utils/algorithms/FloodFill";
+import {Log} from "utils/logger/Logger";
+import {packPos, packPosList} from "utils/Packrat";
+import {ROOMTYPE_CONTROLLER, Traveler} from "utils/traveler/Traveler";
 import {
     getFreeSpacesNextTo,
     getMultirooomDistance,
     manhattanDistance,
     roomNameFromCoord
 } from "utils/UtilityFunctions";
+import {min} from "lodash";
 
 const MINING_DATA_MIN_TTL = 100;
 const MINING_DATA_MAX_TTL = 5000;
@@ -20,6 +20,9 @@ const OWNERSHIP_DATA_MAX_TTL = 5000;
 
 const THREAT_DATA_MIN_TTL = 3;
 const THREAT_DATA_MAX_TTL = 5000;
+
+const THREAT_DATA_MIN_TTL_OWNED_ROOM = 3;
+const THREAT_DATA_MAX_TTL_OWNED_ROOM = 100;
 
 const TERRITORY_DATA_MIN_TTL = 1500;
 const TERRITORY_DATA_MAX_TTL = 5000;
@@ -63,6 +66,7 @@ function evaluateSources(sources: [Source, ...Source[]]): [SourceInfo, ...Source
     // Log.d("Free spaces by source:" + JSON.stringify(freeSpacesBySource));
 
     //Add free spaces one at a time to each source. This solves for cases where they have overlaping spots
+    //By design, must be deterministic
     let packedUsedSpots: string[] = [];
     let maxFreeSpaces = _.max(freeSpacesBySource, spaces => spaces.length)?.length ?? 0;
     for (let spaceIndex = 0; spaceIndex < maxFreeSpaces; spaceIndex++) {
@@ -142,9 +146,9 @@ function evaluateOwnership(room: Room): [RoomThreatInfo | undefined, RoomOwnersh
 
     let hostileTowers = !isMyOwnedRoom
         ? room
-              .find(FIND_HOSTILE_STRUCTURES)
-              .filter(s => s.structureType === STRUCTURE_TOWER)
-              .map(t => t as StructureTower)
+            .find(FIND_HOSTILE_STRUCTURES)
+            .filter(s => s.structureType === STRUCTURE_TOWER)
+            .map(t => t as StructureTower)
         : [];
 
     let allEnemies = room.find(FIND_HOSTILE_CREEPS);
@@ -167,13 +171,20 @@ function evaluateOwnership(room: Room): [RoomThreatInfo | undefined, RoomOwnersh
             creep => (peacefullByPlayer[creep.owner.username] = (peacefullByPlayer[creep.owner.username] ?? 0) + 1)
         );
 
+        let minTtl = THREAT_DATA_MIN_TTL;
+        let maxTtl = THREAT_DATA_MAX_TTL;
+        if(ownershipInfo?.username === global.PLAYER_USERNAME) {
+            minTtl = THREAT_DATA_MIN_TTL_OWNED_ROOM;
+            maxTtl = THREAT_DATA_MAX_TTL_OWNED_ROOM;
+        }
+
         threatInfo = {
             numCombatants: allDangerous.length,
             numNonhostile: allPeaceful.length,
             threatsByPlayer: threatsByPlayer,
             lastUpdate: Game.time,
-            minNextUpdate: Game.time + THREAT_DATA_MIN_TTL,
-            maxNextUpdate: Game.time + THREAT_DATA_MAX_TTL
+            minNextUpdate: Game.time + minTtl,
+            maxNextUpdate: Game.time + maxTtl
         };
 
         //If we didn't get ownership info from reservation info, use the creep info instead
@@ -242,7 +253,10 @@ function sumThreat(creeps: Creep[], allTowers: StructureTower[], owner: string):
 
 function roomNameAt(room: Room, roomCoordMod: Coord) {
     let baseRoomCoord = new RoomPosition(0, 0, room.name).roomCoords;
-    return roomNameFromCoord({ x: baseRoomCoord.x + roomCoordMod.x, y: baseRoomCoord.y + roomCoordMod.y });
+    return roomNameFromCoord({
+        x: baseRoomCoord.x + roomCoordMod.x,
+        y: baseRoomCoord.y + roomCoordMod.y
+    });
 }
 
 function findRallyPoint(room: Room): RoomPosition | undefined {
@@ -269,7 +283,7 @@ function findRallyPoint(room: Room): RoomPosition | undefined {
     //Find the max value in the resulting matrix, it is now the rally point! Tiebreak with favoring
     // distance to the center of the room
     let highest: number = -1;
-    let highestCoord: Coord = { x: 0, y: 0 };
+    let highestCoord: Coord = {x: 0, y: 0};
     for (let y = 0; y <= 49; y++) {
         for (let x = 0; x <= 49; x++) {
             if (matrix.get(x, y) > 0 && matrix.get(x, y) >= highest) {
@@ -332,7 +346,7 @@ function evaluateRoomDepth(
 ): RoomTerritoryInfo {
     if (ownership?.username === global.PLAYER_USERNAME && ownership?.ownershipType === "Claimed") {
         return {
-            claims: [{ roomName: searchRoomName, range: 0 }],
+            claims: [{roomName: searchRoomName, range: 0}],
             lastUpdate: Game.time,
             minNextUpdate: Game.time + TERRITORY_DATA_MIN_TTL,
             maxNextUpdate: Game.time + TERRITORY_DATA_MAX_TTL
@@ -445,8 +459,8 @@ export function _canBeUpdated(data: RoomScoutingInfo): boolean {
 }
 
 function shouldSendScout(roomName: string, data: RoomScoutingInfo, alreadyAssigned: string[]): boolean {
-    if (!data) return true;
     if (alreadyAssigned.includes(roomName)) return false;
+    if (!data) return true;
     let outdatedPathing = isPastMaxTTL(data.pathingInfo);
     let outdatedHazard = isPastMaxTTL(data.hazardInfo);
     let outdatadMining = data.miningInfo && isPastMaxTTL(data.miningInfo);
@@ -512,6 +526,7 @@ export function getRoomsToExplore(
 
 //room position target locks with a TTL
 let controllerTargetLocks: { [creepName: string]: [RoomPosition, number] | undefined } = {};
+
 export function runScout(scout: Creep, roomToExplore: string, shardMap: ShardMap, maxTerritoryRange: number): boolean {
     //If the room we are in is on our map but isn't signed by us
     if (scout.pos.room?.controller && shardMap[scout.pos.roomName] && !controllerTargetLocks[scout.name]) {
@@ -542,7 +557,7 @@ export function runScout(scout: Creep, roomToExplore: string, shardMap: ShardMap
     //Head to the targeted controller
     else if (positionLock) {
         scout.queueSay("🖊️🎯");
-        Traveler.travelTo(scout, positionLock[0], { offRoad: true });
+        Traveler.travelTo(scout, positionLock[0], {offRoad: true});
     }
     //If we are in the room we need to explore
     else if (scout.pos.roomName === roomToExplore && roomNeedsScouting) {

@@ -1,8 +1,5 @@
-import { FEATURE_VISUALIZE_PLANNING } from "utils/featureToggles/FeatureToggleConstants";
-import { getFeature } from "utils/featureToggles/FeatureToggles";
-import { Log } from "utils/logger/Logger";
-import { clamp, findPositionsInsideRect } from "utils/UtilityFunctions";
-import { distanceTransformDiag } from "./DistanceTransform";
+import {clamp, findPositionsInsideRect} from "utils/UtilityFunctions";
+import {distanceTransformDiag} from "./DistanceTransform";
 
 const edgeValue = 255;
 const stdDevDivisor = 4; //Increase to slow down spread.

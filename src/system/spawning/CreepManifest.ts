@@ -1,12 +1,14 @@
 //Persists a mapping of unique identifiers to creep names.
 //Also keeps track of process id's and associates creep names to it so you can find all
 
-import { MemoryComponent, updateMemory } from "utils/MemoryWriter";
-import { Log } from "utils/logger/Logger";
-import { FIRST_NAMES } from "./creepNames/FirstNames";
-import { LAST_NAMES } from "./creepNames/LastNames";
-import { registerResetFunction } from "utils/SystemResetter";
+import {MemoryComponent, updateMemory} from "utils/MemoryWriter";
+import {Log} from "utils/logger/Logger";
+import {FIRST_NAMES} from "./creepNames/FirstNames";
+import {LAST_NAMES} from "./creepNames/LastNames";
+import {registerResetFunction} from "utils/SystemResetter";
+import {profile} from "../../utils/profiler/Profiler";
 
+@profile
 class CreepManifest implements MemoryComponent {
     private memory?: ManifestMemory;
 
@@ -15,6 +17,7 @@ class CreepManifest implements MemoryComponent {
     }
 
     //Get all living creeps under the handle
+    //TODO need some sort of name-based caching
     _getCreeps(handle: string, subHandle?: string): Creep[] {
         this.loadMemory();
 
@@ -51,7 +54,7 @@ class CreepManifest implements MemoryComponent {
         }
     }
 
-    //Linear congruential gnerator to traverse name space. Hits each name once before looping (in theory)
+    //Linear congruential generator to traverse name space. Hits each name once before looping (in theory)
     _nextName(creepHandle: string, jobName: string, subHandle: string = "None"): string {
         this.loadMemory();
         this.memory = this.memory!;
@@ -60,8 +63,10 @@ class CreepManifest implements MemoryComponent {
 
         var nextIndex = -1;
         var lastIndex = this.memory.previousNameIndex;
+        //Just in case I fucked up on my number choices
+        let maxIterations = 10;
         do {
-            nextIndex = (3 * lastIndex + 251) % totalNames;
+            nextIndex = (1000000007 * lastIndex + 251) % totalNames;
             let firstNameIndex = Math.floor(nextIndex / LAST_NAMES.length);
             let lastNameIndex = Math.floor(nextIndex % LAST_NAMES.length);
 
@@ -79,8 +84,12 @@ class CreepManifest implements MemoryComponent {
                 updateMemory(this);
                 return name;
             }
-        } while (nextIndex != this.memory.previousNameIndex);
-        Log.e("Failed to find the next creep name! They were all taken!");
+            maxIterations--;
+        } while (nextIndex != this.memory.previousNameIndex && maxIterations > 0);
+        if(maxIterations === 0)
+            Log.e("You need to tune the name generator's LRG, it isn't traversing everything")
+        else
+            Log.e("Failed to find the next creep name! They were all taken!");
         return `${_.random(0, 10000000)} <${jobName}>`;
     }
 

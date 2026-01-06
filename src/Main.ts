@@ -20,6 +20,8 @@ import { WorkerProcess } from "system/working/WorkerProcess";
 import "./utils/visual/RoomVisual.js";
 import { PlannerProcess as PlannerProcess } from "system/planning/PlannerProcess";
 import { memhack } from "utils/memHack/Memhack";
+import { MilitaryProcess } from "./system/military/MilitaryProcess";
+import { defend } from "QuickAndDirtyTowers";
 
 let deferedInit = false;
 let globalRefresh = true;
@@ -52,6 +54,7 @@ function init() {
     //===================================================================Initialize Processes
 
     global.runner = new ProcessRunner();
+    global.runner.addProcess(new MilitaryProcess());
     global.runner.addProcess(new SpawnProcess());
     global.runner.addProcess(new ScoutProcess());
     global.runner.addProcess(new StorageProcess());
@@ -100,8 +103,11 @@ export const loop = memhack(() => {
         }
 
         if (Game.cpu.bucket === 10000 && Game.cpu.generatePixel) {
-            Game.cpu.generatePixel();
+            //Game.cpu.generatePixel();
         }
+
+        //TODO, replace this with actual military systems. They should be in charge of towers
+        defend();
 
         global.runner.runAll();
 
@@ -116,6 +122,8 @@ export const loop = memhack(() => {
                 delete Memory.creeps[name];
             }
         }
+
+        //Log.d(`Used ${Game.cpu.getUsed()} cpu this tick`)
     } catch (e) {
         Log.e("Uncaught error detected", e);
     }

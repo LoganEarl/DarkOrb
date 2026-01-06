@@ -1,18 +1,16 @@
-import { fill } from "lodash";
-import { getNode, registerNode, unregisterNode } from "system/hauling/HaulerInterface";
+import {getNode, registerNode, unregisterNode} from "system/hauling/HaulerInterface";
 import {
     FAST_FILLER_CONTAINER_COORDS,
     FAST_FILLER_SPAWN_COORDS,
     FAST_FILLER_STANDING_POSITIONS
 } from "system/planning/stamp/FastFiller";
-import { getRoomData } from "system/scouting/ScoutInterface";
-import { getMainStorage } from "system/storage/StorageInterface";
-import { FEATURE_VISUALIZE_FAST_FILLER } from "utils/featureToggles/FeatureToggleConstants";
-import { getFeature } from "utils/featureToggles/FeatureToggles";
-import { Log } from "utils/logger/Logger";
-import { findPositionsInsideRect, getFreeSpacesNextTo, getMultirooomDistance, roomPos } from "utils/UtilityFunctions";
-import { getCreeps, registerCreepConfig, unregisterHandle } from "../SpawnInterface";
-import { FillerPosition, FillRecords, runFillersForPosition } from "./FastFillerLogic";
+import {getRoomData} from "system/scouting/ScoutInterface";
+import {getMainStorage} from "system/storage/StorageInterface";
+import {FEATURE_VISUALIZE_FAST_FILLER} from "utils/featureToggles/FeatureToggleConstants";
+import {shouldVisualize} from "utils/featureToggles/FeatureToggles";
+import {findPositionsInsideRect, getMultirooomDistance, roomPos} from "utils/UtilityFunctions";
+import {getCreeps, registerCreepConfig, unregisterHandle} from "../SpawnInterface";
+import {FillerPosition, FillRecords, runFillersForPosition} from "./FastFillerLogic";
 
 export class RoomFastFillerSystem {
     public roomName: string;
@@ -57,17 +55,23 @@ export class RoomFastFillerSystem {
 
             if (fillersForPosition.length) {
                 runFillersForPosition(fillersForPosition, this.fillerPositions[i], fillRecords);
-                if (getFeature(FEATURE_VISUALIZE_FAST_FILLER)) {
-                    visual.circle(this.fillerPositions[i].standingPosition, { radius: 0.5, fill: "blue" });
+                if (shouldVisualize(FEATURE_VISUALIZE_FAST_FILLER)) {
+                    visual.circle(this.fillerPositions[i].standingPosition, {
+                        radius: 0.5,
+                        fill: "blue"
+                    });
                 }
             } else {
-                if (getFeature(FEATURE_VISUALIZE_FAST_FILLER)) {
-                    visual.circle(this.fillerPositions[i].standingPosition, { radius: 0.5, fill: "red" });
+                if (shouldVisualize(FEATURE_VISUALIZE_FAST_FILLER)) {
+                    visual.circle(this.fillerPositions[i].standingPosition, {
+                        radius: 0.5,
+                        fill: "red"
+                    });
                 }
             }
         }
 
-        if (getFeature(FEATURE_VISUALIZE_FAST_FILLER)) {
+        if (shouldVisualize(FEATURE_VISUALIZE_FAST_FILLER)) {
             let placedFiller = getRoomData(this.roomName)?.roomPlan?.fastFiller;
             if (placedFiller) {
                 let width = placedFiller.group[8].buildings.length;
@@ -125,7 +129,7 @@ export class RoomFastFillerSystem {
                     body: [CARRY, CARRY, CARRY, CARRY, CARRY, MOVE],
                     handle: this.handle,
                     subHandle: `Filler #${i}`,
-                    jobName: "Priest",
+                    jobName: "Summoner",
                     quantity: 1
                 };
                 if (this.fillerPositions[i].spawnId && this.fillerPositions[i].direction) {
@@ -145,14 +149,13 @@ export class RoomFastFillerSystem {
     private updateLogisticsNode(container: StructureContainer) {
         let nodeId = "fillerContainer:" + container.id;
         let node = getNode(this.roomName, nodeId);
+        let priority = container.store.getUsedCapacity(RESOURCE_ENERGY) > 100 ? 2 : 100
         //Update the node
         if (node && container.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
             node.level = container.store.getUsedCapacity(RESOURCE_ENERGY);
-            if (container.store.getUsedCapacity(RESOURCE_ENERGY) > 1000) {
-                node.priorityScalar = 10;
-            } else {
-                node.priorityScalar = 50;
-            }
+            node.priorityScalar = priority
+        } else if (node) {
+            unregisterNode(this.roomName, this.handle, nodeId);
         }
         //Make new node
         else if (container.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
@@ -167,7 +170,7 @@ export class RoomFastFillerSystem {
                 type: "Sink",
                 analyticsCategories: [],
                 lastKnownPosition: container.pos,
-                priorityScalar: 50,
+                priorityScalar: priority,
                 disableLimitedGrab: true,
                 serviceRoute: {
                     pathLength: dist,

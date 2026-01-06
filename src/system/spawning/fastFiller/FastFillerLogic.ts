@@ -1,10 +1,4 @@
-import { spawn } from "child_process";
-import { fill } from "lodash";
-import { FEATURE_VISUALIZE_FAST_FILLER } from "utils/featureToggles/FeatureToggleConstants";
-import { getFeature } from "utils/featureToggles/FeatureToggles";
-import { Log } from "utils/logger/Logger";
-import { Traveler } from "utils/traveler/Traveler";
-import { roomPos } from "utils/UtilityFunctions";
+import {Traveler} from "utils/traveler/Traveler";
 
 export interface FillerPosition {
     standingPosition: RoomPosition;
@@ -16,6 +10,7 @@ export interface FillerPosition {
 }
 
 export type FillRecords = { [id: string]: FillRecord };
+
 //Used to rememeber which
 interface FillRecord {
     structure?: AnyStoreStructure;
@@ -23,6 +18,7 @@ interface FillRecord {
     maxCapacity: number;
 }
 
+//TODO this is all expensive to run apparently. Optimize it
 export function runFillersForPosition(fillers: Creep[], position: FillerPosition, fillRecords: FillRecords) {
     let youngestFiller: Creep | undefined;
     if (fillers.length == 1) youngestFiller = fillers[0];
@@ -32,7 +28,7 @@ export function runFillersForPosition(fillers: Creep[], position: FillerPosition
         //If this is the main filler
         if (filler.name === youngestFiller.name) {
             if (!filler.pos.isEqualTo(position.standingPosition)) {
-                Traveler.travelTo(filler, position.standingPosition, { pushy: true });
+                Traveler.travelTo(filler, position.standingPosition, {pushy: true});
             } else {
                 runFillerInPlace(filler, position, fillRecords);
             }
@@ -152,7 +148,7 @@ function runFillerInPlace(filler: Creep, position: FillerPosition, oldRecords: F
 }
 
 function fillRecordFor(id?: string, oldRecord?: FillRecord): FillRecord {
-    if (!id) return { structure: undefined, newCapacity: 0, maxCapacity: 0 };
+    if (!id) return {structure: undefined, newCapacity: 0, maxCapacity: 0};
 
     if (oldRecord) return oldRecord;
     let structure = Game.getObjectById(id) as AnyStoreStructure | undefined;

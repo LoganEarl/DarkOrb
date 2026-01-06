@@ -1,6 +1,6 @@
 import { Process } from "core/Process";
 import { FEATURE_VISUALIZE_MINING } from "utils/featureToggles/FeatureToggleConstants";
-import { getFeature } from "utils/featureToggles/FeatureToggles";
+import { shouldVisualize } from "utils/featureToggles/FeatureToggles";
 import { profile } from "utils/profiler/Profiler";
 import { ScheduledJob } from "utils/ScheduledJob";
 import { _shardMinerSystem } from "./ShardMinerSystem";
@@ -12,9 +12,9 @@ export class MinerProcess extends Process {
     private first = true;
 
     roomScanner: ScheduledJob = new ScheduledJob(_shardMinerSystem._rescanRooms, _shardMinerSystem, 10);
-    minePartitioner: ScheduledJob = new ScheduledJob(_shardMinerSystem._repartitionMiningRooms, _shardMinerSystem, 100);
+    minePartitioner: ScheduledJob = new ScheduledJob(_shardMinerSystem._repartitionMiningRooms, _shardMinerSystem, 500);
     configReloader: ScheduledJob = new ScheduledJob(_shardMinerSystem._reloadAllConfigs, _shardMinerSystem, 50);
-    pathReloader: ScheduledJob = new ScheduledJob(_shardMinerSystem._reloadAllPaths, _shardMinerSystem, 50);
+    pathReloader: ScheduledJob = new ScheduledJob(_shardMinerSystem._reloadAllPaths, _shardMinerSystem, 200);
     jobReloader: ScheduledJob = new ScheduledJob(_shardMinerSystem._reloadActiveMiningJobs, _shardMinerSystem, 50);
 
     constructor() {
@@ -38,7 +38,7 @@ export class MinerProcess extends Process {
         }
         _shardMinerSystem._runCreeps();
 
-        if (getFeature(FEATURE_VISUALIZE_MINING)) {
+        if (shouldVisualize(FEATURE_VISUALIZE_MINING)) {
             _shardMinerSystem._visualize();
         }
     }

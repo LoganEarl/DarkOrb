@@ -80,6 +80,7 @@ function uint16ArrayToHex(array: Uint16Array): string {
     }
     return hex.join("");
 }
+
 /**
  * Packs a coord as a single utf-16 character. The seemingly strange choice of encoding value ((x << 6) | y) + 65 was
  * chosen to be fast to compute (x << 6 | y is significantly faster than 50 * x + y) and to avoid control characters,
@@ -209,7 +210,7 @@ function packRoomName(roomName: string): string {
 function unpackRoomName(char: string): string {
     if (PERMACACHE._unpackedRoomNames[char] === undefined) {
         const num = char.charCodeAt(0) - 65;
-        const { q, x, y } = {
+        const {q, x, y} = {
             q: (num & 0b11000000111111) >>> 12,
             x: (num & 0b00111111000000) >>> 6,
             y: num & 0b00000000111111
@@ -256,7 +257,7 @@ export function packPos(pos: RoomPosition): string {
  * Benchmarking: average of 600ns to execute on shard2 public server.
  */
 export function unpackPos(chars: string): RoomPosition {
-    const { x, y } = unpackCoord(chars[0]);
+    const {x, y} = unpackCoord(chars[0]);
     return new RoomPosition(x, y, unpackRoomName(chars[1]));
 }
 

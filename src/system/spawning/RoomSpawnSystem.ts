@@ -2,15 +2,22 @@
 //Holds queued creep configs
 
 import { getNode, registerNode, unregisterNode } from "system/hauling/HaulerInterface";
-import { ANALYTICS_SPAWNING, ANALYTICS_SPAWN_GENERATION } from "system/storage/AnalyticsConstants";
+import { ANALYTICS_SPAWN_GENERATION, ANALYTICS_SPAWNING } from "system/storage/AnalyticsConstants";
 import { getMainStorage, postAnalyticsEvent } from "system/storage/StorageInterface";
 import { Log } from "utils/logger/Logger";
 import { findStructure } from "utils/StructureFindCache";
 import { getMultirooomDistance } from "utils/UtilityFunctions";
 import { _creepManifest } from "./CreepManifest";
 import { _getConfigs } from "./SpawnInterface";
-import { _bodyCost, _configShouldBeSpawned, _haveSufficientCapacity, _priorityComparator } from "./SpawnLogic";
+import {
+    _bodyCost,
+    _configShouldBeSpawned,
+    _haveSufficientCapacity,
+    _priorityComparator
+} from "./SpawnLogic";
+import { profile } from "../../utils/profiler/Profiler";
 
+@profile
 export class RoomSpawnSystem {
     public roomName: string;
 
@@ -23,9 +30,10 @@ export class RoomSpawnSystem {
         let storage = getMainStorage(this.roomName);
         if (room && storage) {
             let fillables = findStructure(room, FIND_MY_STRUCTURES)
-                .filter(s => s.structureType === STRUCTURE_SPAWN || s.structureType === STRUCTURE_EXTENSION)
+                .filter(s => (s.structureType === STRUCTURE_SPAWN || s.structureType === STRUCTURE_EXTENSION) && s.isActive())
                 .map(s => s as StructureSpawn | StructureExtension);
 
+            //TODO don't make requests for fast fillable extensions?
             for (let fillable of fillables) {
                 let nodeId = "extension:" + fillable.id;
                 let node = getNode(this.roomName, nodeId);
@@ -38,6 +46,11 @@ export class RoomSpawnSystem {
                     }
                 } else if (fillable.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
                     let dist = getMultirooomDistance(storage!.pos, fillable.pos);
+                    let priorityScalar = 50
+                    //Need an extra bump for extensions that are almost full but not quite
+                    if (fillable.store.getFreeCapacity(RESOURCE_ENERGY) <= 10) {
+                        priorityScalar = 500
+                    }
                     node = {
                         nodeId: nodeId,
                         targetId: fillable.id,
@@ -48,7 +61,7 @@ export class RoomSpawnSystem {
                         type: "Sink",
                         analyticsCategories: [],
                         lastKnownPosition: fillable.pos,
-                        priorityScalar: 50,
+                        priorityScalar: priorityScalar,
                         disableLimitedGrab: true,
                         serviceRoute: {
                             pathLength: dist,
@@ -66,7 +79,7 @@ export class RoomSpawnSystem {
         if (room) {
             let readySpawns: StructureSpawn[] = findStructure(room, FIND_MY_SPAWNS)
                 .map(s => s as StructureSpawn)
-                .filter(s => !s.spawning);
+                .filter(s => !s.spawning && s.isActive());
             let readyToSpawn: CreepConfig[] = Object.values(_getConfigs(this.roomName))
                 .reduce((acc, val) => acc.concat(val), [])
                 .filter(c => _configShouldBeSpawned(c) && _haveSufficientCapacity(room, c));
@@ -106,7 +119,7 @@ export class RoomSpawnSystem {
                                 `Failed to spawn creep with status: ${result} roomName:${this.roomName} spawnId: ${spawn.id} handle:${next.handle}`
                             );
                         }
-                    } else if (result == ERR_NOT_ENOUGH_ENERGY) {
+                    } else if (result == ERR_NOT_ENOUGH_ENERGY || result == ERR_RCL_NOT_ENOUGH) {
                         //not worried in this case. This will happen fairly often and isn't a problem
                     } else {
                         Log.e(

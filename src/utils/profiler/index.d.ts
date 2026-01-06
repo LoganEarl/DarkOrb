@@ -1,9 +1,14 @@
 interface Profiler {
     clear(): void;
+
     output(): void;
+
     start(): void;
+
     status(): void;
+
     stop(): void;
+
     toString(): string;
 }
 

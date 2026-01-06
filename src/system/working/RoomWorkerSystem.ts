@@ -1,5 +1,4 @@
-import { getNode } from "system/hauling/HaulerInterface";
-import { getRallyPosition } from "system/scouting/ScoutInterface";
+import { getRoomData } from "system/scouting/ScoutInterface";
 import {
     getCreeps,
     maximizeBodyForTargetParts,
@@ -7,57 +6,78 @@ import {
     unregisterHandle
 } from "system/spawning/SpawnInterface";
 import {
-    ANALYTICS_ALL,
     ANALYTICS_ARTIFICER,
     ANALYTICS_GOSS_INCOME,
-    ANALYTICS_SPAWNING
+    ANALYTICS_SPAWNING,
+    ANALYTICS_PRIEST
 } from "system/storage/AnalyticsConstants";
 import { getEnergyPerTick, getMainStorage } from "system/storage/StorageInterface";
-import { Log } from "utils/logger/Logger";
-import { MemoryComponent, updateMemory } from "utils/MemoryWriter";
-import { Traveler } from "utils/traveler/Traveler";
-import { drawBar } from "utils/UtilityFunctions";
-import {
-    _constructionPriorities,
-    _maintainencePriorities,
-    _runCreep,
-    _sortDetails,
-    _upgraderPriorities
-} from "./WorkerLogic";
-import { deleteWorkDetail, getWorkDetails } from "./WorkInterface";
+import { getWorkDetails } from "./WorkerInterface";
+import { workerLogic } from "./WorkerLogic";
+import { findStructure } from "../../utils/StructureFindCache";
+import { drawBar, roomPos } from "../../utils/UtilityFunctions";
+import { unpackPos } from "../../utils/Packrat";
+import { getNode, registerNode } from "../hauling/HaulerInterface";
+import { Traveler } from "../../utils/traveler/Traveler";
 
-export class RoomWorkSystem implements MemoryComponent {
-    private memory?: RoomWorkMemory;
+//Building takes 5x energy per work part. Given that, if there is a lot of building to do we need to scale back our work body parts
+//Otherwise we will crash our eco by overdrawing
+const CONSTRUCTION_PROGRESS_REQUIRED_FOR_REDUCED_WORK = 5000
 
+//If we go above this amount, we will double our worker output. Below, and we will halve it to save E. Below emergency, and we will 
+//reduce to barely anything. 1 e per category
+const DOUBLE_EXPENDATURE_ENERGY_THRESHOLD = 100000
+const HALF_EXPENDATURE_ENERGY_THRESHOLD = 50000
+const EMERGENCY_ENERGY_THRESHOLD = 5000
+
+export class RoomWorkSystem {
     public roomName: string;
+    //Creep name to work detail id
+    private creepAssignments: Map<string, string> = new Map();
     private targetWorkParts: number = 0;
-
-    private creepAssignments: { [creepName: string]: string } = {};
+    private targetUpgradeParts: number = 0;
+    private currentUpgradeParts: number = 0;
 
     constructor(roomName: string) {
         this.roomName = roomName;
     }
 
-    private get handle() {
+    private get upgradeHandle() {
+        return `Upgrade: ${this.roomName}`;
+    }
+
+    private get workHandle() {
         return `Work: ${this.roomName}`;
+    }
+
+    private get eRepairHandle() {
+        return `ERepair: ${this.roomName}`;
     }
 
     _visualize() {
         if (Game.rooms[this.roomName]) {
             Object.values(getWorkDetails(this.roomName)).forEach(detail => {
-                new RoomVisual(detail.destPosition.roomName).rect(
-                    detail.destPosition.x - 0.5,
-                    detail.destPosition.y - 0.5,
-                    1,
-                    1,
-                    {
-                        fill: "transparent",
-                        stroke: "yellow"
-                    }
-                );
+                let priorityColors: { [priority: string]: string } = {
+                    "Low": "blue",
+                    "Normal": "green",
+                    "Elevated": "yellow",
+                    "Critical": "red"
+                }
+                Object.values(detail.targets).forEach(target => {
+                    let destPosition = unpackPos(target.packedPosition)
+                    new RoomVisual(destPosition.roomName).rect(
+                        destPosition.x - 0.5,
+                        destPosition.y - 0.5,
+                        1,
+                        1,
+                        {
+                            fill: "transparent",
+                            stroke: priorityColors[detail.priority]
+                        }
+                    );
+                })
             });
-
-            let numWork = _.sum(getCreeps(this.handle), c => _.sum(c.body, p => (p.type === WORK ? 1 : 0)));
+            let numWork = _.sum(getCreeps(this.workHandle), c => _.sum(c.body, p => (p.type === WORK ? 1 : 0)));
             drawBar(
                 `WorkerParts: ${numWork}/${this.targetWorkParts}`,
                 2,
@@ -68,170 +88,219 @@ export class RoomWorkSystem implements MemoryComponent {
     }
 
     _runCreeps() {
-        this.loadMemory();
-        let focus = this.memory!.focus;
         let details: { [id: string]: WorkDetail } = getWorkDetails(this.roomName);
-        let creeps = getCreeps(this.handle);
-        let first = true;
-        for (let creep of creeps) {
-            let assignment: WorkDetail | undefined = this.creepAssignments[creep.name]
-                ? details[this.creepAssignments[creep.name]]
+
+        this.runCreepPool("Upgraders", this.upgradeHandle, details);
+        this.runCreepPool("Workers", this.workHandle, details);
+        this.runCreepPool("EmergencyRepairers", this.eRepairHandle, details);
+        this.updateUpgraderContainerNode();
+    }
+
+    private runCreepPool(pool: WorkerPool, handle: string, workDetails: {
+        [id: string]: WorkDetail
+    }) {
+        let workers = getCreeps(handle);
+        for (let creep of workers) {
+            let assignment: WorkDetail | undefined = this.creepAssignments.get(creep.name)
+                ? workDetails[this.creepAssignments.get(creep.name)!]
                 : undefined;
-            if (!assignment) {
-                let sorted = _sortDetails(creep, Object.values(details));
-                //The first creep is in charge of keeping things running smoothly before the focused task
-                if (first) {
-                    assignment =
-                        _maintainencePriorities(sorted) ??
-                        (focus === "Construction" ? _constructionPriorities(sorted) : undefined) ??
-                        (focus === "Upgrade" ? _upgraderPriorities(sorted) : undefined);
-                } else {
-                    assignment =
-                        (focus === "Construction" ? _constructionPriorities(sorted) : undefined) ??
-                        (focus === "Upgrade" ? _upgraderPriorities(sorted) : undefined) ??
-                        _maintainencePriorities(sorted);
-                }
-
-                if (assignment) this.creepAssignments[creep.name] = assignment.detailId;
-            }
-
+            if (!assignment) assignment = workerLogic._assignWorkDetail(creep, pool, workDetails, this.creepAssignments);
             if (assignment) {
-                let results = _runCreep(creep, assignment, this.roomName, this.handle, [this.handle]);
-                if (results) {
-                    delete this.creepAssignments[creep.name];
-                    deleteWorkDetail(this.roomName, assignment.detailId);
+                this.creepAssignments.set(creep.name, assignment.detailId);
+                let finished = workerLogic._runCreep(creep, assignment, this.roomName, handle, [], getRoomData(creep.pos.roomName)!)
+                if (finished) {
+                    this.creepAssignments.delete(creep.name);
                 }
-            } else {
-                let rally = getRallyPosition(this.roomName);
-                if (rally) Traveler.travelTo(creep, rally);
-                creep.sayWaiting();
+            }
+        }
+    }
+
+    private updateUpgraderContainerNode() {
+        let mapData = getRoomData(this.roomName);
+        if (mapData?.roomPlan?.upgradeContainerPos) {
+            let containerPos = roomPos(mapData!.roomPlan!.upgradeContainerPos!, this.roomName);
+            let upgradeContainer = findStructure(Game.rooms[this.roomName], FIND_STRUCTURES)
+                .find(s => s instanceof StructureContainer &&
+                    s.pos.getRangeTo(containerPos) === 0) as StructureContainer | undefined
+            if (upgradeContainer) {
+                let existingNode = getNode(this.roomName, "UpgradeContainer")
+                //The mod thing makes sure we re-measure the path cost every once in a while
+                if (existingNode && Game.time % 150 != 43) {
+                    existingNode.level = upgradeContainer.store.getUsedCapacity(RESOURCE_ENERGY)
+                    existingNode.baseDrdt = this.targetUpgradeParts * UPGRADE_CONTROLLER_POWER
+                } else {
+                    let pathCost = 40;
+                    let pathLength = 20;
+                    let storage = getMainStorage(this.roomName)
+                    if (storage) {
+                        let pathInfo = Traveler.findTravelPath(storage, Game.rooms[this.roomName].controller!, {
+                            plainCost: 2,
+                            range: 1,
+                            ignoreRoads: false,
+                            ignoreStructures: false
+                        });
+                        pathCost = pathInfo.cost;
+                        pathLength = pathInfo.path.length
+                    }
+
+                    registerNode(this.roomName, this.upgradeHandle, {
+                        analyticsCategories: [],
+                        baseDrdt: this.targetUpgradeParts * UPGRADE_CONTROLLER_POWER,
+                        lastKnownPosition: upgradeContainer.pos,
+                        level: upgradeContainer.store.getUsedCapacity(RESOURCE_ENERGY),
+                        maxLevel: upgradeContainer.store.getCapacity(RESOURCE_ENERGY),
+                        nodeId: "UpgradeContainer",
+                        resource: RESOURCE_ENERGY,
+                        serviceRoute: { pathCost: pathCost, pathLength: pathLength },
+                        targetId: upgradeContainer.id,
+                        type: "Sink"
+                    })
+                }
             }
 
-            first = false;
         }
-    }
-
-    set focus(focus: WorkFocus) {
-        this.loadMemory();
-        if (this.memory!.focus !== focus) {
-            //Remove prev assignemnts when we change focus
-            this.creepAssignments = {};
-            this.memory!.focus = focus;
-            this.memory!.lastFocusUpdate = Game.time;
-            updateMemory(this);
-        }
-    }
-
-    get focus(): WorkFocus {
-        this.loadMemory();
-        return this.memory!.focus;
-    }
-
-    get lastFocusUpdate() {
-        this.loadMemory();
-        return this.memory!.lastFocusUpdate;
     }
 
     _reloadConfigs() {
-        this.loadMemory();
         let details = Object.values(getWorkDetails(this.roomName));
-        let focus = this.memory!.focus;
+        //There are several types of worker pool. We need to figure out how much
+        // e/t to devote to each
 
-        if (details.length > 0) {
-            let configs: CreepConfig[] = [];
-
-            //Net energy not counting workers
-            let availableEnergy =
-                getEnergyPerTick(this.roomName, ANALYTICS_GOSS_INCOME) +
-                getEnergyPerTick(this.roomName, ANALYTICS_SPAWNING) -
-                getEnergyPerTick(this.roomName, ANALYTICS_ARTIFICER);
-
-            let storage = getMainStorage(this.roomName);
-            if (
-                storage &&
-                storage instanceof StructureStorage &&
-                storage.store.getUsedCapacity(RESOURCE_ENERGY) > 50000
-            ) {
-                availableEnergy *= 2;
-            }
-
-            // Log.d(`Available energy: ${availableEnergy}`);
-            //If we are netting low, only make a single dude to maintain things
-            if (availableEnergy < 0 || focus === "None") {
-                this.targetWorkParts = 1;
-                configs = [
+        if (details.length === 0) {
+            //If there aren't any details just keep a single upgrader around
+            registerCreepConfig(
+                this.upgradeHandle,
+                [
                     {
-                        handle: this.handle,
-                        subHandle: "Artificer",
+                        handle: this.upgradeHandle,
+                        subHandle: "Priest",
                         body: [WORK, CARRY, CARRY, CARRY, MOVE],
-                        jobName: "Artificer",
+                        jobName: "Priest",
                         quantity: 1
                     }
-                ];
-            } else {
-                let bodies: BodyPartConstant[][] = [];
-                //These creeps are easier on the hauling system. Build them instead for RCL1
-                if (Game.rooms[this.roomName].controller!.level === 1) {
-                    this.targetWorkParts = Math.ceil(availableEnergy / UPGRADE_CONTROLLER_POWER);
-                    bodies = maximizeBodyForTargetParts(
-                        [WORK, CARRY, CARRY, CARRY, MOVE],
-                        [WORK, CARRY, MOVE],
-                        WORK,
-                        this.targetWorkParts,
-                        Game.rooms[this.roomName]!.energyCapacityAvailable
-                    );
-                } else if (focus === "Construction") {
-                    //Each part is 5 e/t.
-                    this.targetWorkParts = Math.ceil(availableEnergy / BUILD_POWER);
-                    bodies = maximizeBodyForTargetParts(
-                        [WORK, CARRY, CARRY, CARRY, MOVE],
-                        [WORK, CARRY, MOVE],
-                        WORK,
-                        this.targetWorkParts,
-                        Game.rooms[this.roomName]!.energyCapacityAvailable
-                    );
-                } else if (focus === "Upgrade") {
-                    this.targetWorkParts = Math.ceil(availableEnergy / UPGRADE_CONTROLLER_POWER);
-                    bodies = maximizeBodyForTargetParts(
-                        [WORK, WORK, CARRY, MOVE],
-                        [WORK, WORK, CARRY, MOVE],
-                        WORK,
-                        this.targetWorkParts,
-                        Game.rooms[this.roomName]!.energyCapacityAvailable
-                    );
-                }
+                ],
+                this.roomName
+            );
+            return;
+        }
 
-                configs = [];
-                for (let i = 0; i < bodies.length; i++) {
-                    configs.push({
-                        handle: this.handle,
-                        subHandle: "Artificer:" + i,
-                        body: bodies[i],
-                        jobName: "Artificer",
-                        quantity: 1
-                    });
-                }
+        //TODO this is closeish. Will become increasingly wrong as we add new systems that spend energy that aren't work though...
+        let availableEnergy =
+            getEnergyPerTick(this.roomName, ANALYTICS_GOSS_INCOME) +
+            getEnergyPerTick(this.roomName, ANALYTICS_SPAWNING) -
+            getEnergyPerTick(this.roomName, ANALYTICS_ARTIFICER) -
+            getEnergyPerTick(this.roomName, ANALYTICS_PRIEST);
+
+        //TODO temporary measure to burn off excesses. Needs to get replaced with a larger room control and budgeting system eventually
+        let storage = getMainStorage(this.roomName);
+        let haveHighCapacityStorage = (storage?.store.getCapacity(RESOURCE_ENERGY) ?? 0) > 10000
+        if (haveHighCapacityStorage) {
+            let highCapacity = (storage?.store.getUsedCapacity(RESOURCE_ENERGY) ?? 0) > DOUBLE_EXPENDATURE_ENERGY_THRESHOLD
+            let lowCapacity = (storage?.store.getUsedCapacity(RESOURCE_ENERGY) ?? 0) < HALF_EXPENDATURE_ENERGY_THRESHOLD
+            let emergencyLow = (storage?.store.getUsedCapacity(RESOURCE_ENERGY) ?? 0) < EMERGENCY_ENERGY_THRESHOLD
+            if (highCapacity) {
+                availableEnergy *= 2;
+            } else if (lowCapacity) {
+                availableEnergy *= 0.5;
+            } else if (emergencyLow) {
+                availableEnergy = 2
             }
-            registerCreepConfig(this.handle, configs, this.roomName);
+        }
+
+        let energyBudgetPerWorkerPool: Map<WorkerPool, number> = new Map();
+        let maxUpgraders = 0;
+        for (let detail of details) {
+            //First just signal that this pool is needed
+            energyBudgetPerWorkerPool.set(detail.primaryPool, 1);
+            if (detail.primaryPool === "Upgraders") {
+                maxUpgraders += detail.maxCreeps;
+            }
+        }
+        //TODO this is super crude. Eventually we will want more granular control over energy distribution per rcl
+        //Next scale each pool to match the desired ratio (for now, just even distribution)
+        let numActivePools = energyBudgetPerWorkerPool.size;
+        if (energyBudgetPerWorkerPool.get("EmergencyRepairers")) {
+            //0 out the other categories
+            for (let pool of energyBudgetPerWorkerPool.keys()) energyBudgetPerWorkerPool.set(pool, 0);
+            //Give repair all we got
+            let eRepairEnergy = availableEnergy * 2; //For a total of x4 in emergencies
+            energyBudgetPerWorkerPool.set("EmergencyRepairers", eRepairEnergy);
         } else {
-            unregisterHandle(this.handle);
+            //Split the energy amongst the pools
+            for (let pool of energyBudgetPerWorkerPool.keys()) {
+                //Minimum of 1e/t
+                let energy = Math.max(Math.floor(availableEnergy / numActivePools), 1);
+                energyBudgetPerWorkerPool.set(pool, energy);
+            }
         }
-    }
 
-    loadMemory(): void {
-        if (!this.memory) {
-            if (!Memory.roomWorkMemory) Memory.roomWorkMemory = {};
+        //If we need workers, queue them up
+        let workEnergy = energyBudgetPerWorkerPool.get("Workers");
+        if (workEnergy) {
+            let constructionSites = Game.rooms[this.roomName]
+                ?.find(FIND_CONSTRUCTION_SITES)
+            let remainingConstructionProgress = (constructionSites && constructionSites.length > 0) ?
+                constructionSites.map(site => site.progressTotal - site.progress)
+                    .reduceRight((prev, cur) => prev + cur) : 0
+            let spentEnergyPerWorkPart = remainingConstructionProgress > CONSTRUCTION_PROGRESS_REQUIRED_FOR_REDUCED_WORK ? BUILD_POWER : 1
+            let baseTemplate = [WORK, CARRY, CARRY, MOVE, MOVE];
+            let spawnEnergyPerWorkPart = baseTemplate.map(part => BODYPART_COST[part]).reduceRight((a, b) => a + b)
+            //Factor in the recurring cost of keeping them spawned. This isn't perfectly accurate due to prespawning, but close enough
+            let spawnEnergyPerWorkPerTick = spawnEnergyPerWorkPart / 1500
 
-            this.memory = Memory.roomWorkMemory[this.roomName] ?? {
-                focus: "None",
-                lastFocusUpdate: Game.time
-            };
+            this.targetWorkParts = Math.ceil((workEnergy - spawnEnergyPerWorkPerTick) / spentEnergyPerWorkPart);
+            let bodies = maximizeBodyForTargetParts(
+                baseTemplate,
+                baseTemplate,
+                WORK,
+                this.targetWorkParts,
+                Game.rooms[this.roomName]!.energyCapacityAvailable
+            );
+            let configs: CreepConfig[] = [];
+            for (let i = 0; i < bodies.length; i++) {
+                configs.push({
+                    handle: this.workHandle,
+                    subHandle: "Artificer:" + i,
+                    body: bodies[i],
+                    jobName: "Artificer",
+                    quantity: 1
+                });
+            }
+            registerCreepConfig(this.workHandle, configs, this.roomName);
+        } else {
+            unregisterHandle(this.workHandle);
         }
-    }
 
-    saveMemory(): void {
-        if (this.memory) {
-            Memory.roomWorkMemory![this.roomName] = this.memory;
+        let upgradeEnergy = energyBudgetPerWorkerPool.get("Upgraders");
+        this.currentUpgradeParts = _.sum(getCreeps(this.workHandle), c => _.sum(c.body, p => (p.type === WORK ? 1 : 0)));
+        if (upgradeEnergy) {
+            let repeatingTemplate = [WORK, WORK, MOVE];
+            let roughSpawnEnergyPerWork = repeatingTemplate.map(part => BODYPART_COST[part]).reduceRight((a, b) => a + b)
+            let roughSpawnEnergyPerWorkPerTick = roughSpawnEnergyPerWork / 1500
+            this.targetUpgradeParts = Math.ceil((upgradeEnergy - roughSpawnEnergyPerWorkPerTick) / UPGRADE_CONTROLLER_POWER);
+            let bodies = maximizeBodyForTargetParts(
+                [WORK, WORK, CARRY, MOVE],
+                repeatingTemplate,
+                WORK,
+                this.targetUpgradeParts,
+                Game.rooms[this.roomName].energyAvailable
+            );
+            let configs: CreepConfig[] = [];
+            for (let i = 0; i < bodies.length && i < maxUpgraders; i++) {
+                configs.push({
+                    handle: this.upgradeHandle,
+                    subHandle: "Priest:" + i,
+                    body: bodies[i],
+                    jobName: "Priest",
+                    quantity: 1,
+                    dontPrespawnParts: true //We do this because there is limited space available.
+                });
+            }
+            registerCreepConfig(this.upgradeHandle, configs, this.roomName);
+        } else {
+            unregisterHandle(this.upgradeHandle);
         }
+
+        //TODO emergency builders would go here. Need to figure out boosts before I mess with that...
     }
 }

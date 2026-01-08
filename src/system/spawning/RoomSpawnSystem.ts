@@ -89,6 +89,8 @@ export class RoomSpawnSystem {
 
                 for (let spawn of readySpawns) {
                     readyToSpawn.sort(_priorityComparator);
+                    if (readyToSpawn.length === 0) continue
+
                     let next = readyToSpawn[0];
                     let result = spawn.spawnCreep(next.body, "SPAWN_TEST:" + Math.random(), { dryRun: true });
                     if (result == OK) {
@@ -103,8 +105,7 @@ export class RoomSpawnSystem {
                         if (result == OK) {
                             //Remove the spawned creep from the list of ready ones if there is more than one spawn
                             if (readySpawns.length > 1) {
-                                let i = readyToSpawn.indexOf(next);
-                                if (i > -1) readyToSpawn.splice(i, 1);
+                                readyToSpawn.shift()
                             }
                             postAnalyticsEvent(
                                 this.roomName,

@@ -1,7 +1,7 @@
-import {_creepManifest} from "./CreepManifest";
+import { _creepManifest } from "./CreepManifest";
 
 const PART_ORDER: BodyPartConstant[] = [TOUGH, WORK, CARRY, ATTACK, RANGED_ATTACK, CLAIM, HEAL, MOVE];
-const DEFAULT_SORTER: BodySorter = function (a: BodyPartConstant, b: BodyPartConstant): number {
+const DEFAULT_SORTER: BodySorter = function(a: BodyPartConstant, b: BodyPartConstant): number {
     return PART_ORDER.indexOf(a) - PART_ORDER.indexOf(b);
 };
 
@@ -19,9 +19,9 @@ const defaultPriorities = [
 
 export const _priorityComparator = (a: CreepConfig, b: CreepConfig) => {
     let aPriority = defaultPriorities.indexOf(a.jobName);
-    if(aPriority === -1) aPriority = 9999999
+    if (aPriority === -1) aPriority = 9999999
     let bPriority = defaultPriorities.indexOf(b.jobName) ?? 9999999;
-    if(bPriority === -1) bPriority = 9999999
+    if (bPriority === -1) bPriority = 9999999
     if (aPriority === bPriority) {
         aPriority = a.subPriority ?? 9999999;
         bPriority = b.subPriority ?? 9999999;
@@ -67,7 +67,7 @@ export function _maximizeBodyForTargetParts(
             bodyEnergyCost + repeatingCost <= maxCapacity &&
             currentBody.length + repeatingBody.length <= 50 &&
             usedParts < targetNumber
-            ) {
+        ) {
             currentBody = currentBody.concat(repeatingBody);
             bodyEnergyCost += repeatingCost;
             usedParts += repeatingBodyPartUsage;
@@ -104,20 +104,20 @@ export function _maximizeBody(
 }
 
 export function _bodyCost(body: BodyPartConstant[]) {
-    return body.reduce(function (cost, part) {
+    return body.reduce(function(cost, part) {
         return cost + BODYPART_COST[part];
     }, 0);
 }
 
 export function _configShouldBeSpawned(config: CreepConfig): boolean {
     let currentPopulation = _creepManifest
-        ._getCreeps(config.handle, config.subHandle)
+        ._getCreepSpawned(config.handle, config.subHandle)
         .filter(c => !_isReadyForPrespawn(c, config)).length;
     return currentPopulation < config.quantity;
 }
 
 export function _isReadyForPrespawn(creep: Creep, config: CreepConfig): boolean {
-    let partPrespawn = config.dontPrespawnParts ? 0 : config.body.length * 3;
+    let partPrespawn = config.dontPrespawnParts ? 0 : config.body.length * CREEP_SPAWN_TIME;
     let totalPrespawn = partPrespawn + (config.additionalPrespawntime ?? 0);
     let ticksUntilPrespawn = (creep.ticksToLive ?? CREEP_LIFE_TIME) - totalPrespawn;
     return ticksUntilPrespawn <= 0;

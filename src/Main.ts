@@ -4,7 +4,7 @@ import { sayAll } from "prototypes/Creep";
 import "./prototypes/RoomPosition";
 import "./prototypes/Structures";
 import "./prototypes/Creep";
-import { hasRespawned } from "utils/UtilityFunctions";
+import { hasRespawned, exponentialMovingAverage } from "utils/UtilityFunctions";
 import { setFeature, toggleFeature } from "utils/featureToggles/FeatureToggles";
 import { updateAllMemory } from "utils/MemoryWriter";
 import { Log } from "utils/logger/Logger";
@@ -30,7 +30,7 @@ Log.i(`Global refresh detected, recreating process table`);
 global.PLAYER_USERNAME = Game.spawns[Object.keys(Game.spawns)[0]].owner.username;
 global.INVADER_USERNAME = "Invader";
 global.KEEPER_USERNAME = "Source Keeper";
-global.__PROFILER_ENABLED__ = true;
+global.__PROFILER_ENABLED__ = false;
 
 function resetForRespawn() {
     //Clear out memory from old spawn
@@ -47,6 +47,8 @@ function resetForRespawn() {
     //Reset systems
     resetAllSystems();
 }
+
+var cpu = -1;
 
 function init() {
     if (!Memory.rooms) Memory.rooms = {};
@@ -123,7 +125,11 @@ export const loop = memhack(() => {
             }
         }
 
-        //Log.d(`Used ${Game.cpu.getUsed()} cpu this tick`)
+        if (cpu === -1) cpu = Game.cpu.getUsed()
+        else {
+            cpu = exponentialMovingAverage(Game.cpu.getUsed(), cpu, 100)
+        }
+        if (Game.time % 100 === 0) Log.d(`Using ${cpu} cpu on average. Bucket:${Game.cpu.bucket}`)
     } catch (e) {
         Log.e("Uncaught error detected", e);
     }

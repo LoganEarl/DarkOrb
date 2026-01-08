@@ -1,12 +1,13 @@
 //Persists a mapping of unique identifiers to creep names.
 //Also keeps track of process id's and associates creep names to it so you can find all
 
-import {MemoryComponent, updateMemory} from "utils/MemoryWriter";
-import {Log} from "utils/logger/Logger";
-import {FIRST_NAMES} from "./creepNames/FirstNames";
-import {LAST_NAMES} from "./creepNames/LastNames";
-import {registerResetFunction} from "utils/SystemResetter";
-import {profile} from "../../utils/profiler/Profiler";
+import { MemoryComponent, updateMemory } from "utils/MemoryWriter";
+import { Log } from "utils/logger/Logger";
+import { FIRST_NAMES } from "./creepNames/FirstNames";
+import { LAST_NAMES } from "./creepNames/LastNames";
+import { registerResetFunction } from "utils/SystemResetter";
+import { profile } from "../../utils/profiler/Profiler";
+import { _getConfigs } from "./SpawnInterface";
 
 @profile
 class CreepManifest implements MemoryComponent {
@@ -19,6 +20,10 @@ class CreepManifest implements MemoryComponent {
     //Get all living creeps under the handle
     //TODO need some sort of name-based caching
     _getCreeps(handle: string, subHandle?: string): Creep[] {
+        return this._getCreepSpawned(handle, subHandle).filter(c => !c.spawning) ?? []
+    }
+
+    _getCreepSpawned(handle: string, subHandle?: string): Creep[] {
         this.loadMemory();
 
         let byHandle = this.memory!.creepNamesByHandle[handle] ?? {};
@@ -32,7 +37,7 @@ class CreepManifest implements MemoryComponent {
                 updateMemory(this);
             }
 
-            return (byHandle[subHandle] ?? []).map(name => Game.creeps[name]).filter(c => c && !c.spawning) ?? [];
+            return (byHandle[subHandle] ?? []).map(name => Game.creeps[name]).filter(c => !!c) ?? [];
         } else {
             //Detect any that died during the query phase=
             let deadCreepNames = Object.values(byHandle)
@@ -49,7 +54,7 @@ class CreepManifest implements MemoryComponent {
                 Object.values(byHandle)
                     .reduce((acc, val) => acc.concat(val), [])
                     .map(name => Game.creeps[name])
-                    .filter(c => c && !c.spawning) ?? []
+                    .filter(c => !!c) ?? []
             );
         }
     }
@@ -86,7 +91,7 @@ class CreepManifest implements MemoryComponent {
             }
             maxIterations--;
         } while (nextIndex != this.memory.previousNameIndex && maxIterations > 0);
-        if(maxIterations === 0)
+        if (maxIterations === 0)
             Log.e("You need to tune the name generator's LRG, it isn't traversing everything")
         else
             Log.e("Failed to find the next creep name! They were all taken!");
@@ -107,7 +112,7 @@ export let _creepManifest: CreepManifest = new CreepManifest();
 registerResetFunction(() => (_creepManifest = new CreepManifest()));
 
 /*
-For when I invariably forget why this works and check this comment. 
+For when I invariably forget why this works and check this comment.
 Pretend the letter combos are names and double check it
 fnames = 2
 lnames = 6

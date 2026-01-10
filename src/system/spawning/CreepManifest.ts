@@ -7,56 +7,96 @@ import { FIRST_NAMES } from "./creepNames/FirstNames";
 import { LAST_NAMES } from "./creepNames/LastNames";
 import { registerResetFunction } from "utils/SystemResetter";
 import { profile } from "../../utils/profiler/Profiler";
-import { _getConfigs } from "./SpawnInterface";
 
 @profile
 class CreepManifest implements MemoryComponent {
     private memory?: ManifestMemory;
 
+    private creepCacheByHandle: { [handle: string]: Creep[] } = {};
+    private creepCacheBySubHandle: { [handle: string]: { [subHandle: string]: Creep[] } } = {};
+    private lastCacheTick = 0;
+
     saveMemory(): void {
         if (this.memory) Memory.manifestMemory = this.memory;
     }
 
-    //Get all living creeps under the handle
-    //TODO need some sort of name-based caching
+    primeCache(): void {
+        if (Game.time === this.lastCacheTick) {
+            return; // Already primed for this tick
+        }
+
+        this.loadMemory(); // Load the name manifest from Memory
+        this.creepCacheByHandle = {};
+        this.creepCacheBySubHandle = {};
+        this.lastCacheTick = Game.time;
+
+        const allKnownCreepNames: { [name: string]: { handle: string; subHandle: string } } = {};
+        // Invert the memory structure for faster lookups
+        for (const handle in this.memory!.creepNamesByHandle) {
+            for (const subHandle in this.memory!.creepNamesByHandle[handle]) {
+                for (const creepName of this.memory!.creepNamesByHandle[handle][subHandle]) {
+                    allKnownCreepNames[creepName] = { handle, subHandle };
+                }
+            }
+        }
+
+        const liveCreepNames: Set<string> = new Set();
+
+        // Single loop through all living creeps
+        for (const creepName in Game.creeps) {
+            liveCreepNames.add(creepName);
+            const creep = Game.creeps[creepName];
+            const identity = allKnownCreepNames[creepName];
+
+            if (identity) {
+                const { handle, subHandle } = identity;
+
+                // Populate cache by handle
+                if (!this.creepCacheByHandle[handle]) {
+                    this.creepCacheByHandle[handle] = [];
+                }
+                this.creepCacheByHandle[handle].push(creep);
+
+                // Populate cache by sub-handle
+                if (!this.creepCacheBySubHandle[handle]) {
+                    this.creepCacheBySubHandle[handle] = {};
+                }
+                if (!this.creepCacheBySubHandle[handle][subHandle]) {
+                    this.creepCacheBySubHandle[handle][subHandle] = [];
+                }
+                this.creepCacheBySubHandle[handle][subHandle].push(creep);
+            }
+        }
+
+        // Now, clean up the memory structure based on dead creeps
+        let memoryDirty = false;
+        for (const handle in this.memory!.creepNamesByHandle) {
+            for (const subHandle in this.memory!.creepNamesByHandle[handle]) {
+                const originalCount = this.memory!.creepNamesByHandle[handle][subHandle].length;
+                this.memory!.creepNamesByHandle[handle][subHandle] = this.memory!.creepNamesByHandle[handle][
+                    subHandle
+                ].filter(name => liveCreepNames.has(name));
+                if (this.memory!.creepNamesByHandle[handle][subHandle].length !== originalCount) {
+                    memoryDirty = true;
+                }
+            }
+        }
+
+        if (memoryDirty) {
+            updateMemory(this);
+        }
+    }
+
     _getCreeps(handle: string, subHandle?: string): Creep[] {
-        return this._getCreepSpawned(handle, subHandle).filter(c => !c.spawning) ?? []
+        let spawned = this._getCreepSpawned(handle, subHandle);
+        return spawned.filter(c => !c.spawning) ?? [];
     }
 
     _getCreepSpawned(handle: string, subHandle?: string): Creep[] {
-        this.loadMemory();
-
-        let byHandle = this.memory!.creepNamesByHandle[handle] ?? {};
-
         if (subHandle) {
-            //Detect any that died during the query phase=
-            let deadCreepNames = (byHandle[subHandle] ?? []).filter(name => !Game.creeps[name]);
-            if (deadCreepNames.length > 0) {
-                // Log.d("Clearing memory for creeps with names: " + JSON.stringify(deadCreepNames));
-                byHandle[subHandle] = byHandle[subHandle].filter(name => Game.creeps[name]);
-                updateMemory(this);
-            }
-
-            return (byHandle[subHandle] ?? []).map(name => Game.creeps[name]).filter(c => !!c) ?? [];
-        } else {
-            //Detect any that died during the query phase=
-            let deadCreepNames = Object.values(byHandle)
-                .reduce((acc, val) => acc.concat(val), [])
-                .filter(name => !Game.creeps[name]);
-            if (deadCreepNames.length > 0) {
-                // Log.d("Clearing memory for creeps with names: " + JSON.stringify(deadCreepNames));
-                for (let subHandle of Object.keys(byHandle))
-                    byHandle[subHandle] = byHandle[subHandle].filter(name => Game.creeps[name]);
-                updateMemory(this);
-            }
-
-            return (
-                Object.values(byHandle)
-                    .reduce((acc, val) => acc.concat(val), [])
-                    .map(name => Game.creeps[name])
-                    .filter(c => !!c) ?? []
-            );
+            return this.creepCacheBySubHandle[handle]?.[subHandle] ?? [];
         }
+        return this.creepCacheByHandle[handle] ?? [];
     }
 
     //Linear congruential generator to traverse name space. Hits each name once before looping (in theory)
@@ -92,9 +132,8 @@ class CreepManifest implements MemoryComponent {
             maxIterations--;
         } while (nextIndex != this.memory.previousNameIndex && maxIterations > 0);
         if (maxIterations === 0)
-            Log.e("You need to tune the name generator's LRG, it isn't traversing everything")
-        else
-            Log.e("Failed to find the next creep name! They were all taken!");
+            Log.e("You need to tune the name generator's LRG, it isn't traversing everything");
+        else Log.e("Failed to find the next creep name! They were all taken!");
         return `${_.random(0, 10000000)} <${jobName}>`;
     }
 

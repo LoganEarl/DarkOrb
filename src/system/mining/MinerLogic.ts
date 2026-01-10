@@ -203,7 +203,16 @@ class MinerLogic {
 
     _addStructuresIfMissing(assignment: MinerAssignment) {
         if (Game.rooms[assignment.placeToStand.roomName]) {
-            if (!assignment.depositLink && !assignment.depositContainer && !assignment.constructionProject) {
+            const containerInvalid = assignment.depositContainer && !Game.getObjectById(assignment.depositContainer);
+            const linkInvalid = assignment.depositLink && !Game.getObjectById(assignment.depositLink);
+            const csiteInvalid = assignment.constructionProject && !Game.getObjectById(assignment.constructionProject);
+
+            if (
+                (!assignment.depositLink && !assignment.depositContainer && !assignment.constructionProject) ||
+                containerInvalid ||
+                linkInvalid ||
+                csiteInvalid
+            ) {
                 const structures = assignment.placeToStand.findInRange(FIND_STRUCTURES, 1);
                 const sites = assignment.placeToStand.findInRange(FIND_CONSTRUCTION_SITES, 1);
                 const links: StructureLink[] = structures
@@ -221,15 +230,23 @@ class MinerLogic {
     }
 
     _runSourceMiner(
-        creep: Creep, parentRoomName: string, handle: string, assignment: MinerAssignment, primaryMiner: boolean
+        creep: Creep,
+        parentRoomName: string,
+        handle: string,
+        assignment: MinerAssignment,
+        primaryMiner: boolean
     ): MinerCurrentBehavior {
+        if (primaryMiner) {
+            this._addStructuresIfMissing(assignment);
+        }
+
         if (!samePos(creep.pos, assignment.placeToStand)) {
             Traveler.travelTo(creep, assignment.placeToStand);
             return "Traveling";
         }
 
         Traveler.reservePosition(creep.pos);
-        var behaviour: MinerCurrentBehavior = "Mining"
+        var behaviour: MinerCurrentBehavior = "Mining";
 
         //Place csite for container if we can
         if (
@@ -297,7 +314,7 @@ class MinerLogic {
             postAnalyticsEvent(parentRoomName, creep.getBodyPower(WORK, "harvest", HARVEST_POWER), handle);
             creep.harvest(source);
         } else if (behaviour === "Mining") {
-            behaviour = "Waiting"
+            behaviour = "Waiting";
         }
         return behaviour;
     }

@@ -204,8 +204,12 @@ export class SourceMinerSystem implements MemoryComponent {
         let creeps = getCreeps(this.handle);
 
         //Saves running this function on mining jobs that never get run
-        if (creeps.length === 0 && this.memory!.state !== "Active" && Game.time % 50 !== 26) return
+        if (creeps.length === 0 && this.memory!.state !== "Active" && Game.time % 50 !== 26) return;
 
+        const room = Game.rooms[this.roomName];
+        if (room) {
+            scoutRoom(room);
+        }
         let roomData = getRoomData(this.roomName);
         if ((roomData?.hazardInfo?.numCombatants ?? 0) > 0) this.addStopReason("Attacked");
         else this.clearStopReason("Attacked");
@@ -218,10 +222,12 @@ export class SourceMinerSystem implements MemoryComponent {
                 });
 
                 for (let creep of creeps) {
-                    scoutRoom(creep.room);
-
-                    let threats = (getRoomData(creep.room.name)?.hazardInfo?.numCombatants ?? 0) > 0;
-                    if (threats) this.addStopReason("Attacked");
+                    //Only scout and check threats if the creep is outside the main room
+                    if (creep.room.name !== this.roomName) {
+                        scoutRoom(creep.room);
+                        let threats = (getRoomData(creep.room.name)?.hazardInfo?.numCombatants ?? 0) > 0;
+                        if (threats) this.addStopReason("Attacked");
+                    }
 
                     if (this.miningStandSpaces.length < creeps.length && creep.memory.jobName === "Primordial") {
                         creep.suicide();
@@ -229,7 +235,7 @@ export class SourceMinerSystem implements MemoryComponent {
                     } else {
                         if (!this.creepAssignments[creep.name]) {
                             //Old creeps lose their place
-                            let healthyCreepCount = creeps.filter(c => (c?.ticksToLive ?? 0) > 150).length
+                            let healthyCreepCount = creeps.filter(c => (c?.ticksToLive ?? 0) > 150).length;
                             let populationSize = Math.max(
                                 _.sum(this.configs, c => c.quantity),
                                 healthyCreepCount
@@ -246,7 +252,6 @@ export class SourceMinerSystem implements MemoryComponent {
                         let assignment = this.creepAssignments[creep.name];
                         let primary = samePos(this.miningStandSpaces[0], assignment.placeToStand);
                         if (this.isSource) {
-                            minerLogic._addStructuresIfMissing(assignment);
                             //TODO we need to properly register when we are repairing our container. When we are, we shouldn't say our node is filling up
                             let state = minerLogic._runSourceMiner(creep, this.parentRoomName, this.handle, assignment, primary);
                             this.updateSourceLogisticsNodes(creep, assignment, state);
@@ -256,9 +261,9 @@ export class SourceMinerSystem implements MemoryComponent {
                     }
                 }
             } else {
-                postAnalyticsEvent(this.parentRoomName, 0, this.handle)
+                postAnalyticsEvent(this.parentRoomName, 0, this.handle);
                 for (let creep of creeps) {
-                    creep.randomSwear(8)
+                    creep.randomSwear(8);
                     let packedRally = getRoomData(this.parentRoomName)?.pathingInfo?.packedRallyPos;
                     if (packedRally !== undefined) Traveler.travelTo(creep, unpackPos(packedRally));
                 }
@@ -266,9 +271,9 @@ export class SourceMinerSystem implements MemoryComponent {
         } else {
             //Set the drdt to 0 when we don't have any creeps
             getNodesByProvider(this.parentRoomName, this.handle).forEach(node => {
-                node.baseDrdt = 0
-            })
-            postAnalyticsEvent(this.parentRoomName, 0, this.handle)
+                node.baseDrdt = 0;
+            });
+            postAnalyticsEvent(this.parentRoomName, 0, this.handle);
         }
     }
 

@@ -1,7 +1,8 @@
-import {Process} from "core/Process";
-import {profile} from "utils/profiler/Profiler";
-import {ScheduledJob} from "utils/ScheduledJob";
-import {_shardSpawnSystem} from "./ShardSpawnSystem";
+import { Process } from "core/Process";
+import { profile } from "utils/profiler/Profiler";
+import { ScheduledJob } from "utils/ScheduledJob";
+import { _creepManifest } from "./CreepManifest";
+import { _shardSpawnSystem } from "./ShardSpawnSystem";
 
 //Responsible for triggering spawning code. Single process for the whole empire
 @profile
@@ -18,6 +19,10 @@ export class SpawnProcess extends Process {
     constructor() {
         super("SpawnProcess", 0);
         _shardSpawnSystem._scanSpawnSystems();
+    }
+
+    preRun(): void {
+        _creepManifest.primeCache();
     }
 
     private first = true;

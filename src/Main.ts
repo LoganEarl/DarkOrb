@@ -19,6 +19,7 @@ import { WorkerProcess } from "system/working/WorkerProcess";
 
 import "./utils/visual/RoomVisual.js";
 import { PlannerProcess as PlannerProcess } from "system/planning/PlannerProcess";
+import { showPlannedRooms } from "system/scouting/ScoutInterface";
 import { memhack } from "utils/memHack/Memhack";
 import { MilitaryProcess } from "./system/military/MilitaryProcess";
 import { defend } from "QuickAndDirtyTowers";
@@ -72,6 +73,7 @@ function init() {
     global.setFeature = setFeature;
     global.toggleFeature = toggleFeature;
     global.spawnQueues = printSpawnQueues;
+    global.showPlannedRooms = showPlannedRooms;
 
     global.Profiler = Profiler.init();
 }

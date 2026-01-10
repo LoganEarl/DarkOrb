@@ -2,6 +2,7 @@ import { MemoryComponent, updateMemory } from "utils/MemoryWriter";
 import { unpackPos } from "utils/Packrat";
 import { registerResetFunction } from "utils/SystemResetter";
 import { _canBeUpdated, _scoutRoom } from "./ScoutLogic";
+import { Log } from "../../utils/logger/Logger";
 
 export const MAX_SCOUT_DEPTH = 15;
 
@@ -61,4 +62,25 @@ export function getRallyPosition(roomName: string): RoomPosition | undefined {
     let rawRally = getRoomData(roomName)?.pathingInfo?.packedRallyPos;
     if (rawRally) return unpackPos(rawRally);
     return undefined;
+}
+
+
+export function showPlannedRooms(): void {
+    const allRooms = Object.values(getShardData());
+    const plannedRooms = allRooms.filter(r => r.roomPlan && !r.roomPlan.wasPruned);
+
+    if (plannedRooms.length === 0) {
+        Log.i("No active room plans found.");
+        return;
+    }
+
+    let output = "Active Room Plans:\n";
+    plannedRooms.sort((a, b) => (b.roomPlan?.score ?? 0) - (a.roomPlan?.score ?? 0));
+
+    for (const roomData of plannedRooms) {
+        const score = roomData.roomPlan?.score?.toFixed(2) ?? "N/A";
+        output += `  - ${roomData.roomName}: Score ${score}\n`;
+    }
+
+    Log.i(output);
 }

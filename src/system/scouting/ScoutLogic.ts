@@ -1,16 +1,16 @@
-import {planRoom} from "system/planning/PlannerInterface";
-import {distanceTransformDiag} from "utils/algorithms/DistanceTransform";
-import {floodFill} from "utils/algorithms/FloodFill";
-import {Log} from "utils/logger/Logger";
-import {packPos, packPosList} from "utils/Packrat";
-import {ROOMTYPE_CONTROLLER, Traveler} from "utils/traveler/Traveler";
+import { planRoom } from "system/planning/PlannerInterface";
+import { distanceTransformDiag } from "utils/algorithms/DistanceTransform";
+import { floodFill } from "utils/algorithms/FloodFill";
+import { Log } from "utils/logger/Logger";
+import { packPos, packPosList } from "utils/Packrat";
+import { ROOMTYPE_CONTROLLER, Traveler } from "utils/traveler/Traveler";
 import {
     getFreeSpacesNextTo,
     getMultirooomDistance,
     manhattanDistance,
     roomNameFromCoord
 } from "utils/UtilityFunctions";
-import {min} from "lodash";
+import { min } from "lodash";
 
 const MINING_DATA_MIN_TTL = 100;
 const MINING_DATA_MAX_TTL = 5000;
@@ -173,7 +173,7 @@ function evaluateOwnership(room: Room): [RoomThreatInfo | undefined, RoomOwnersh
 
         let minTtl = THREAT_DATA_MIN_TTL;
         let maxTtl = THREAT_DATA_MAX_TTL;
-        if(ownershipInfo?.username === global.PLAYER_USERNAME) {
+        if (ownershipInfo?.username === global.PLAYER_USERNAME) {
             minTtl = THREAT_DATA_MIN_TTL_OWNED_ROOM;
             maxTtl = THREAT_DATA_MAX_TTL_OWNED_ROOM;
         }
@@ -283,7 +283,7 @@ function findRallyPoint(room: Room): RoomPosition | undefined {
     //Find the max value in the resulting matrix, it is now the rally point! Tiebreak with favoring
     // distance to the center of the room
     let highest: number = -1;
-    let highestCoord: Coord = {x: 0, y: 0};
+    let highestCoord: Coord = { x: 0, y: 0 };
     for (let y = 0; y <= 49; y++) {
         for (let x = 0; x <= 49; x++) {
             if (matrix.get(x, y) > 0 && matrix.get(x, y) >= highest) {
@@ -346,7 +346,7 @@ function evaluateRoomDepth(
 ): RoomTerritoryInfo {
     if (ownership?.username === global.PLAYER_USERNAME && ownership?.ownershipType === "Claimed") {
         return {
-            claims: [{roomName: searchRoomName, range: 0}],
+            claims: [{ roomName: searchRoomName, range: 0 }],
             lastUpdate: Game.time,
             minNextUpdate: Game.time + TERRITORY_DATA_MIN_TTL,
             maxNextUpdate: Game.time + TERRITORY_DATA_MAX_TTL
@@ -557,7 +557,7 @@ export function runScout(scout: Creep, roomToExplore: string, shardMap: ShardMap
     //Head to the targeted controller
     else if (positionLock) {
         scout.queueSay("🖊️🎯");
-        Traveler.travelTo(scout, positionLock[0], {offRoad: true});
+        Traveler.travelTo(scout, positionLock[0], { offRoad: true });
     }
     //If we are in the room we need to explore
     else if (scout.pos.roomName === roomToExplore && roomNeedsScouting) {

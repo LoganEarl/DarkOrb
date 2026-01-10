@@ -27,6 +27,7 @@ declare global {
             setFeature: (feature: string, enabled: boolean) => void;
             toggleFeature: (feature: string) => boolean;
             spawnQueues: () => void;
+            showPlannedRooms: () => void;
         }
     }
 }

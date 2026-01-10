@@ -1,11 +1,11 @@
-import {MemoryComponent, updateMemory} from "utils/MemoryWriter";
-import {Log} from "utils/logger/Logger";
-import {assignRoomToScout, getRoomsToExplore, runScout} from "./ScoutLogic";
-import {registerResetFunction} from "utils/SystemResetter";
-import {getCreeps, registerCreepConfig, unregisterHandle} from "system/spawning/SpawnInterface";
-import {unpackPos} from "utils/Packrat";
-import {hslToHex} from "utils/UtilityFunctions";
-import {getRoomData, getShardData, MAX_SCOUT_DEPTH, saveMapData} from "./ScoutInterface";
+import { MemoryComponent, updateMemory } from "utils/MemoryWriter";
+import { Log } from "utils/logger/Logger";
+import { assignRoomToScout, getRoomsToExplore, runScout } from "./ScoutLogic";
+import { registerResetFunction } from "utils/SystemResetter";
+import { getCreeps, registerCreepConfig, unregisterHandle } from "system/spawning/SpawnInterface";
+import { unpackPos } from "utils/Packrat";
+import { hslToHex } from "utils/UtilityFunctions";
+import { getRoomData, getShardData, MAX_SCOUT_DEPTH, saveMapData } from "./ScoutInterface";
 
 const SCOUTS_PER_CLUSTER = 3;
 
@@ -89,19 +89,43 @@ class ShardScoutSystem implements MemoryComponent {
         for (let i = 0; i < clusters.length; i++) {
             let clusterColor = hslToHex((i / clusters.length) * 360, 100, 50);
             for (let roomName of clusters[i]) {
-                let pathingInfo = getRoomData(roomName)?.pathingInfo;
+                const roomData = getRoomData(roomName);
+                const pathingInfo = roomData?.pathingInfo;
+
                 if (pathingInfo?.packedRallyPos) {
-                    let pos = unpackPos(pathingInfo.packedRallyPos);
+                    const pos = unpackPos(pathingInfo.packedRallyPos);
+
+                    // --- Plan Status Visualization ---
+                    let planStatusColor = "#808080"; // Grey for no plan
+                    const MAX_RADIUS = 4;
+                    const MIN_RADIUS = 1.5;
+                    let radius = MIN_RADIUS;
+
+                    if (roomData?.roomPlan) {
+                        if (roomData.roomPlan.wasPruned) {
+                            planStatusColor = "#ff0000"; // Red for pruned
+                        } else {
+                            planStatusColor = "#00ff00"; // Green for active
+                        }
+                        const score = roomData.roomPlan.score ?? 0;
+                        radius = MIN_RADIUS + (score / 100) * (MAX_RADIUS - MIN_RADIUS);
+                    }
+
+                    // Draw circle with plan status as fill, cluster color as stroke
                     Game.map.visual.circle(pos, {
-                        radius: 1.5,
+                        radius: radius,
                         stroke: clusterColor,
-                        fill: clusterColor
+                        strokeWidth: 0.2,
+                        fill: planStatusColor,
+                        opacity: 0.6
                     });
+
+                    // Draw lines to indicate cluster connections
                     pathingInfo.pathableExits
-                        .map(roomName => getRoomData(roomName)?.pathingInfo?.packedRallyPos)
+                        .map(exitRoomName => getRoomData(exitRoomName)?.pathingInfo?.packedRallyPos)
                         .filter(p => p)
                         .map(p => unpackPos(p!))
-                        .forEach(p => Game.map.visual.line(pos, p, {color: clusterColor}));
+                        .forEach(p => Game.map.visual.line(pos, p, { color: clusterColor }));
                 }
             }
         }

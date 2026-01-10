@@ -15,6 +15,7 @@ interface PlacedStructureGroup {
 
 interface PlannedRoom {
     score: number; //0-100, where 100 is a perfect score and a 0 is a hard no
+    wasPruned?: boolean;
     storageCore?: PlacedStructureGroup;
     fastFiller?: PlacedStructureGroup;
     extensionPods?: PlacedStructureGroup[];

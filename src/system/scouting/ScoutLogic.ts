@@ -402,13 +402,23 @@ export function _scoutRoom(
         ownership = ownershipValues[1];
     }
 
-    let exitsToRooms: string[] =
-        oldRoomData?.exitsToRooms ??
-        _.unique(Object.values(Game.map.describeExits(room.name)))
-            .filter(v => v)
-            .map(v => v!) ??
-        [];
+    let exitsToRooms: string[];
+    if (oldRoomData?.exitsToRooms) {
+        exitsToRooms = oldRoomData.exitsToRooms;
+    } else {
+        const describedExits = Game.map.describeExits(room.name);
+        exitsToRooms = describedExits ? _.unique(Object.values(describedExits).filter((v): v is string => !!v)) : [];
+    }
     let pathingInfo = getIfCurrent(oldRoomData?.pathingInfo) ?? evaluatePathing(room, exitsToRooms);
+    if (!pathingInfo) {
+        pathingInfo = {
+            packedRallyPos: undefined,
+            pathableExits: [],
+            lastUpdate: Game.time,
+            minNextUpdate: Game.time + PATH_DATA_MIN_TTL,
+            maxNextUpdate: Game.time + PATH_DATA_MAX_TTL
+        };
+    }
     // Log.i(`ownership: ${JSON.stringify(ownership)} username: ${global.PLAYER_USERNAME}`);
     let territoryInfo =
         getIfCurrent(oldRoomData?.territoryInfo) ??
@@ -435,7 +445,7 @@ export function _scoutRoom(
 
 function getIfCurrent<T extends TTLData>(data: T | undefined): T | undefined {
     if (!data) return undefined;
-    if (isPastMinTTL(data)) return data;
+    if (!isPastMinTTL(data)) return data;
     return undefined;
 }
 
@@ -468,9 +478,11 @@ function shouldSendScout(roomName: string, data: RoomScoutingInfo, alreadyAssign
 
     let outdated = outdatedPathing || outdatedHazard || outdatadMining || outdatedOwnership;
 
-    // Log.d(
-    //     `Checking if room ${roomName} needs to get scouted. outdatedPathing:${outdatedPathing} outdatedHazard:${outdatedHazard} outdatadMining:${outdatadMining} outdatadMining:${outdatadMining}`
-    // );
+    if (outdated && roomName === "W3N0") {
+        Log.d(
+            `Checking if room ${roomName} needs to get scouted. outdatedPathing:${outdatedPathing} outdatedHazard:${outdatedHazard} outdatadMining:${outdatadMining} outdatadMining:${outdatadMining}`
+        );
+    }
     return outdated;
 }
 
@@ -561,7 +573,7 @@ export function runScout(scout: Creep, roomToExplore: string, shardMap: ShardMap
     }
     //If we are in the room we need to explore
     else if (scout.pos.roomName === roomToExplore && roomNeedsScouting) {
-        let roomData = _scoutRoom(scout.room, shardMap, maxTerritoryRange);
+        let roomData = _scoutRoom(scout.room, shardMap, maxTerritoryRange, shardMap[scout.room.name]);
         //If it is a controller room, work on signing the controller if it isn't already done
         scout.queueSay("👁️✅");
         done = true;

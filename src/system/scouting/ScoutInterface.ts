@@ -41,6 +41,12 @@ export function scoutRoom(room: Room): void {
     }
 }
 
+export function clearRoomPlan(roomName: string) {
+    memory.loadMemory();
+    memory.shardMap![roomName].roomPlan = undefined;
+    updateMemory(memory);
+}
+
 export function getRoomData(roomName: string): RoomScoutingInfo | undefined {
     memory.loadMemory();
     // Log.d(`Returning room data ${JSON.stringify(memory.shardMap![roomName])}`);

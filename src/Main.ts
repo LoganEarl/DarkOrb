@@ -19,10 +19,11 @@ import { WorkerProcess } from "system/working/WorkerProcess";
 
 import "./utils/visual/RoomVisual.js";
 import { PlannerProcess as PlannerProcess } from "system/planning/PlannerProcess";
-import { showPlannedRooms } from "system/scouting/ScoutInterface";
+import { showPlannedRooms, clearRoomPlan, getRoomData } from "system/scouting/ScoutInterface";
 import { memhack } from "utils/memHack/Memhack";
 import { MilitaryProcess } from "./system/military/MilitaryProcess";
 import { defend } from "QuickAndDirtyTowers";
+import { planRoom } from "system/planning/PlannerInterface";
 
 let deferedInit = false;
 let globalRefresh = true;
@@ -74,6 +75,20 @@ function init() {
     global.toggleFeature = toggleFeature;
     global.spawnQueues = printSpawnQueues;
     global.showPlannedRooms = showPlannedRooms;
+    global.replanRoom = (roomName: string) => {
+        const room = Game.rooms[roomName]
+        if (!room) {
+            Log.e(`Cannot replan room ${roomName} without vision`);
+            return;
+        }
+        const roomData = getRoomData(roomName);
+        if (!roomData) {
+            Log.e(`Cannot manually plan room ${roomName} as we have not scouted it before`);
+            return;
+        }
+        clearRoomPlan(roomName);
+        planRoom(room, roomData);
+    }
 
     global.Profiler = Profiler.init();
 }

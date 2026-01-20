@@ -1,4 +1,4 @@
-import {FEATURE_VISUALIZE_ALL} from "./FeatureToggleConstants";
+import { FEATURE_VISUALIZE_ALL } from "./FeatureToggleConstants";
 
 var featureCache: { [feature: string]: boolean } = {};
 

@@ -1,11 +1,11 @@
-import {floodFill} from "utils/algorithms/FloodFill";
-import {LagoonDetector} from "utils/algorithms/LagoonFlow";
-import {getCutTiles, Rectangle} from "utils/algorithms/MinCut";
-import {FEATURE_VISUALIZE_PLANNING} from "utils/featureToggles/FeatureToggleConstants";
-import {shouldVisualize} from "utils/featureToggles/FeatureToggles";
-import {Log} from "utils/logger/Logger";
-import {unpackCoordList, unpackPos} from "utils/Packrat";
-import {PriorityQueue, PriorityQueueItem} from "utils/PriorityQueue";
+import { floodFill } from "utils/algorithms/FloodFill";
+import { LagoonDetector } from "utils/algorithms/LagoonFlow";
+import { getCutTiles, Rectangle } from "utils/algorithms/MinCut";
+import { FEATURE_VISUALIZE_PLANNING } from "utils/featureToggles/FeatureToggleConstants";
+import { shouldVisualize } from "utils/featureToggles/FeatureToggles";
+import { Log } from "utils/logger/Logger";
+import { unpackCoordList, unpackPos, unpackPosList } from "utils/Packrat";
+import { PriorityQueue, PriorityQueueItem } from "utils/PriorityQueue";
 import {
     clamp,
     clone2DArray,
@@ -16,15 +16,17 @@ import {
     roomPos,
     rotateMatrix
 } from "utils/UtilityFunctions";
-import {EXTENSION_GROUP} from "./stamp/ExtensionPod";
-import {FAST_FILLER_GROUP, FAST_FILLER_SPAWN_COORDS} from "./stamp/FastFiller";
-import {deepCopyGroups, rotateGroup} from "./stamp/StampLogic";
-import {STORAGE_CORE_GROUP} from "./stamp/StorageCore";
-import {distanceTransformDiag} from "../../utils/algorithms/DistanceTransform";
+import { EXTENSION_GROUP } from "./stamp/ExtensionPod";
+import { FAST_FILLER_GROUP, FAST_FILLER_SPAWN_COORDS } from "./stamp/FastFiller";
+import { deepCopyGroups, rotateGroup } from "./stamp/StampLogic";
+import { STORAGE_CORE_GROUP } from "./stamp/StorageCore";
+import { distanceTransformDiag } from "../../utils/algorithms/DistanceTransform";
+import { Traveler } from "utils/traveler/Traveler";
 
 type PlanningState =
     | "New"
     | "ReservingSpaces"
+    | "PlacingMiningLinks"
     | "PlacingFillerUsingSpawn" //We do this when we just spawned and we want to build the filler around the spawn
     | "RunningLagoonFlow"
     | "PlacingCore"
@@ -35,6 +37,7 @@ type PlanningState =
     | "PlacingWalls"
     | "PlacingTowers"
     | "Failed"
+    | "Viewing"
     | "Done";
 
 interface ScoredCoord extends Coord, PriorityQueueItem {
@@ -45,6 +48,7 @@ interface ScoredCoord extends Coord, PriorityQueueItem {
 const MIN_EDGE_DISTANCE = 5;
 const LAGOON_FLOW_ITERATIONS_PER_TICK = 5;
 const ROWS_SCANNED_PER_TICK = 4;
+var doneOnTick: Number | undefined
 
 export class RoomPlanner implements PriorityQueueItem {
     public queueIndex: number = 0; //Ignore this
@@ -77,6 +81,7 @@ export class RoomPlanner implements PriorityQueueItem {
     private placedFastFiller: PlacedStructureGroup | undefined;
     private placedStorageCore: PlacedStructureGroup | undefined;
     private placedExtensionPods: PlacedStructureGroup[] | undefined;
+    private placedMinerLinks: PlacedStructureGroup[] | undefined;
     private placedRoads: Coord[] | undefined;
     private placedWalls: Coord[] | undefined;
     private placedTowers: Coord[] | undefined;
@@ -94,7 +99,10 @@ export class RoomPlanner implements PriorityQueueItem {
 
         let spawns = room.find(FIND_MY_SPAWNS);
         if (spawns.length === 1) this.spawnPos = spawns[0].pos;
-        else if (spawns.length > 1) this.fail("Room too advanced for replanning");
+        //Go with the one with the lowest alphanumeric name... Not the best but itl do
+        else if (spawns.length > 1) this.spawnPos = spawns.reduce((prev, cur) => {
+            return (prev.name < cur.name) ? prev : cur
+        })?.pos ?? spawns[0].pos;
     }
 
     public continuePlanning(): PlannedRoom | undefined {
@@ -102,6 +110,9 @@ export class RoomPlanner implements PriorityQueueItem {
             Log.i(`Started roomplanning in ${this.roomName}`);
             this.loadTerrainData();
             this.reserveSpaces();
+            this.planningState = "PlacingMiningLinks";
+        } else if (this.planningState === "PlacingMiningLinks") {
+            this.placeMiningLinks();
             if (this.spawnPos) this.planningState = "PlacingFillerUsingSpawn";
             else this.planningState = "RunningLagoonFlow";
         } else if (this.planningState === "PlacingFillerUsingSpawn") {
@@ -135,12 +146,15 @@ export class RoomPlanner implements PriorityQueueItem {
             this.planningState = "PlacingTowers";
         } else if (this.planningState === "PlacingTowers") {
             this.placeTowers();
-            this.planningState = "Done";
-        } else if (this.planningState === "Done") {
+            this.planningState = "Viewing";
+        } else if (this.planningState === "Viewing") {
+            if (doneOnTick === undefined) doneOnTick = Game.time + 50
+            else if (doneOnTick < Game.time) this.planningState = "Done";
             if (shouldVisualize(FEATURE_VISUALIZE_PLANNING)) {
                 let visual = new RoomVisual(this.roomName);
                 this.placedWalls!.forEach(pos => visual.structure(pos.x, pos.y, STRUCTURE_RAMPART, {}));
                 this.placedExtensionPods!.forEach(p => drawPlacedStructureGroup(visual, p));
+                this.placedMinerLinks!.forEach(p => drawPlacedStructureGroup(visual, p));
                 drawPlacedStructureGroup(visual, this.placedStorageCore);
                 drawPlacedStructureGroup(visual, this.placedFastFiller);
                 for (let roadPos of this.placedRoads!) visual.structure(roadPos.x, roadPos.y, STRUCTURE_ROAD, {});
@@ -148,7 +162,7 @@ export class RoomPlanner implements PriorityQueueItem {
             }
         }
 
-        new RoomVisual(this.roomName).text(this.planningState, 1, 1, {align: "left"});
+        new RoomVisual(this.roomName).text(this.planningState, 1, 1, { align: "left" });
 
         if (this.planningState === "Done") {
             return {
@@ -160,10 +174,11 @@ export class RoomPlanner implements PriorityQueueItem {
                 towerPositions: this.placedTowers,
                 wallPositions: this.placedWalls,
                 upgraderPositions: this.upgraderPositions,
-                upgradeContainerPos: this.placedUpgradeContainer
+                upgradeContainerPos: this.placedUpgradeContainer,
+                minerLinks: this.placedMinerLinks,
             };
         } else if (this.planningState === "Failed") {
-            return {score: 0};
+            return { score: 0 };
         } else return undefined;
     }
 
@@ -232,7 +247,7 @@ export class RoomPlanner implements PriorityQueueItem {
                     p => this.terrain.get(p.x, p.y) !== TERRAIN_MASK_WALL
                 );
                 //Slightly makes areas away from walls preferable. Helps with pathing
-                let score = neighboors.length + dtDiag.get(pos.x, pos.y)/50.0;
+                let score = neighboors.length + dtDiag.get(pos.x, pos.y) / 50.0;
 
                 if (score > maxScore) {
                     maxIndex = i;
@@ -260,13 +275,115 @@ export class RoomPlanner implements PriorityQueueItem {
         return true;
     }
 
+    private placeMiningLinks(): boolean {
+        if (!this.pathMatrix) return this.fail("Unable to process without pathing matrix");
+        let sources: SourceInfo[] = this.roomData.miningInfo?.sources ?? []
+        let linkPositions: RoomPosition[] = []
+
+        //We always mine out of source position 0, so try to place links in an unoccupied spot around that
+        for (let sourceInfo of sources) {
+            let pos = unpackPosList(sourceInfo.packedFreeSpots)[0]
+            let roomCallback: (forbiddenPosition: Coord) => boolean | CostMatrix = (forbiddenPosition) => {
+                if (!this.pathMatrix) return false;
+                let tempMatrix = this.pathMatrix!.clone()
+                tempMatrix.set(forbiddenPosition.x, forbiddenPosition.y, 255)
+                return tempMatrix;
+            };
+            let reachablePosition = unpackPos(this.roomData.pathingInfo?.packedRallyPos!)
+            let positions = findPositionsInsideRect(pos.x - 1, pos.y - 1, pos.x + 1, pos.y + 1)
+                .filter(
+                    p => this.terrain.get(p.x, p.y) !== TERRAIN_MASK_WALL
+                )
+                //Can't be ontop of the miner pos
+                .filter(
+                    p => p.x !== pos.x || p.y !== pos.y
+                )
+                //Filter out room positions that block access to the controller
+                .filter(
+                    p => !PathFinder.search(pos, reachablePosition, {
+                        roomCallback: (_) => roomCallback(p),
+                    }).incomplete
+                );
+
+            if (shouldVisualize(FEATURE_VISUALIZE_PLANNING)) {
+                let visual = new RoomVisual(this.roomName);
+                for (let pos of positions) {
+                    visual.structure(pos.x, pos.y, STRUCTURE_LINK, {});
+                }
+            }
+
+            if (positions.length > 0) {
+                linkPositions.push(roomPos(positions[0], this.roomName))
+            }
+        }
+
+        for (let pos of linkPositions) {
+            this.pathMatrix.set(pos.x, pos.y, 255)
+            this.forbiddenMatrix!.set(pos.x, pos.y, 255)
+        }
+
+        this.placedMinerLinks = []
+        if (linkPositions.length > 0) {
+            this.placedMinerLinks.push({
+                dx: linkPositions[0].x,
+                dy: linkPositions[0].y,
+                group: [
+                    { rcl: 0, buildings: [] },
+                    { rcl: 1, buildings: [] },
+                    { rcl: 2, buildings: [] },
+                    { rcl: 3, buildings: [] },
+                    { rcl: 4, buildings: [] },
+                    { rcl: 5, buildings: [] },
+                    {
+                        rcl: 6,
+                        buildings: [[[STRUCTURE_LINK]]]
+                    },
+                    {
+                        rcl: 7,
+                        buildings: [[[STRUCTURE_LINK]]]
+                    },
+                    {
+                        rcl: 8,
+                        buildings: [[[STRUCTURE_LINK]]]
+                    }
+                ]
+            })
+        }
+        if (linkPositions.length > 1) {
+            //Place one less. RCL6 only has 3 links, we can build one for each source starting at 7
+            this.placedMinerLinks.push({
+                dx: linkPositions[1].x,
+                dy: linkPositions[1].y,
+                group: [
+                    { rcl: 0, buildings: [] },
+                    { rcl: 1, buildings: [] },
+                    { rcl: 2, buildings: [] },
+                    { rcl: 3, buildings: [] },
+                    { rcl: 4, buildings: [] },
+                    { rcl: 5, buildings: [] },
+                    { rcl: 6, buildings: [] },
+                    {
+                        rcl: 7,
+                        buildings: [[[STRUCTURE_LINK]]]
+                    },
+                    {
+                        rcl: 8,
+                        buildings: [[[STRUCTURE_LINK]]]
+                    }
+                ]
+            })
+        }
+
+        return true;
+    }
+
     private placeFillerUsingSpawn() {
         if (this.spawnPos) {
             //We don't rotate the fast filler ever. Makes spawning fillers annoying
             let buildings = FAST_FILLER_GROUP[8].buildings;
             let stampX = this.spawnPos.x - FAST_FILLER_SPAWN_COORDS[0].x;
             let stampY = this.spawnPos.y - FAST_FILLER_SPAWN_COORDS[0].y;
-            if (!this.place({x: stampX, y: stampY}, buildings)) this.fail("Bad spawn position");
+            if (!this.place({ x: stampX, y: stampY }, buildings)) this.fail("Bad spawn position");
             else {
                 this.placedFastFiller = {
                     dx: stampX,
@@ -346,7 +463,7 @@ export class RoomPlanner implements PriorityQueueItem {
             for (let rotations = 0; rotations < 4 && !placedPos; rotations++) {
                 let offset = this.placeCentered(pos, toPlace);
                 if (offset !== false) {
-                    placedPos = {x: pos.x - offset, y: pos.y - offset};
+                    placedPos = { x: pos.x - offset, y: pos.y - offset };
                     placedRotation = rotations as 0 | 1 | 2 | 3;
                 } else rotateMatrix(toPlace);
             }
@@ -397,8 +514,8 @@ export class RoomPlanner implements PriorityQueueItem {
                 if (this.pathMatrix.get(x, y) !== 255 && this.forbiddenMatrix.get(x, y) === 0) {
                     let path = PathFinder.search(
                         new RoomPosition(x, y, this.roomName),
-                        {pos: this.storagePos, range: 1},
-                        {roomCallback: callback}
+                        { pos: this.storagePos, range: 1 },
+                        { roomCallback: callback }
                     );
 
                     //Slightly prefer it when they are closer in euclidian terms. Serves as a tiebreaker
@@ -406,7 +523,7 @@ export class RoomPlanner implements PriorityQueueItem {
                     let score = path.cost + clamp(euclidian / 100, 0, 0.9);
 
                     if (!path.incomplete) {
-                        let coord: ScoredCoord = {x: x, y: y, score: score, queueIndex: 0};
+                        let coord: ScoredCoord = { x: x, y: y, score: score, queueIndex: 0 };
                         this.scoredCoords = insertSorted(coord, this.scoredCoords, this.scoredCoordComparator);
                     }
                 }
@@ -446,7 +563,7 @@ export class RoomPlanner implements PriorityQueueItem {
             for (let rotations = 0; rotations < 4 && !placedPos; rotations++) {
                 let offset = this.placeCentered(pos, toPlace);
                 if (offset !== false) {
-                    placedPos = {x: pos.x - offset, y: pos.y - offset};
+                    placedPos = { x: pos.x - offset, y: pos.y - offset };
                     placedRotation = rotations as 0 | 1 | 2 | 3;
                 } else rotateMatrix(toPlace);
             }
@@ -529,6 +646,7 @@ export class RoomPlanner implements PriorityQueueItem {
         if (!this.roomData.miningInfo || !this.roomData.pathingInfo)
             return this.fail("Cannot load mining paths without a storage position");
         if (!this.placedUpgradeContainer) return this.fail("Cannot place roads without an upgrader position");
+        if (!this.pathMatrix) return this.fail("Cannot place roads without a path matrix created");
 
         let pathingTargets: RoomPosition[] = [];
         //Add the fast filler station
@@ -560,7 +678,7 @@ export class RoomPlanner implements PriorityQueueItem {
             let path = PathFinder.search(this.storagePos!, {
                 pos: target,
                 range: 1
-            }, {roomCallback: callback});
+            }, { roomCallback: callback });
             for (let pos of path.path) {
                 if (this.pathMatrix?.get(pos.x, pos.y) !== 1) {
                     this.pathMatrix?.set(pos.x, pos.y, 1);
@@ -581,10 +699,11 @@ export class RoomPlanner implements PriorityQueueItem {
             this.placedExtensionPods!.forEach(p => drawPlacedStructureGroup(visual, p));
             drawPlacedStructureGroup(visual, this.placedStorageCore);
             drawPlacedStructureGroup(visual, this.placedFastFiller);
+            drawPathMatrix(visual, this.pathMatrix!);
             for (let roadPos of this.placedRoads) visual.structure(roadPos.x, roadPos.y, STRUCTURE_ROAD, {});
             visual.structure(this.placedUpgradeContainer!.x, this.placedUpgradeContainer!.y, STRUCTURE_CONTAINER, {});
             for (let upgradePos of this.upgraderPositions!)
-                visual.circle(upgradePos.x, upgradePos.y, {radius: 0.5, fill: "blue"});
+                visual.circle(upgradePos.x, upgradePos.y, { radius: 0.5, fill: "blue" });
             visual.connectRoads();
         }
 
@@ -621,7 +740,7 @@ export class RoomPlanner implements PriorityQueueItem {
             for (let y = 0; y < buildings.length; y++) {
                 for (let x = 0; x < buildings[y].length; x++) {
                     if (buildings[y][x].includes(STRUCTURE_EXTENSION)) {
-                        ePodPositions.push({x: x + pod.dx, y: y + pod.dy});
+                        ePodPositions.push({ x: x + pod.dx, y: y + pod.dy });
                     }
                 }
             }
@@ -670,7 +789,7 @@ export class RoomPlanner implements PriorityQueueItem {
 
         if (shouldVisualize(FEATURE_VISUALIZE_PLANNING)) {
             let visual = new RoomVisual(this.roomName);
-            visual.circle(avgX, avgY, {radius: 1, fill: "red"});
+            visual.circle(avgX, avgY, { radius: 1, fill: "red" });
 
             this.placedWalls!.forEach(pos => visual.structure(pos.x, pos.y, STRUCTURE_RAMPART, {}));
             this.placedExtensionPods!.forEach(p => drawPlacedStructureGroup(visual, p));
@@ -679,7 +798,7 @@ export class RoomPlanner implements PriorityQueueItem {
             for (let roadPos of this.placedRoads!) visual.structure(roadPos.x, roadPos.y, STRUCTURE_ROAD, {});
 
             fillCoords(visual, ePodPositions);
-            this.placedTowers.forEach(p => visual.circle(p.x, p.y, {radius: 0.5, fill: "green"}));
+            this.placedTowers.forEach(p => visual.circle(p.x, p.y, { radius: 0.5, fill: "green" }));
 
             visual.connectRoads();
         }
@@ -702,7 +821,7 @@ export class RoomPlanner implements PriorityQueueItem {
     // that can be subtracted from the center coord to result in the stamp being centered
     private placeCentered(center: Coord, group: BuildableStructureConstant[][][]): number | false {
         let offset = Math.floor(group.length / 2); //square matrix remember?
-        let upperLeft: Coord = {x: center.x - offset, y: center.y - offset};
+        let upperLeft: Coord = { x: center.x - offset, y: center.y - offset };
         if (this.place(upperLeft, group)) return offset;
         return false;
     }

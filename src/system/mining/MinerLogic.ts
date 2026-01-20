@@ -175,17 +175,27 @@ class MinerLogic {
             mineId: mineId
         };
 
-        // Get a list of spots that are already assigned to other creeps
-        const assignedSpots = Object.values(existingAssignments).map(a => packPos(a.placeToStand));
+        if (populationSize > 1) {
+            let usedSpaces = _.min([populationSize, possibleSpaces.length]);
+            let occupiedCount: number[] = new Array<number>(usedSpaces);
+            let assignedSpaces = Object.values(existingAssignments);
+            //Find how many times each possible space was used, and pick the space which is assigned the least times
+            let minIndex = 0;
+            let min = 999;
+            for (let i = 0; i < usedSpaces; i++) {
+                occupiedCount[i] = _.sum(assignedSpaces, assignment =>
+                    samePos(possibleSpaces[i], assignment.placeToStand) ? 1 : 0
+                );
+                if (occupiedCount[i] < min) {
+                    min = occupiedCount[i];
+                    minIndex = i;
+                }
+            }
+        }
 
-        // Find the first possible space that isn't already in the assigned list
-        const unassignedSpace = possibleSpaces.find(p => !assignedSpots.includes(packPos(p)));
-
-        // Assign the unassigned space if we found one, otherwise default to the first space in the list
-        // (for cases like pre-spawning where we want creeps to stack up and wait)
-        assignment.placeToStand = unassignedSpace ?? possibleSpaces[0];
-
-        this._addStructuresIfMissing(assignment);
+        if (assignment.placeToStand === possibleSpaces[0]) {
+            this._addStructuresIfMissing(assignment);
+        }
 
         return assignment;
     }

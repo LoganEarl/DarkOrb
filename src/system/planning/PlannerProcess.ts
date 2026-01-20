@@ -1,11 +1,11 @@
-import {Process} from "core/Process";
-import {getRoomData, getShardData} from "system/scouting/ScoutInterface";
-import {FEATURE_VISUALIZE_PLANS} from "utils/featureToggles/FeatureToggleConstants";
-import {getFeature} from "utils/featureToggles/FeatureToggles";
-import {profile} from "utils/profiler/Profiler";
-import {ScheduledJob} from "utils/ScheduledJob";
-import {drawPlacedStructureGroup} from "./PlannerLogic";
-import {_shardPlannerSystem} from "./ShardPlannerSystem";
+import { Process } from "core/Process";
+import { getRoomData, getShardData } from "system/scouting/ScoutInterface";
+import { FEATURE_VISUALIZE_PLANS } from "utils/featureToggles/FeatureToggleConstants";
+import { getFeature } from "utils/featureToggles/FeatureToggles";
+import { profile } from "utils/profiler/Profiler";
+import { ScheduledJob } from "utils/ScheduledJob";
+import { drawPlacedStructureGroup } from "./PlannerLogic";
+import { _shardPlannerSystem } from "./ShardPlannerSystem";
 
 @profile
 export class PlannerProcess extends Process {
@@ -13,7 +13,7 @@ export class PlannerProcess extends Process {
 
     roomScanner: ScheduledJob = new ScheduledJob(_shardPlannerSystem._rescanRooms, _shardPlannerSystem, 30);
     buildingQueuer: ScheduledJob = new ScheduledJob(_shardPlannerSystem._queueBuildings, _shardPlannerSystem, 10);
-    planningRunner: ScheduledJob = new ScheduledJob(_shardPlannerSystem._continuePlanning, _shardPlannerSystem, 3)
+    planningRunner: ScheduledJob = new ScheduledJob(_shardPlannerSystem._continuePlanning, _shardPlannerSystem, 1)
 
     constructor() {
         super("PlannerProcess", 3);

@@ -1,6 +1,6 @@
-import {getRoomData} from "system/scouting/ScoutInterface";
-import {Log} from "utils/logger/Logger";
-import {findStructure} from "utils/StructureFindCache";
+import { getRoomData } from "system/scouting/ScoutInterface";
+import { Log } from "utils/logger/Logger";
+import { findStructure } from "utils/StructureFindCache";
 
 export class RoomPlannerSystem {
     public roomName: string;
@@ -49,6 +49,17 @@ export class RoomPlannerSystem {
                 remainingSites,
                 remainingBuildings
             );
+
+            for (let index = 0; index < plan.minerLinks!.length && remainingSites > 0; index++) {
+                remainingSites -= this.planGroup(
+                    room,
+                    controller.level,
+                    plan.minerLinks![index],
+                    structures,
+                    remainingSites,
+                    remainingBuildings
+                );
+            }
 
             if (controller.level >= 2) {
                 remainingSites -= this.planStructuresByCoord(
@@ -107,10 +118,10 @@ export class RoomPlannerSystem {
 
                 let buildableOneTile = toBuild[y]?.[x] ?? [];
                 //Only one csite per tile, even if you can have >1 structure per tile. Place non-roads first
-                buildableOneTile.sort((a,b) => {
-                    if(a === b) return 0
-                    if(a === STRUCTURE_ROAD) return 1
-                    if(b === STRUCTURE_ROAD) return -1
+                buildableOneTile.sort((a, b) => {
+                    if (a === b) return 0
+                    if (a === STRUCTURE_ROAD) return 1
+                    if (b === STRUCTURE_ROAD) return -1
                     return 0;
                 })
                 for (let buildable of toBuild[y]?.[x] ?? []) {

@@ -9,7 +9,8 @@ import {
     ANALYTICS_ARTIFICER,
     ANALYTICS_GOSS_INCOME,
     ANALYTICS_SPAWNING,
-    ANALYTICS_PRIEST
+    ANALYTICS_PRIEST,
+    ANALYTICS_EXPENDATURE
 } from "system/storage/AnalyticsConstants";
 import { getEnergyPerTick, getMainStorage } from "system/storage/StorageInterface";
 import { getWorkDetails } from "./WorkerInterface";
@@ -19,6 +20,7 @@ import { drawBar, roomPos } from "../../utils/UtilityFunctions";
 import { unpackPos } from "../../utils/Packrat";
 import { getNode, registerNode } from "../hauling/HaulerInterface";
 import { Traveler } from "../../utils/traveler/Traveler";
+import { Log } from "utils/logger/Logger";
 
 //Building takes 5x energy per work part. Given that, if there is a lot of building to do we need to scale back our work body parts
 //Otherwise we will crash our eco by overdrawing
@@ -26,7 +28,7 @@ const CONSTRUCTION_PROGRESS_REQUIRED_FOR_REDUCED_WORK = 5000
 
 //If we go above this amount, we will double our worker output. Below, and we will halve it to save E. Below emergency, and we will 
 //reduce to barely anything. 1 e per category
-const DOUBLE_EXPENDATURE_ENERGY_THRESHOLD = 100000
+const DOUBLE_EXPENDATURE_ENERGY_THRESHOLD = 500000
 const HALF_EXPENDATURE_ENERGY_THRESHOLD = 50000
 const EMERGENCY_ENERGY_THRESHOLD = 5000
 
@@ -184,26 +186,25 @@ export class RoomWorkSystem {
             return;
         }
 
-        //TODO this is closeish. Will become increasingly wrong as we add new systems that spend energy that aren't work though...
-        let availableEnergy =
-            getEnergyPerTick(this.roomName, ANALYTICS_GOSS_INCOME) +
-            getEnergyPerTick(this.roomName, ANALYTICS_SPAWNING) -
-            getEnergyPerTick(this.roomName, ANALYTICS_ARTIFICER) -
-            getEnergyPerTick(this.roomName, ANALYTICS_PRIEST);
+        let grossIncome = getEnergyPerTick(this.roomName, ANALYTICS_GOSS_INCOME)
+
+
+        //Tried doing smarter things... it didn't work. Just keep it super simple
+        let availableEnergy = grossIncome * 0.4
 
         //TODO temporary measure to burn off excesses. Needs to get replaced with a larger room control and budgeting system eventually
         let storage = getMainStorage(this.roomName);
         let haveHighCapacityStorage = (storage?.store.getCapacity(RESOURCE_ENERGY) ?? 0) > 10000
         if (haveHighCapacityStorage) {
             let highCapacity = (storage?.store.getUsedCapacity(RESOURCE_ENERGY) ?? 0) > DOUBLE_EXPENDATURE_ENERGY_THRESHOLD
-            let lowCapacity = (storage?.store.getUsedCapacity(RESOURCE_ENERGY) ?? 0) < HALF_EXPENDATURE_ENERGY_THRESHOLD
             let emergencyLow = (storage?.store.getUsedCapacity(RESOURCE_ENERGY) ?? 0) < EMERGENCY_ENERGY_THRESHOLD
+            let lowCapacity = (storage?.store.getUsedCapacity(RESOURCE_ENERGY) ?? 0) < HALF_EXPENDATURE_ENERGY_THRESHOLD
             if (highCapacity) {
                 availableEnergy *= 2;
-            } else if (lowCapacity) {
-                availableEnergy *= 0.5;
             } else if (emergencyLow) {
                 availableEnergy = 2
+            } else if (lowCapacity) {
+                availableEnergy *= 0.5;
             }
         }
 

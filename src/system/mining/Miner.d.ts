@@ -5,11 +5,11 @@ type MinerState =
 type MinerStopReason =
     | "PathBlocked" //We can't get to the mining site
     | "NoMapData" //We are missing scouting data for the room
-    | "Attacked" //The mining site is dangerous
     | "ForeignOwnership" //Somebody else claimed the room
     | "ForeignReservation" //Somebody else reserved the site
     | "NoHomeRoom" //Home room is missing. Mining system should be destroyed with time
-    | "Mandated"; //We were told to stop
+    | "Mandated" //We were told to stop
+    | string; //For custom fomats (like being attacked in a specific room
 type MinerCurrentBehavior =
     | "Mining"  //Normal mining. Expect full resource output
     | "Traveling" //On their way to the source

@@ -1,4 +1,4 @@
-import {findStructure} from "./StructureFindCache";
+import { findStructure } from "./StructureFindCache";
 
 export function hasRespawned() {
     // server reset or sim
@@ -275,7 +275,7 @@ export function maxBy<T>(objects: T[], iteratee: (obj: T) => number | false): T 
 
 export function groupBy<T>(objects: T[], keyGetter: ((obj: T) => string)): Map<string, T> {
     let map: Map<string, T> = new Map()
-    for(let o of objects) {
+    for (let o of objects) {
         map.set(keyGetter(o), o);
     }
     return map;
@@ -283,7 +283,7 @@ export function groupBy<T>(objects: T[], keyGetter: ((obj: T) => string)): Map<s
 
 export function removeItem<T>(objects: T[], toRemove: T) {
     let index = objects.indexOf(toRemove);
-    if(index !== -1) {
+    if (index !== -1) {
         objects.splice(index, 1);
     }
     return objects
@@ -349,7 +349,7 @@ export function findPositionsInsideRect(x1: number, y1: number, x2: number, y2: 
             if (x < 0 || x >= 50 || y < 0 || y >= 50) continue;
 
             // Otherwise pass the x and y to positions
-            positions.push({x, y});
+            positions.push({ x, y });
         }
     }
 

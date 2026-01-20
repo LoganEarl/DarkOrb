@@ -30,6 +30,7 @@ export class SourceMinerSystem implements MemoryComponent {
     private miningStandSpaces: RoomPosition[] = [];
     private creepAssignments: { [creepName: string]: MinerAssignment } = {};
     private configs: CreepConfig[] = [];
+    private requiredPeacefulRoomNames: string[] = [];
 
     public targetWorkParts: number = 0;
 
@@ -106,6 +107,11 @@ export class SourceMinerSystem implements MemoryComponent {
                 this.clearStopReason("PathBlocked");
                 this.memory!.pathCost = path.cost;
                 this.memory!.pathLength = path.path.length;
+                this.requiredPeacefulRoomNames = path.path
+                    .map(pos => pos.roomName)
+                    .filter((value, index, self) => {
+                        return self.indexOf(value) === index;
+                    })
             } else {
                 this.addStopReason("PathBlocked");
             }
@@ -210,9 +216,10 @@ export class SourceMinerSystem implements MemoryComponent {
         if (room) {
             scoutRoom(room);
         }
-        let roomData = getRoomData(this.roomName);
-        if ((roomData?.hazardInfo?.numCombatants ?? 0) > 0) this.addStopReason("Attacked");
-        else this.clearStopReason("Attacked");
+
+        for (let roomName of this.requiredPeacefulRoomNames) {
+            this.stopIfAttacked(roomName);
+        }
 
         if (creeps.length) {
             if (this.memory!.state === "Active") {
@@ -225,8 +232,6 @@ export class SourceMinerSystem implements MemoryComponent {
                     //Only scout and check threats if the creep is outside the main room
                     if (creep.room.name !== this.roomName) {
                         scoutRoom(creep.room);
-                        let threats = (getRoomData(creep.room.name)?.hazardInfo?.numCombatants ?? 0) > 0;
-                        if (threats) this.addStopReason("Attacked");
                     }
 
                     if (this.miningStandSpaces.length < creeps.length && creep.memory.jobName === "Primordial") {
@@ -275,6 +280,13 @@ export class SourceMinerSystem implements MemoryComponent {
             });
             postAnalyticsEvent(this.parentRoomName, 0, this.handle);
         }
+    }
+
+    private stopIfAttacked(roomName: string) {
+        let roomData = getRoomData(roomName);
+        let stopReason = "Attacked:" + roomName;
+        if ((roomData?.hazardInfo?.numCombatants ?? 0) > 0) this.addStopReason(stopReason);
+        else this.clearStopReason(stopReason);
     }
 
     private clearStopReason(reason: MinerStopReason) {

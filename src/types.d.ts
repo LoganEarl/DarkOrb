@@ -1,5 +1,5 @@
 // example declaration file - remove these and add your own custom typings
-import {ProcessRunner} from "core/ProcessRunner";
+import { ProcessRunner } from "core/ProcessRunner";
 // memory extension samples
 declare global {
     interface RoomMemory {
@@ -28,6 +28,7 @@ declare global {
             toggleFeature: (feature: string) => boolean;
             spawnQueues: () => void;
             showPlannedRooms: () => void;
+            replanRoom: (roomName: string) => void
         }
     }
 }

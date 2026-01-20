@@ -64,7 +64,7 @@ interface RoomThreatInfo extends TTLData {
 interface RoomPathingInfo extends TTLData {
     //(if present. If not present it is just the largest open area)
     pathableExits: string[]; //Exits reachable from the rally position
-    packedRallyPos: string; //The position of the largest open area reachable from the controller
+    packedRallyPos?: string; //The position of the largest open area reachable from the controller
 }
 
 interface RoomScoutingInfo {

@@ -161,9 +161,9 @@ class ShardScoutSystem implements MemoryComponent {
                         Log.i(`${scout.name} has finished scouting ${assignment}`);
                         if (!clusters[i].includes(assignment)) {
                             clusters[i].push(assignment);
-                            saveMapData();
                             updateMemory(this);
                         }
+                        saveMapData();
                         delete this.scoutAssignments[scout.name];
                     }
                 } else {

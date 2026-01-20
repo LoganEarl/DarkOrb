@@ -1,15 +1,27 @@
-import {Log} from "utils/logger/Logger";
-import {RoomWorkSystem} from "./RoomWorkerSystem";
-import {getRoomData} from "../scouting/ScoutInterface";
-import {deleteWorkDetail, getWorkDetailById, registerWorkDetail} from "./WorkerInterface";
-import {registerResetFunction} from "../../utils/SystemResetter";
-import {roomPos} from "../../utils/UtilityFunctions";
-import {packPos} from "../../utils/Packrat";
+import { Log } from "utils/logger/Logger";
+import { RoomWorkSystem } from "./RoomWorkerSystem";
+import { getRoomData } from "../scouting/ScoutInterface";
+import { deleteWorkDetail, getWorkDetailById, registerWorkDetail } from "./WorkerInterface";
+import { registerResetFunction } from "../../utils/SystemResetter";
+import { roomPos } from "../../utils/UtilityFunctions";
+import { packPos } from "../../utils/Packrat";
 
 const SCAN_INTERVAL = 20;
 const RAMP_BUCKET_SIZE = 40000;
 //How much over the current bucket we will upgrade a given ramp before calling it good
 const RAMP_BUCKET_BUFFER = 10000;
+
+const MAX_RAMP_SIZE_BY_RCL = [
+    0, //No such thing as rcl 0
+    0, //No ramps at rcl 1
+    300000,
+    1000000,
+    3000000,
+    10000000,
+    15000000, //Scale it back a bit. Don't need to keep max hp ramps
+    30000000,
+    60000000,
+]
 
 class ShardWorkerSystem {
     private roomWorkSystems: { [roomName: string]: RoomWorkSystem } = {};
@@ -96,8 +108,9 @@ class ShardWorkerSystem {
                 this.updateLowRampRepair(bestRoom, lowRamps);
 
 
+                let maxWallHeight = MAX_RAMP_SIZE_BY_RCL[room.controller?.level ?? 0]
                 let reinforcementTargets = rampartsAndWalls.filter(
-                    r => r.structureType !== STRUCTURE_RAMPART || r.hits > RAMP_BUCKET_SIZE
+                    r => r.structureType !== STRUCTURE_RAMPART || (r.hits > RAMP_BUCKET_SIZE && r.hits < maxWallHeight)
                 );
                 let lowestWallBucket: (StructureWall | StructureRampart)[] = [];
                 let minBucket: number | undefined;
@@ -123,7 +136,7 @@ class ShardWorkerSystem {
         let workTargets: { [targetId: string]: WorkTarget } = existingWorkDetail?.targets ?? {};
         for (let pos of upgraderPositions ?? []) {
             let targetId = `${pos.x}:${pos.y}:${!room.controller!.id}`
-            if(workTargets[targetId]) {
+            if (workTargets[targetId]) {
                 workTargets[targetId].currentProgress = room.controller!.progress
             } else {
                 workTargets[targetId] = {
@@ -191,7 +204,7 @@ class ShardWorkerSystem {
 
     private updateStructureRepair(system: RoomWorkSystem, structures: Structure[]) {
         let workDetailId = "RepairStructures" + system.roomName
-        let existingDetail = getWorkDetailById(system.roomName, workDetailId )
+        let existingDetail = getWorkDetailById(system.roomName, workDetailId)
         if (structures.length) {
             let targets: { [targetId: string]: WorkTarget } = existingDetail?.targets ?? {};
             for (let structure of structures) {
@@ -251,7 +264,7 @@ class ShardWorkerSystem {
                     workerPools: ["Workers", "EmergencyRepairers"]
                 });
             }
-        } else if (Object.values(existingWorkDetail?.targets ?? {}).length === 0){
+        } else if (Object.values(existingWorkDetail?.targets ?? {}).length === 0) {
             deleteWorkDetail(system.roomName, workDetailId);
         }
     }
